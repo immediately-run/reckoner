@@ -584,6 +584,14 @@ relations from the stdlib vocabulary → capture fixtures via the freeze flow (t
 optionally invoke the independent second agent for intent-derived tests → present
 formula + tests + result + kind-coverage in one review surface.
 
+The draft **standing system prompt** for the formula-authoring agent is
+[assistant/FORMULA_AUTHORING_PROMPT.md](assistant/FORMULA_AUTHORING_PROMPT.md) — it encodes
+the syntax contract (§3.1), the authoring loop, the test-kind rules, fenced-data handling,
+and the live/gated write boundary, with a design-rationale section mapping each part to its
+finding. Load-bearing behaviors (holdout, kind-weighted review) are stated there as facts
+about the environment and *enforced by the harness*, not left to prompt discipline. The
+prompt is part of the surface E-6 (the RQ-A5 agent-loop gate) evaluates.
+
 ### 8.4 Report generation (PD-3), sequenced honestly inside v1
 
 Plan-then-generate, per report RQ-F2/F3:
