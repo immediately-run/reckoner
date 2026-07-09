@@ -44,6 +44,14 @@ which (Q3 egress-fixing) is not merely unbuilt but **undesigned**. Track 2's Q3 
 sprint is therefore the first platform work item (§10 M0), because it is the single most
 load-bearing gap (spec §4.5) and its design could plausibly force changes elsewhere.
 
+**Standing on unbuilt platform functionality is not a defect of this plan — it is the
+point.** Reckoner is deliberately the **forcing function** for these platform capabilities
+(the platform spec's own framing, spec §0): each delta gets designed and built against a
+real, demanding consumer rather than speculatively, which is how the platform avoids
+shipping security machinery whose requirements were guessed. The milestone gates in §10
+exist to sequence that forcing honestly (nothing shared ships before its backstops), not to
+hedge against the dependency itself.
+
 ---
 
 ## 2. System overview
@@ -674,10 +682,13 @@ sprint (D2).
 
 **Plan-specific risks:**
 
-- **R-1 (schedule, from PD-1):** seven platform deltas gate M3; one undesigned. If D2's
-  design sprint uncovers a blocker, the fallback is explicit: ship M1/M2 (static +
-  authoring) as the public product and hold live behind the gate — the milestone structure
-  makes this a scope cut, not a redesign.
+- **R-1 (schedule, from PD-1):** seven platform deltas gate M3; one undesigned. The
+  dependency itself is intentional — Reckoner is the forcing function for these platform
+  capabilities (§1), so "blocked on platform work" is the program working as designed, not
+  a planning failure. The residual risk is purely schedule-shaped, and the fallback is
+  explicit: if D2's design sprint uncovers a blocker, ship M1/M2 (static + authoring) as
+  the public product and hold live behind the gate — the milestone structure makes this a
+  scope cut, not a redesign.
 - **R-2 (isolation honesty, from PD-6):** between M1 and AA-01 landing, the four "realms"
   share an appKey. Nothing shared ships in that window; dev/demo materials must not claim
   isolation before D7's gate is green.
