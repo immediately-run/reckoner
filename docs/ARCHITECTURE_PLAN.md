@@ -624,6 +624,13 @@ The composite root and the only realm a pure viewer ever needs.
   author's code in your browser; live reports fetch only from sources you approve, and
   nothing here can reach your other data."* — written into chrome last, in M4, when it is
   true (research proposal sequencing).
+- **Key user flows and UI design:** the enumerated flows (zero-consent open, params
+  drill, value-provenance inspection via the cell inspector, histogram
+  re-bin/`drillTo`, worksheet navigation, assistant/form/editor authoring paths, freeze
+  moment) and the commissioned UI design live in the docs repo:
+  `design-briefs/reckoner/00-reckoner-ui.md`, with the benchmark port case study
+  (the Meridian SaaS exec-metrics workbook — also the E-1 bake-off corpus and an F1
+  catalog stress test) in `design-briefs/reckoner/01-benchmark-case-study.md`.
 
 ---
 
