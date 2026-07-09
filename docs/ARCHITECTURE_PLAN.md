@@ -166,59 +166,126 @@ my-dashboard/                     # the document root (a mount: space, repo dir,
     ops.mdx
 ```
 
-### 3.1 Worksheets and cells
+### 3.1 Worksheets and cells — the formula syntax
 
 A worksheet is a JS module **evaluated only inside the engine's SES compartment**. Module
 evaluation *is* content execution, which is exactly what the engine realm exists to do. The
 module registers cells declaratively; the engine extracts the dependency graph from the
 registrations and publishes it (names + declared inputs only, no values) to the scheduler.
+Imports resolve only to `@reckoner/stdlib` (the compartment controls module resolution).
+
+Each cell is a named export created by one constructor, with a three-part shape — `doc`,
+`inputs`, `formula` — that follows directly from report RQ-A1/A2:
 
 ```js
 // worksheets/revenue.sheet.js
+import { cell, testCell, table, sum, conservation, permutationInvariance,
+         expectClose } from "@reckoner/stdlib";
+
 export const by_month = cell({
   doc: "Monthly revenue, EUR-normalized",
-  inputs: ["feeds.orders", "static.fx_rates", "params.region"],
-  formula: ({ orders, fx_rates, region }) =>
+  inputs: {
+    orders: "feeds.orders",        // local name → declared path
+    fx:     "static.fx_rates",
+    region: "params.region",
+  },
+  formula: ({ orders, fx, region }) =>
     table(orders)
-      .filter(o => region === "all" || o.region === region)
-      .join(fx_rates, { on: "currency" })
+      .filter(r => region === "all" || r.region === region)
+      .join(fx, { on: "currency" })
       .derive({ eur: r => r.amount * r.rate })
       .groupBy("month")
-      .rollup({ revenue: sum("eur") }),
-});
-
-export const by_month_conserves = testCell({
-  kind: "metamorphic",                    // characterization | specification | metamorphic | property
-  subject: "revenue.by_month",
-  inputs: ["fixtures.orders_2026_06", "static.fx_rates"],
-  relation: conservation({
-    of: "revenue",
-    partitionedBy: "month",
-    equalsUnpartitionedTotal: true,
-  }),
+      .rollup({ revenue: sum("eur") })
+      .rows(),                     // exits sugar back to plain objects
 });
 ```
 
 Binding rules (all load-bearing, all from the report):
 
-- **Inputs are explicit and exhaustive** (RQ-A2). The formula receives exactly its declared
-  inputs as frozen, structurally-shared values — an undeclared read is *unnameable*: there
-  is no ambient `cells` object, no globals, no module-scope escape (SES lockdown removes
-  the intrinsics). Dynamic dependency ("read the cell the viewer picked") is expressed as
-  parameterized dependency: the selector is itself a declared input cell, and indirection
-  targets are restricted to a declared namespace (the Shake/Bazel treatment; never an
-  `INDIRECT()`-style volatile).
+- **`inputs` is an explicit map, and it is the *only* way to see data** (RQ-A2). The
+  evaluator injects exactly the declared inputs as frozen, structurally-shared values — an
+  undeclared read is *unnameable*: no ambient `cells` object, no globals, no module-scope
+  escape (SES lockdown removes the intrinsics). That is what makes Class B unreachable by
+  construction and gives the scheduler, taint fold, and test runner an exact dependency
+  set. The **object form** (local name → path) rather than a positional array is an
+  agent-ergonomics decision: it eliminates the "which positional arg was which"
+  mis-serialization failure class (RQ-A5's platform scar tissue).
+- **`formula` is a pure function: plain values in, one plain value out.** Return values
+  are JSON-ish data (rows as arrays of plain objects, scalars, nested plain structures) —
+  never class instances or closures. Plain immutable values are also what makes early
+  cutoff cheap (RQ-B1: reference-equality fast path + content hashing), so the syntax
+  simply cannot produce un-hashable results.
 - **Names, not coordinates.** Cells are referenced `worksheet.cell`; the namespaces are
   `feeds.*`, `fixtures.*`, `static.*`, `params.*`, and `<worksheet>.*`.
 - **Purity is layered, not assumed** (RQ-A4): SES `lockdown()` + Compartment (no ambient
-  `Date.now`/`Math.random`), frozen inputs, virtualized nondeterminism (`params.now` is a
-  cell if a formula needs time), double-evaluation spot checks in authoring/CI. Accepted
-  residuals per the report: perf nondeterminism, float associativity, infinite loops —
-  the last handled by a worker watchdog at the engine boundary, not by the language.
-- **Tests are cells** (RQ-D1) with a mandatory `kind` label (report workstream D preamble).
-  A cell whose only coverage is `characterization` tests derived from its own fitting data
-  renders as *visibly unvalidated* in the review surface — the same visual class as
-  untested.
+  `Date.now`/`Math.random`), frozen inputs, virtualized nondeterminism,
+  double-evaluation spot checks in authoring/CI. Accepted residuals per the report: perf
+  nondeterminism, float associativity, infinite loops — the last handled by a worker
+  watchdog at the engine boundary, not by the language.
+
+**Dynamic dependencies — parameterized, never `INDIRECT()`** (RQ-A2). A formula that needs
+"the cell the viewer picked" declares the *selector* as an input and indirects only within
+a **declared namespace** — the Shake/Bazel treatment, with Excel's volatile `INDIRECT()`
+as the named anti-pattern. The engine computes the conservative dependency set
+(`revenue.*`) statically; nothing recalculates every cycle, nothing outside the namespace
+is nameable:
+
+```js
+export const focus_metric = cell({
+  inputs: {
+    which:      "params.metric",   // the selector is itself a declared input
+    candidates: "revenue.*",       // declared namespace indirection
+  },
+  formula: ({ which, candidates }) => candidates[which],
+});
+```
+
+**Feeds and time — declared, snapshotted, windowed** (RQ-A3/A4). A feed is a frozen
+snapshot per recalculation — just another input. History is opt-in via an explicit window
+declared *at the input site*, never conjured inside the formula; the clock is a cell, not
+an ambient API:
+
+```js
+export const orders_last_hour = cell({
+  inputs: { recent: { feed: "orders", window: "1h" } },  // event-time window over the buffer
+  formula: ({ recent }) => recent.length,
+});
+
+export const staleness = cell({
+  inputs: { now: "params.now", fetched_at: "feeds.orders.meta.fetched_at" },
+  formula: ({ now, fetched_at }) => now - fetched_at,
+});
+```
+
+**Tests are cells with a mandatory `kind`** (RQ-D1 + workstream D preamble). A test's value
+is a structured pass/fail record carrying its kind; under infer-then-fortify a green suite
+means nothing without the label, because characterization tests pinned from the formula's
+own fitting data are green by construction. A cell whose only coverage is such tests
+renders as *visibly unvalidated* — the same visual class as untested:
+
+```js
+export const by_month_holdout = testCell({
+  kind: "specification",           // characterization | specification | metamorphic | property
+  subject: "revenue.by_month",
+  inputs: { rows: "fixtures.orders_holdout" },   // rows withheld from the fitting context
+  expect: ({ result }) =>
+    expectClose(result.find(m => m.month === "2026-05").revenue, 48_120, { rel: 0.01 }),
+});
+
+export const by_month_conserves = testCell({
+  kind: "metamorphic",
+  subject: "revenue.by_month",
+  inputs: { orders: "fixtures.orders_2026_06", fx: "static.fx_rates" },
+  relation: conservation({ of: "revenue", partitionedBy: "month" }),
+});
+
+export const by_month_order_free = testCell({
+  kind: "metamorphic",
+  subject: "revenue.by_month",
+  inputs: { orders: "fixtures.orders_2026_06", fx: "static.fx_rates" },
+  relation: permutationInvariance({ over: "orders" }),
+});
+```
 
 ### 3.2 The formula API surface (committed, PD-4)
 
@@ -231,15 +298,31 @@ enough to hold (**well under 20 top-level callables**, report RQ-A5), additive-o
   "other" bucket), `derive`, `filter`.
 - **Testing:** `testCell()`, `expectEqual`/`expectClose`, `property()` (PBT),
   `conservation()`, `permutationInvariance()`, `scaleInvariance()` — metamorphic relations
-  as named stdlib citizens (report RQ-D5).
+  as named stdlib citizens (report RQ-D5): they are the non-circular correctness evidence
+  in a workflow where nobody knows the "true" formula.
 - **Screening (assistant-facing, §8.3):** `trend()`, `outliers()`, `deltas()` — the
   computed message-finding tools, themselves pure formulas.
 
 Every callable ships a JSON-Schema-typed self-description with purpose line, per-parameter
 descriptions, enums for closed choices, and 1–2 worked examples (RQ-A5); the catalog of
 self-descriptions is a first-class evaluated artifact with its own gate test (§11). The
-fluent `table()` API is a thin layer over the plain-value core — same semantics, no second
-engine.
+fluent `table()` API is a thin layer over the plain-value core — `table(rows)…rows()` in,
+plain rows out; same semantics, no second engine, no separate columnar runtime.
+
+**Deliberately absent — the absences are findings too:**
+
+- **No SQL strings** (RQ-A1): opaque to diff review and the additive-only contract; blurs
+  into a query engine.
+- **No ambient anything** (RQ-A2/A4): no `fetch`, no `console` (diagnostics go through the
+  typed host channel, §4.3), no clock/random, no cell registry.
+- **No stateful notebook cells:** a cell cannot assign to another cell or hold state
+  across evaluations — that restriction is what keeps recalculation, testing, and trace
+  replay sound.
+- **No large launch surface** (RQ-A5 + additive-only caveat): a mis-designed stdlib
+  function can never be removed, so v1 errs toward too little, not too complete.
+
+This exact surface is what the M0 bake-off (E-1, §11) validates from the self-descriptions
+alone, with the written promotion rule if SQL-hybrid wins by ≥10 points.
 
 ### 3.3 Templates
 
