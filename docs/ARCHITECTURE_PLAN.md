@@ -39,10 +39,18 @@ product decision, not an engineering one.
 | PD-6 | Repo topology | **One repo (`reckoner`), realms as sibling entry points; AA-01 booked as an in-program dependency** | AA-01 (program-identity `appKey`, `AGENT_AUTHORING §5.1`) becomes the **seventh** platform delta this program owns. **Honesty note:** until AA-01 lands, all entry points in one repo share an `appKey`, so realm grant isolation is *fiction* — acceptable for development, and a hard gate before anything shared or live ships (§9, §10). |
 
 **The honest one-line consequence of PD-1/PD-5/PD-6:** this is a two-track program. Track 1
-is the Reckoner app; Track 2 is seven platform deltas (six from spec §8 plus AA-01), one of
-which (Q3 egress-fixing) is not merely unbuilt but **undesigned**. Track 2's Q3 design
-sprint is therefore the first platform work item (§10 M0), because it is the single most
-load-bearing gap (spec §4.5) and its design could plausibly force changes elsewhere.
+is the Reckoner app; Track 2 is **nine platform deltas** (six from spec §8, plus AA-01, plus
+the launch-to-run/standing-app-lifecycle capability the per-instance delegation rides, plus
+the redacted-mount-view holdout mechanism — §9), two of which are not merely unbuilt but
+**undesigned** (Q3 egress-fixing; the redacted-mount view). Track 2's Q3 design sprint is
+the first platform work item (§10 M0), because it is the single most load-bearing gap
+(spec §4.5) and its design could plausibly force changes elsewhere.
+
+> *(Adversarial-review-1 reconciliation, 2026-07-09 — the prior text said "seven deltas."
+> The security pass (H4) showed the per-instance `capDir` delegation folded into D1 in fact
+> **rides an unbuilt, design-pending launch-to-run/standing-app-lifecycle delta** (spec §4.3,
+> §6.3, §8), and the holdout mechanism (H3) needs its own host delta; both are now booked in
+> §9 as D8/D9. The honest count is nine. See `ADVERSARIAL_REVIEW_1.md`.)*
 
 **Standing on unbuilt platform functionality is not a defect of this plan — it is the
 point.** Reckoner is deliberately the **forcing function** for these platform capabilities
@@ -697,11 +705,17 @@ can ship in v1 (PD-3) because the harness comes first *within* v1.
 
 ---
 
-## 9. The platform workstream — seven deltas (PD-5, PD-6)
+## 9. The platform workstream — nine deltas (PD-5, PD-6)
 
 The safety of everything shared or live rests on these. Each row is a booked workstream
 this program owns, with the spec's gate test as exit criterion. Nothing shared/live ships
 while its gating rows are open.
+
+> *(Adversarial-review-1, 2026-07-09 — D8 and D9 were added when the security pass showed
+> the count was seven only by folding two unbuilt dependencies into other rows: per-instance
+> `capDir` delegation (in D1) rides an unbuilt, design-pending launch-to-run capability (H4),
+> and holdout enforcement (§6) needs a host mechanism the assistant's `rw@self` grant
+> otherwise defeats (H3). See `ADVERSARIAL_REVIEW_1.md`.)*
 
 | # | Delta | Repo(s) | Design status | Exit gate test | Gates |
 |---|---|---|---|---|---|
@@ -712,6 +726,8 @@ while its gating rows are open.
 | D5 | Hardened sandbox profile (per-frame CSP delta on G1a) | sandbox, site-main | needs per-frame-CSP infra | connector frame: `connect-src 'none'` with `net:fetch` surviving via host proxy | live (M3) |
 | D6 | Composite: manifest resolution, composite-aware powerbox (un-bundled TS-5b line, mobile one-member-per-card), inspector + aggregate reach view | site-main | net-new (spec §6) | powerbox tests (badge integrity, un-bundled elevated line); run-mode-first gate (static doc → zero powerbox, desktop + mobile) | shared/live (M3) |
 | D7 | **AA-01 program-identity `appKey`** (per-entry-point identity) | site-main | V2 design of record exists (AGENT_AUTHORING §5.1); unbuilt | sibling-isolation gate: two entry points of one repo hold disjoint grant bundles; engine entry point resolves to an empty bundle | realm isolation being real — anything shared (M2→M3 boundary) |
+| D8 | **Launch-to-run / standing-app-lifecycle** (per-instance delegated launch + keep-warm/teardown that per-instance `capDir` delegation and composite lifecycle ride) | site-main | **design-pending** (STANDING_APP_LIFECYCLE §4.1/§5.1, Open Q#10; rides AA-01) | per-instance-delegation gate: two live instances of one connector `appKey` hold disjoint source grants and independent lifecycle | D1 per-instance tiering + D6 composite lifecycle (live/shared, M3) |
+| D9 | **Redacted-mount-view for holdout** (the assistant's read tool returns only the training split during inference, so held-out fixtures are unreadable even under `rw@self`) | site-main (+ SDK fs surface) | **UNDESIGNED** — net-new; fights the standing `rw@self` grant | holdout-enforcement gate: an inference-mode agent with `rw@self` over the document cannot read the withheld rows; blind second-agent authoring cannot read the implementation/fitting data | holdout + blind-authoring being real, not prompt discipline (H3) — testing story (M2) |
 
 Design content for D2 is already fixed by the report (RQ-E1) — the sprint's job is the
 host-side design doc + adversarial pass, not research: allowlist of scheme+host+port;
