@@ -324,44 +324,115 @@ plain rows out; same semantics, no second engine, no separate columnar runtime.
 This exact surface is what the M0 bake-off (E-1, §11) validates from the self-descriptions
 alone, with the written promotion rule if SQL-hybrid wins by ≥10 points.
 
-### 3.3 Templates
+### 3.3 Templates — the template language
 
-Non-executable MDX subset (spec §3.4): bindings are declarative attributes
-(`<Chart source="revenue.by_month" kind="line" />`), never expressions; unknown components
-render as safe placeholders. Interactivity is declarative and feeds back into `params.*`
-input cells:
+**The substrate: MDX syntax with computation removed.** A template *looks* like MDX —
+markdown prose interleaved with JSX-style component tags — but it renders through the
+host/SDK **no-acorn render-as-data** safe renderer (spec §3.4, platform delta D3), which
+changes what the syntax means:
+
+- **Markdown renders as markdown** — headings, paragraphs, lists, links; the prose layer
+  of a report is ordinary writing.
+- **Component tags are data, not code:** a tag is parsed to a node (name + attributes);
+  the renderer looks the name up in the closed catalog and instantiates the *audited*
+  component. The author's document never contributes executable code.
+- **Expressions never evaluate.** There is no evaluator in the pipeline: an expression
+  body is captured as an inert string (the verified test case: `f={fetch("/x")}` arrives
+  as literal text). Same for anything that would be an event handler.
+- **No imports/exports/ESM** — the catalog is fixed by the app (or a fork of it).
+- **Unknown components render as a safe placeholder** — a visible "this report uses
+  `<Timeline>`, which this app doesn't provide" block; never a page-killing error, never
+  silent omission. This is also the fork story (spec §3.5): component *definitions* are
+  app source (audited by the fork author), component *usages* are content, and a document
+  using fork components degrades gracefully in stock Reckoner.
+- **Attribute values are literals only:** strings, numbers, booleans, and literal
+  arrays/objects (`options={["all","emea"]}` is captured as plain data by the
+  render-as-data path). Anything non-literal is inert text.
+
+Opening a stranger's dashboard is therefore safe **by grammar**, not by sandbox heroics.
+
+**Data binding: the `source` attribute.** All data flows through declarative attribute
+references resolved by the renderer — never interpolation
+(`<Kpi source="revenue.total" />` is the one way to bind; `{cells.revenue.total}` renders
+as text). The binding grammar is the formula language's dotted-name namespace:
+`worksheet.cell`, `feeds.*` (rare — usually bind the cell that shaped the feed), and
+`params.*` (echo a viewer selection in prose via `<Value source="params.region" />`).
+Resolution mechanics, all load-bearing:
+
+1. The renderer collects every `source` in the document and subscribes to those names on
+   the **host-tiered result channel**. A template's reads are enumerable by inspection —
+   it can only display what it names, and the host knows the full set statically.
+2. When the engine recomputes a bound cell, the component re-renders. Liveness is entirely
+   the binding's doing; the template stays a static document.
+3. Values arrive **with their tier**, so shared-view chrome can badge low-trust-derived
+   tiles; a template never touches values (only names them), so it cannot launder.
+4. **Shape contracts are the component's job** (`Kpi` wants a scalar, `Chart` wants rows
+   with the encoded fields); a mis-shaped binding is an authoring-time diagnostic and a
+   marked broken tile in view mode — never a blank or a crash.
+
+**The component catalog** (report RQ-F1 — the closed v1 set; typed attributes with enums
+for closed choices; responsive reflow, dark/light theming, axis/legend correctness, and
+accessible color are built into the components, not author decisions):
+
+| Component | Key attributes | Notes |
+|---|---|---|
+| `Kpi` | `source`, `compare`, `format`, `spark` | stat card; the "just show the number" form |
+| `Chart kind="bar"` | `source`, `x`, `y`, `stack` (`none`/`stacked`/`normalized`), `color` | incl. stacked & 100%-stacked |
+| `Chart kind="line"` | `source`, `x`, `y`, `color` | |
+| `Chart kind="area"` | as line | |
+| `Chart kind="scatter"` | `source`, `x`, `y`, `color`, `size` | |
+| `Chart kind="histogram"` | `source`, `value`, `bins` | |
+| `Chart kind="pie"` | `source`, `value`, `label` | **≤5 slices enforced** — excess auto-buckets to "other" |
+| `Table` | `source`, `columns` (literal list), `sortable` | matrix display |
+| `Map kind="choropleth"/"point"` | `source`, `region`/`lat`/`lon`, `value` | |
+| `Facets` | `source`, `by`, wraps one `Chart` | small-multiples — the endorsed alternative to cramming series |
+
+Plus: markdown prose, `Callout` (`tone`), `Value` (inline bound scalar), one KPI-style
+gauge (the single permitted radial); layout primitives `Section` and `Row` (coarse only —
+components own their internal responsive behavior via container queries, RQ-F5: one
+template, catalog-owned adaptation; per-form-factor overrides are a per-section escape
+hatch); and a `Params` block of input widgets — `Select`, `Toggle`, `Range`, `DateRange`
+(each with `name`, typed `options`/bounds, `default`).
+
+**Excluded by construction** (anti-affordances the catalog makes inexpressible): 3D
+anything, dual-axis by default, pies beyond 5 slices, radial/gauge beyond the one KPI
+gauge, word clouds. Every future addition passes an anti-affordance review.
+
+**Interactivity: widgets write to input cells.** There are no event handlers in the
+language; interaction closes a loop through the workbook:
 
 ```mdx
 <Params>
   <Select name="region" options={["all", "emea", "amer", "apac"]} default="all" />
+  <DateRange name="period" default="last-90d" />
 </Params>
 
 # Weekly revenue.
 
+Showing <Value source="params.region" /> for <Value source="params.period" />.
+
 <Kpi source="revenue.total" compare="revenue.total_prev" />
-<Chart source="revenue.by_month" kind="line" />
-<Table source="churn.by_cohort" />
+<Chart source="revenue.by_month" kind="line" x="month" y="revenue" />
+<Facets source="churn.by_cohort" by="cohort">
+  <Chart kind="bar" x="month" y="churned" />
+</Facets>
 ```
 
-(The `options={[…]}` literal form is data captured by the no-acorn render-as-data path —
-inert values, not evaluated code; anything non-literal is an inert string.)
+A widget's `name` designates a `params.*` **input cell**: the viewer picks EMEA → the host
+writes `params.region` → every formula that declared it recomputes → every bound component
+re-renders. Drill-down, filtering, and re-parameterization are all this one mechanism —
+interaction is pure data flow the dependency graph already understands, and viewer actions
+can never invoke anything, only change declared inputs. Declared `options`/bounds double
+as validation: a widget can only produce values from its literal set.
 
-Component catalog (report RQ-F1) — the closed v1 set, each with typed attributes and
-built-in responsive/theme/accessibility behavior owned by the component, not the author:
+**Degraded states are component-owned** (RQ-C2): bound cell threw → marked broken tile (no
+internals in view mode); unconsented feed → explicit "needs feed access" state with the
+consent affordance; aged-out buffer → "data aged out" — never silent wrong data.
 
-1. `Kpi` (stat card, optional compare/spark), 2. `Chart kind="bar"` (incl. stacked,
-100%-stacked), 3. `kind="line"`, 4. `kind="area"`, 5. `Table` (matrix), 6. `kind="scatter"`,
-7. `kind="histogram"`, 8. `kind="pie"` (**≤5 slices enforced**, else auto-"other"),
-9. `Facets` (small-multiples wrapper), 10. `Map` (choropleth/point) — plus prose,
-`Callout`/annotation, `Params` widgets, and layout primitives (`Row`, `Section`).
-Excluded by construction: 3D anything, dual-axis by default, radial/gauge beyond one KPI
-gauge form, word clouds. Every future addition passes an anti-affordance review.
-
-Responsive: **one template, catalog-owned adaptation** via container queries (RQ-F5);
-per-form-factor overrides exist only as a per-section escape hatch. Degraded states are
-component-owned: a bound cell that errors renders a marked broken tile (no internals in
-view mode); an unconsented feed renders the component in an explicit "needs feed access"
-state; an aged-out buffer renders "data aged out" — never silent wrong data (RQ-C2).
+**Why this also serves generation** (workstream F): the language is a closed,
+deterministic structure — the LLM layout stage picks from audited forms (no escape into
+HTML/JS), the mechanical lints (§8.4) are checkable on the parse tree, and "make churn
+lead, drop the pie" lands as a small, reviewable diff (RQ-F6).
 
 ### 3.4 Feeds and fixtures
 
