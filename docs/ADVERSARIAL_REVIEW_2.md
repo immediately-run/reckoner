@@ -195,3 +195,26 @@ decision, because they question whether the mechanism earns its place:**
 
 The clear doc-fixes and the two shipped-code bugs (SSRF ranges; the `exists`/method
 fail-open) I can apply/file now; the three above are yours.
+
+## Dispositions — all applied 2026-07-09
+
+Three premise decisions (user): **holdout → best-effort tripwire, metamorphic/mutation
+load-bearing**; **glitch-free + accept depth staleness (common-epoch barrier)**; **full D2
+revision**. Applied:
+
+- **Plan** (`35daa61`, `56e1097`): recalc invariants corrected in §4.1/§4.2/§5.3/§11 (circuit
+  breaker, soft/hard timeout split, common-epoch barrier + the stated freshness/glitch-freedom
+  trade, depth·max(c,e) bound, params-leaf/literal-namespace, consent-elevation exception, six
+  hardened E-2 tests); testing story re-scoped in §6; §13 records all decisions; D2/D9 delta
+  rows updated.
+- **D9 spec** (`415b7cd`): re-scoped to tripwire; §5.1 test-oracle channel, §5.2 central
+  reconstruction, §3.1 deny-by-default fs (CODE-GAP A/B), §4 capture-contradiction resolved
+  (OQ-2 closed); gate tests extended (G-HRM-2/3 metadata, G-HRM-7/8).
+- **D2 spec** (`9d55bdb`): §3.1 pinned secret path, §2 host-minted cursors + request-body cap,
+  §2.1 write-sink consent, §4 honest fast-write residual, §5 pass rewritten, verdict "does not
+  suffice to call safe."
+
+**Not yet done — the two shipped-code platform bugs** (SSRF `fe80`-only link-local in
+`netFetch.ts`/`netFetchPolicy.ts`; `filteredFs`/`scopedFs` fail-open method allowlist in
+site-main): to be **filed as issues** against the platform repos, pending confirmation (they
+are real bugs independent of Reckoner, surfaced by this pass).
