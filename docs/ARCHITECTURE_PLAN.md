@@ -76,8 +76,12 @@ the launch-to-run/standing-app-lifecycle capability the per-instance delegation 
 the redacted-mount-view holdout mechanism — §9). Q3 egress-fixing was the most load-bearing
 gap; its **design sprint ran first and is now done**
 (`docs/specs/CONNECTOR_EGRESS_FIXING_SPEC.md`, §10 M0), which found the SSRF proxy already
-built and only the connector target-fixing layer undesigned — now designed. **One delta
-remains undesigned: D9, the redacted-mount-view holdout mechanism (H3).**
+built and only the connector target-fixing layer undesigned — now designed. **D9's design
+sprint also ran** (`docs/specs/HOLDOUT_REDACTED_MOUNT_SPEC.md`): the holdout mechanism is
+path-level (held-out rows at an ungranted `.holdout/` scope, reusing the existing
+`scopedFs`/`attenuateDelta` machinery — no new fs primitive). **Both formerly-undesigned
+deltas are now designed;** all nine have a design of record, and the remaining work is build,
+not design.
 
 > *(Adversarial-review-1 reconciliation, 2026-07-09 — the prior text said "seven deltas."
 > The security pass (H4) showed the per-instance `capDir` delegation folded into D1 in fact
@@ -742,12 +746,20 @@ architecture, not test-infra niceties:
    emits them as `specification` tests automatically. **This is only real if the agent
    *cannot* read the withheld rows** — but the assistant holds `rw@self` over the document,
    which contains the fixtures, so "the harness withholds a slice from you" is not free from
-   G12. It requires the **redacted-mount-view mechanism (D9)**: during inference the agent's
-   read tool returns only the training split; the held-out fixtures are unreadable even
-   under `rw@self`. Held-out rows are the only example-based tests carrying genuine
-   correctness weight, so this enforcement is load-bearing, not a nicety. Until D9 lands
-   (M2), holdout is prompt discipline with known erosion and must be labeled as such —
-   never presented as enforced.
+   G12. It requires the **redacted-mount-view mechanism (D9,
+   `docs/specs/HOLDOUT_REDACTED_MOUNT_SPEC.md`)**: held-out rows live at an ungranted
+   `.holdout/` scope the assistant's `rw@self` (defined as the enumerated authoring subtrees,
+   never whole-root) does not cover, and are resolved into test-cell evaluation only by the
+   engine's host-brokered injection — the agent *names* `fixtures.orders_holdout` but cannot
+   read its bytes or list it via `readdir` (the `synthesizedChildren` leak is closed by
+   keeping `.holdout/` a top-level sibling). The split is host-performed and pre-agent, so no
+   window exists in which the agent held the full set. Held-out rows are the only
+   example-based tests carrying genuine correctness weight, so this enforcement is
+   load-bearing, not a nicety. Until D9 lands (M2), holdout is prompt discipline with known
+   erosion and must be labeled as such — never presented as enforced. Named residual (spec
+   §5): the agent still sees the *training* split and could model its distribution to
+   reconstruct likely holdout values — weaker than a direct read, backstopped by the
+   metamorphic/mutation legs that hide nothing.
 3. **Metamorphic relations and PBT are stdlib citizens** (§3.2) — non-circular, oracle-free
    correctness checks that agents state well.
 4. **Independent authoring:** the assistant can invoke a second agent that writes
@@ -925,7 +937,7 @@ while its gating rows are open.
 | D6 | Composite: manifest resolution, composite-aware powerbox (un-bundled TS-5b line, mobile one-member-per-card), inspector + aggregate reach view, **host-rendered tier/trust badges** (H2), **manifest↔launch-graph reconciliation** (L2) | site-main | net-new (spec §6) | powerbox tests (badge integrity, un-bundled elevated line); run-mode-first gate (static doc → zero powerbox, desktop + mobile); **reconciliation gate: an undeclared sandbox spawned under the composite root is flagged** (RS-9/RS-11); **tier badge is host-drawn, not app-emittable** | shared/live (M3) |
 | D7 | **AA-01 program-identity `appKey`** (per-entry-point identity) | site-main | V2 design of record exists (AGENT_AUTHORING §5.1); unbuilt | sibling-isolation gate: two entry points of one repo hold disjoint grant bundles; engine entry point resolves to an empty bundle | realm isolation being real — anything shared (M2→M3 boundary) |
 | D8 | **Launch-to-run / standing-app-lifecycle** (per-instance delegated launch + keep-warm/teardown that per-instance `capDir` delegation and composite lifecycle ride) | site-main | **design-pending** (STANDING_APP_LIFECYCLE §4.1/§5.1, Open Q#10; rides AA-01) | per-instance-delegation gate: two live instances of one connector `appKey` hold disjoint source grants and independent lifecycle | D1 per-instance tiering + D6 composite lifecycle (live/shared, M3) |
-| D9 | **Redacted-mount-view for holdout** (the assistant's read tool returns only the training split during inference, so held-out fixtures are unreadable even under `rw@self`) | site-main (+ SDK fs surface) | **UNDESIGNED** — net-new; fights the standing `rw@self` grant | holdout-enforcement gate: an inference-mode agent with `rw@self` over the document cannot read the withheld rows; blind second-agent authoring cannot read the implementation/fitting data | holdout + blind-authoring being real, not prompt discipline (H3) — testing story (M2) |
+| D9 | **Redacted-mount-view for holdout** (held-out fixtures live at an ungranted `.holdout/` scope; resolved into test evaluation only by the engine's host-brokered injection, never readable by the assistant) | site-main (+ SDK fs surface) | **designed 2026-07-09** (`docs/specs/HOLDOUT_REDACTED_MOUNT_SPEC.md`); path-level, reuses `scopedFs` + `attenuateDelta`, no new fs primitive | holdout-enforcement gate: an agent with `rw@self` cannot read the withheld rows or list them via readdir (G-HRM-1..6); blind second-agent scope is intent-only | holdout + blind-authoring being real, not prompt discipline (H3) — testing story (M2) |
 
 The D2 design sprint ran 2026-07-09 → `docs/specs/CONNECTOR_EGRESS_FIXING_SPEC.md`. It found
 the framing sharper than "undesigned": the **SSRF/DNS-rebinding/redirect-resistant proxy is
@@ -994,8 +1006,9 @@ run-mode-first value ordering implies.
 - **C1 transport rig:** the write-notify-read loop measured end-to-end (p95), rate × size
   × transport swept. Exit: the v1 envelope numbers.
 - **AA-01 (D7) implementation start** in site-main (design of record exists); **D9
-  redacted-mount-view design** (net-new; the holdout enforcer) and **D8 launch-to-run
-  design** advanced far enough to unblock M2/M3.
+  redacted-mount-view designed** (`HOLDOUT_REDACTED_MOUNT_SPEC.md` — path-level, reuses
+  `scopedFs`/`attenuateDelta`) and **D8 launch-to-run design** advanced far enough to unblock
+  M2/M3.
 - **E3 reach-view efficacy study designed and started** (review-1 M6): moved ahead of M4 so
   M3 sharing can gate on it (below), mirroring the F4-before-generation rule.
 
@@ -1121,8 +1134,9 @@ sprint (D2).
 
 **Plan-specific risks:**
 
-- **R-1 (schedule, from PD-1):** **nine** platform deltas gate M3; one still undesigned
-  (D9 — D2 was designed 2026-07-09, `CONNECTOR_EGRESS_FIXING_SPEC.md`).
+- **R-1 (schedule, from PD-1):** **nine** platform deltas gate M3; **all now have a design
+  of record** (D2 → `CONNECTOR_EGRESS_FIXING_SPEC.md`, D9 → `HOLDOUT_REDACTED_MOUNT_SPEC.md`,
+  both 2026-07-09) — the remaining risk is build-and-integration, not design discovery.
   The dependency itself is intentional — Reckoner is the forcing function for these platform
   capabilities (§1), so "blocked on platform work" is the program working as designed, not
   a planning failure. The residual risk is purely schedule-shaped, and the fallback is
