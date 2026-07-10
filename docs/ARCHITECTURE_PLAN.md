@@ -73,10 +73,11 @@ product decision, not an engineering one.
 **The honest one-line consequence of PD-1/PD-5/PD-6:** this is a two-track program. Track 1
 is the Reckoner app; Track 2 is **nine platform deltas** (six from spec §8, plus AA-01, plus
 the launch-to-run/standing-app-lifecycle capability the per-instance delegation rides, plus
-the redacted-mount-view holdout mechanism — §9), two of which are not merely unbuilt but
-**undesigned** (Q3 egress-fixing; the redacted-mount view). Track 2's Q3 design sprint is
-the first platform work item (§10 M0), because it is the single most load-bearing gap
-(spec §4.5) and its design could plausibly force changes elsewhere.
+the redacted-mount-view holdout mechanism — §9). Q3 egress-fixing was the most load-bearing
+gap; its **design sprint ran first and is now done**
+(`docs/specs/CONNECTOR_EGRESS_FIXING_SPEC.md`, §10 M0), which found the SSRF proxy already
+built and only the connector target-fixing layer undesigned — now designed. **One delta
+remains undesigned: D9, the redacted-mount-view holdout mechanism (H3).**
 
 > *(Adversarial-review-1 reconciliation, 2026-07-09 — the prior text said "seven deltas."
 > The security pass (H4) showed the per-instance `capDir` delegation folded into D1 in fact
@@ -917,7 +918,7 @@ while its gating rows are open.
 | # | Delta | Repo(s) | Design status | Exit gate test | Gates |
 |---|---|---|---|---|---|
 | D1 | Ingestion taint / output tiering + per-instance `capDir` delegation (spec §4) | site-main (+ SDK fs surface) | designed (TRUST_MODES §5 ext.), unbuilt | ingestion-taint gate: M3-bound output arrives tagged M3; two instances of one connector `appKey` share no source grant | all live/shared |
-| D2 | **Host-enforced connector egress-fixing (spec Q3)** | site-main (host proxy) | **UNDESIGNED — first platform work item (M0 design sprint)** | egress-fixing gate: hostile-connector harness cannot fetch a non-fixed host (incl. redirect/rebinding attacks) | all live |
+| D2 | **Host-enforced connector egress-fixing (spec Q3)** — the connector **target-fixing / request-template layer** over the *already-built* SSRF-pinning proxy | site-main + backend | **designed 2026-07-09** (`docs/specs/CONNECTOR_EGRESS_FIXING_SPEC.md`); the SSRF/rebinding/redirect proxy is **built** (`backend/netFetch.ts`), only the target-fixing layer is unbuilt | egress-fixing gate: metacircular-connector harness cannot cause a request to any host/path outside its frozen feed templates (incl. redirect/rebinding/param-injection); body-fix + per-instance budget bound the TS-4 residual | all live |
 | D3 | Non-executable-MDX safe renderer | immediately-run-sdk | designed + empirically verified (TRUST_MODES §5.1), unbuilt | `f={fetch("/x")}` captured as inert string; no evaluator in the pipeline | all rendering (M1) |
 | D4 | Freeze/write-laundering enforcement (RS-10; rides R3-156 track) | site-main | designed direction, unbuilt | write-laundering gate: silent persist refused; explicit freeze refloors or is refused | freeze UX (M2), shared (M3) |
 | D5 | Hardened sandbox profile (per-frame CSP delta on G1a) | sandbox, site-main | needs per-frame-CSP infra | connector frame: `connect-src 'none'` with `net:fetch` surviving via host proxy | live (M3) |
@@ -926,11 +927,20 @@ while its gating rows are open.
 | D8 | **Launch-to-run / standing-app-lifecycle** (per-instance delegated launch + keep-warm/teardown that per-instance `capDir` delegation and composite lifecycle ride) | site-main | **design-pending** (STANDING_APP_LIFECYCLE §4.1/§5.1, Open Q#10; rides AA-01) | per-instance-delegation gate: two live instances of one connector `appKey` hold disjoint source grants and independent lifecycle | D1 per-instance tiering + D6 composite lifecycle (live/shared, M3) |
 | D9 | **Redacted-mount-view for holdout** (the assistant's read tool returns only the training split during inference, so held-out fixtures are unreadable even under `rw@self`) | site-main (+ SDK fs surface) | **UNDESIGNED** — net-new; fights the standing `rw@self` grant | holdout-enforcement gate: an inference-mode agent with `rw@self` over the document cannot read the withheld rows; blind second-agent authoring cannot read the implementation/fitting data | holdout + blind-authoring being real, not prompt discipline (H3) — testing story (M2) |
 
-The D2 *recipe* is known from the report (RQ-E1), but the **host-enforced design is not
-done** — spec §0/§4.5/§12 Q3 call it the single most load-bearing gap and mark it UNDESIGNED
-(review-1 M3 corrected the earlier "already fixed" phrasing, which undersold the residual).
-The M0 sprint's job is the host-integrated design doc + adversarial pass, not literature
-research; the recipe it must integrate: allowlist of scheme+host+port;
+The D2 design sprint ran 2026-07-09 → `docs/specs/CONNECTOR_EGRESS_FIXING_SPEC.md`. It found
+the framing sharper than "undesigned": the **SSRF/DNS-rebinding/redirect-resistant proxy is
+already built** (`immediately-run-backend/src/netFetch.ts` — resolve-all-addresses +
+reject-if-any-private + pin, per-hop redirect re-validate, no credential forwarding,
+size-bounded body), and the host already computes a `manifest ∩ grant` allowlist
+(`netFetchPolicy.ts`). The report's RQ-E1 recipe (below) is therefore **implemented** for the
+general `net:fetch` path. The genuinely undesigned part — now designed — is the **connector
+target-fixing layer**: a metacircular connector still had per-call choice *inside* the
+allowlist (which host, what body), so the connector holds a template-bound `feed:fetch`
+capability (not general `net:fetch`), never passes a URL, and fires host-constructed request
+templates derived from trusted feed config with only bounded typed data-plane params. The
+adversarial pass (spec §5) walks the metacircular attack move by move; the TS-4 body residual
+is shrunk to declared-param entropy and budget-tripwired, not closed. The built recipe it
+composes with: allowlist of scheme+host+port;
 resolve-then-pin the IP; re-validate the resolved IP after **every** redirect hop (or
 disable redirects); block RFC1918/loopback/link-local/CGNAT/ULA/metadata ranges;
 single egress proxy (Smokescreen as reference); per-instance fetch budgets (rate + volume)
@@ -960,8 +970,13 @@ run-mode-first value ordering implies.
 
 ### M0 — Design sprints, harnesses, spikes (parallel; nothing ships)
 
-- **D2 egress-fixing design sprint** (the undesigned load-bearing gap) → design doc +
-  adversarial pass with the metacircular-connector attack walked through.
+- **D2 egress-fixing design sprint** → **done 2026-07-09**:
+  `docs/specs/CONNECTOR_EGRESS_FIXING_SPEC.md`, with the metacircular-connector attack walked
+  move-by-move (spec §5) and code-anchored to the built SSRF proxy. Finding: the proxy is
+  built; only the connector target-fixing layer was undesigned, and it now is. Residual for
+  the third fresh-agent pass: is the param-entropy + budget covert channel (spec OQ-3)
+  tolerable for the M3-reach the connector already holds? Build of the target-fixing layer is
+  M3 (with the connector realm).
 - **F4 judge harness** built and calibrated: rubric, benchmark set, per-dimension κ vs.
   human raters. Exit: κ published per dimension; dimensions below agreement threshold are
   marked judge-unusable (human review required there).
@@ -1106,7 +1121,8 @@ sprint (D2).
 
 **Plan-specific risks:**
 
-- **R-1 (schedule, from PD-1):** **nine** platform deltas gate M3; two undesigned (D2, D9).
+- **R-1 (schedule, from PD-1):** **nine** platform deltas gate M3; one still undesigned
+  (D9 — D2 was designed 2026-07-09, `CONNECTOR_EGRESS_FIXING_SPEC.md`).
   The dependency itself is intentional — Reckoner is the forcing function for these platform
   capabilities (§1), so "blocked on platform work" is the program working as designed, not
   a planning failure. The residual risk is purely schedule-shaped, and the fallback is
