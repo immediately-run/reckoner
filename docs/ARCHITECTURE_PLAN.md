@@ -580,15 +580,83 @@ accessible color are built into the components, not author decisions):
 | `Facets` | `source`, `by`, wraps one `Chart` | small-multiples — the endorsed alternative to cramming series |
 
 Plus: markdown prose, `Callout` (`tone`), `Value` (inline bound scalar), one KPI-style
-gauge (the single permitted radial); layout primitives `Section` and `Row` (coarse only —
-components own their internal responsive behavior via container queries, RQ-F5: one
-template, catalog-owned adaptation; per-form-factor overrides are a per-section escape
-hatch); and a `Params` block of input widgets — `Select`, `Toggle`, `Range`, `DateRange`
-(each with `name`, typed `options`/bounds, `default`).
+gauge (the single permitted radial); layout primitives `Section` and `Row`; the responsive
+conditional components `ShowAbove`/`ShowBelow` (§3.3.1); and a `Params` block of input
+widgets — `Select`, `Toggle`, `Range`, `DateRange` (each with `name`, typed
+`options`/bounds, `default`).
 
 **Excluded by construction** (anti-affordances the catalog makes inexpressible): 3D
 anything, dual-axis by default, pies beyond 5 slices, radial/gauge beyond the one KPI
 gauge, word clouds. Every future addition passes an anti-affordance review.
+
+### 3.3.1 Responsive templates — one document, all resolutions
+
+A report is opened at every size, from a phone to a 4K panel to a narrow embedded side-pane,
+and mobile is a first-class platform value. The load-bearing constraint (§3.3): **the
+template carries no responsive logic** — non-executable MDX has no author JS, no expressions,
+no media-query authoring. So responsiveness lives in the *audited catalog components*, the
+*layout primitives*, and a *bounded declarative vocabulary* the renderer interprets — never
+in the document. The author authors none of it (RQ-F5: one template, catalog-owned
+adaptation). One clean consequence: **resize ≠ recompute** — a container getting narrower is
+a pure *view* operation in the report-view realm; the data on the tiered result channel is
+unchanged, so the engine, the recalc graph, and the tier fold are never touched (contrast a
+`params` change, which does recompute). The layered stack:
+
+1. **Intrinsic / fluid layout as the baseline** — fluid grids (`repeat(auto-fit, minmax(…,
+   1fr))` so KPI tiles/facets add and drop columns *continuously* with space), `clamp()` for
+   fluid type/spacing, and a prose `max-width` so a wide monitor does not stretch a line
+   unreadably. Bidirectional: shrinks for mobile **and** caps/expands for large screens. No
+   breakpoints, no author input.
+2. **Container queries (`@container`) for component-level semantic reflow** — a component
+   adapts to *its own allotted width*, not the global viewport, so a chart in a narrow column
+   reflows even on a wide screen. Strictly better than viewport media queries for a composable
+   catalog, and it sidesteps viewport-meta concerns inside the sandboxed iframe. Viewport
+   `@media` is reserved for page-level chrome only.
+3. **SVG-first charts** (decision, §13) — chart marks render as **SVG**: resolution-independent
+   (crisp at any device-pixel-ratio for free — this retires the DPR axis for charts),
+   accessible (DOM + ARIA), and stylable by the design-system tokens. Canvas is used **only**
+   for very high mark counts (thousands of points), and then the backing store is scaled by
+   `devicePixelRatio` explicitly. A chart component observes its container (`ResizeObserver`)
+   and **re-renders** (not re-scales) down an adaptation ladder: wide → full labels/legend/ticks;
+   medium → abbreviated labels, legend below, fewer ticks; narrow → minimal ticks, inline
+   labels, downsample.
+4. **`ShowAbove` / `ShowBelow` — the declarative conditional-render components (v1, §13).**
+   For the *semantic* switches catalog adaptation cannot infer (e.g. a dense chart that should
+   become a table on a phone), the author wraps a subtree in a conditional component whose
+   threshold is a **literal attribute** the render-as-data path reads — never an expression:
+
+   ```mdx
+   <ShowAbove width="640">
+     <Chart source="revenue.by_month" kind="line" x="month" y="revenue" />
+   </ShowAbove>
+   <ShowBelow width="640">
+     <Table source="revenue.by_month" columns={["month", "revenue"]} />
+   </ShowBelow>
+
+   <ShowAbove dpr="2"> <Map source="sites.by_region" kind="choropleth" /> </ShowAbove>
+   ```
+
+   - **Two components, one typed threshold attribute** — `width` / `height` (CSS px,
+     **container**-relative, via a container query) or `dpr` (device pixel ratio, a display
+     property, via `matchMedia('(min-resolution: Ndppx)')`). `ShowAbove` renders its children
+     when the measured value is ≥ the threshold; `ShowBelow` when it is `<`. Values are literal
+     numbers.
+   - **Conditional *render*, not CSS `display:none`** — the hidden subtree is not mounted (a
+     hidden chart never draws), re-evaluated on resize/DPR change via `ResizeObserver` /
+     `matchMedia`. Because resize ≠ recompute and the data is already on the result channel,
+     re-mounting is a cheap re-draw from cached values.
+   - **Bounded, escape-hatch only** — these cover the handful of narrow-screen semantic
+     switches; the *primary* mechanism stays intrinsic + container-query adaptation *inside*
+     components (1–3). A template that wraps everything in size-class branches is a lint
+     smell, not the intended use.
+   - **Shipped in v1** because it is part of the **template syntax**, which must be stable for
+     the v1 format freeze (§13; `docs/specs/DOCUMENT_VERSIONING_SPEC.md` — the catalog version
+     covers these components).
+
+**Responsive integrity is tested, not asserted:** the F4 harness renders each template at a
+fixed width ladder (e.g. 360 / 768 / 1024 / 1440) + a hi-DPR pass and checks no horizontal
+page scroll, no overlapping/clipped marks, legible labels, and — the real bar — *the message
+survives* at every size. The Meridian exec deck is the corpus.
 
 **Interactivity: widgets write to input cells.** There are no event handlers in the
 language; interaction closes a loop through the workbook:
@@ -1417,6 +1485,17 @@ catalog/stdlib versioning across long-lived shared documents; BYOK quota/cost be
   mechanical lints + externally-anchored critique (report workstream F).** *Rejected:*
   raw grammar-of-graphics exposure; per-form-factor variants as the norm; vibes-based
   self-critique.
+- **Responsive templates (§3.3.1, user decision 2026-07-09):** intrinsic/fluid layout +
+  container-query semantic reflow as the baseline; **SVG-first charts** (resolution-independent,
+  retires the DPR axis; canvas only for high mark counts with explicit DPR scaling);
+  **`ShowAbove`/`ShowBelow` conditional-render components in v1** (width/height/`dpr`
+  literal thresholds; conditional mount, not `display:none`) as the bounded semantic
+  escape hatch — shipped in v1 because they are template *syntax* and must be stable for the
+  format freeze. *Rejected:* viewport media queries as the primary mechanism (an iframe/panel
+  mis-judges size; a nested narrow column would not reflow); canvas-first charts (DPR-fragile,
+  less accessible); per-component `narrow=` attributes (the wrapper components cover it more
+  composably); a separate mobile template (RQ-F5 drift); deferring the escape hatch past v1
+  (it would change the frozen template syntax).
 - **Viewer trust claim: a *reach/starvation* bound, not a *no-execution* bound, shipped
   last (review-1 H1).** *Rejected:* "runs none of the author's code" (literally false — a
   static report runs the author's formulas, starved); over-claiming "safe" (Gatekeeper

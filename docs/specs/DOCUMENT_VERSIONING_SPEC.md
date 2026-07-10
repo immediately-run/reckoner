@@ -28,7 +28,11 @@ things underneath it **evolve independently of the document**:
 1. the **document format** (the worksheet/template/fixture/`reckoner.json` schema, §3);
 2. the **stdlib** (formula callables, §3.2 — additive-only, but additions still change what a
    document may reference);
-3. the **component catalog** (template components, §3.3 — additive);
+3. the **component catalog** (template components, §3.3 — additive; includes the responsive
+   conditional components `ShowAbove`/`ShowBelow` with `width`/`height`/`dpr` literal
+   thresholds, which are **template syntax** and are therefore frozen with the v1 catalog at
+   M1 — a document using them declares the catalog version that introduced them,
+   `ARCHITECTURE_PLAN §3.3.1/§13`);
 4. the **tier-tag encoding** and other host-interpreted metadata (§5.4).
 
 If the format carries **no version envelope from v1**, the first change to any of these either

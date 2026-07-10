@@ -88,6 +88,13 @@ for holdout-scoped payloads** (the D9 fix, generalized from "hide the file" to "
 channel"), and **C1's epoch stamp + common-epoch barrier** (the recalc fix, generalized from
 "cell→cell" to "the result channel to a subscriber").
 
+**Not a channel — view-layer events.** A viewport/container **resize** or a **device-pixel-ratio**
+change (which drive responsive template adaptation, `ARCHITECTURE_PLAN §3.3.1`) are **pure
+report-view events**: they re-lay-out and re-render components from data already delivered on C1,
+and they **never re-enter the engine** — no C1 re-emit, no C6 write, no recompute. Only a
+`params` change (C6) recomputes. This keeps responsiveness entirely in the view realm, off the
+engine boundary and the tier fold.
+
 ## 5. The assistant is an audience — the holdout fix, generalized  *(normative)*
 
 `HOLDOUT_REDACTED_MOUNT_SPEC` closed the **file** channel and missed C3/C4. The general rule
