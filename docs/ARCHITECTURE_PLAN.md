@@ -103,6 +103,64 @@ is specified enough to build. The seams are the up-front work.
 
 ---
 
+## 0.2 Dogfooding — developing Reckoner within immediately.run  *(planning stance — strong preference, not a hard requirement)*
+
+Reckoner is a forcing function on **two** axes, not one. Axis 1 (the rest of this plan) is the
+platform's **runtime** capabilities — the nine deltas. Axis 2, stated here, is the platform's
+ability to **host its own development**: the strong preference is that Reckoner be built *inside*
+immediately.run (edit → test → preview → commit, in-platform), so the app doubles as the proof
+that the platform can develop non-trivial apps in itself. Where the platform can't yet host a
+step, that gap is a **self-hosting forcing-function requirement**, tracked like a delta — not a
+reason to give up the preference.
+
+**The dogfooding gradient is layered, and it deepens across the milestones** — stated honestly,
+because a four-realm SES composite cannot be *fully* built in-platform until the composite
+capabilities it forces (D1–D9) exist (a real recursion). Three layers:
+
+- **In-platform today** (the shipped editor working-tree + CoW overlay, the agent write-port
+  AA-23, VCS control, and the `local`-provider host preview — `LOCAL_DEVELOPMENT_SPEC`,
+  `EDITOR_AS_APP_SPEC`, `AGENT_AUTHORING_ARCHITECTURE`):
+  1. **Authoring all document *content*** — worksheets (`*.sheet.js`), templates (`*.mdx`),
+     fixtures, feeds config, `reckoner.json`. This is the *most* dogfoodable work: it is plain
+     files the platform editor + agent already edit, rendered live in the host preview. The
+     Meridian case-study workbook (brief 01) is entirely in-platform content work.
+  2. **Iterating app *source*** (engine, report view, catalog) via the editor + agent write-port
+     + live host reload.
+  3. **The design/spec/doc work itself** (markdown in the editor) — this session's artifacts
+     included.
+- **In-platform *by construction* once the engine lands (M1)** — a Reckoner win, not a platform
+  ask: because **tests-as-cells run in the browser engine** (§6), a full-workbook test run is a
+  *browser* operation, so running a document's test suite needs no Node test runner. Dogfooding
+  gets *easier* precisely where a normal app would need CI.
+- **Gated on platform self-hosting capability** (the honest gaps → tracked requirements):
+  Node-side CI gates for the *TypeScript source* (`npm run build`/`lint`/`vitest`, mutation
+  testing) are not browser operations; dependency resolution (SES, CodeMirror) rides the
+  platform's module-fetch path but is unproven for these packages; and running the *real
+  multi-realm composite* in-platform is gated on D1–D9 (the recursion). Full self-hosting of the
+  platform *deltas themselves* (site-main/sandbox work) is the north star, out of scope as a v1
+  requirement.
+
+**Self-hosting requirements this program books** (distinct from the runtime deltas D1–D9;
+Reckoner is the forcing consumer for each):
+
+| # | Self-hosting capability | State | Needed for |
+|---|---|---|---|
+| S1 | In-platform edit → live-preview loop for app source | **exists** (editor + agent + `local` provider) | authoring content & source (all milestones) |
+| S2 | In-platform document-test execution | **by construction** (tests-as-cells run in the engine) | running Reckoner's own suites (M1+) |
+| S3 | In-platform VCS (branch/commit/push) | **partial** (editor `vcsControl` / working-tree) | committing without leaving the platform |
+| S4 | In-platform Node-equivalent CI gate (build/lint/source-tests/mutation) | **gap** | the source-level gates CLAUDE.md requires |
+| S5 | In-platform dependency resolution for SES/editor deps | **gap/unproven** | building the engine & editor realms in-platform |
+| S6 | Running a multi-realm composite in-platform | **gated on D1–D9** (recursion) | dogfooding the *real* app, not a stub |
+
+**Planning consequence — mark work items in-platform-completable.** From M0 on, each work item
+carries an **in-platform tag**: ✅ *fully in-platform now* (content authoring, spec/doc work),
+◐ *in-platform once its milestone's engine/deltas land* (document tests M1; live composite
+M3), or ✗ *needs S4/S5 (external CI/deps until self-hosting closes the gap)*. The default is
+in-platform wherever a layer above supports it; an ✗ item is a booked self-hosting requirement,
+not an accepted permanent exception. §10 milestones apply these tags.
+
+---
+
 ## 1. Product decisions recorded (2026-07-09)
 
 Six scope decisions were made in the planning session. They are recorded here with their
@@ -1207,6 +1265,31 @@ over R-2.
 - AA-01 + D9 inside M2: the last point where "realms share an appKey" and "holdout is
   prompt discipline" are honest, because M3 is where strangers' documents and real
   credentials arrive.
+
+### In-platform-completable work items (dogfooding, §0.2)
+
+Tags: ✅ fully in-platform now · ◐ in-platform once this milestone's engine/deltas land · ✗
+needs S4/S5 (external CI/deps until self-hosting closes the gap).
+
+- **M0** — ✅ the F4 rubric/benchmark authoring, the spec/design docs, the case-study `.xlsx`
+  design and the porting plan (content/markdown). ✗ the B1/C1 spikes and the A1 bake-off harness
+  (Node benchmarking). ✅ *the D2/D9/Spine-1 design specs themselves were authored in-platform-style
+  (markdown) — a proof of layer-1 dogfooding.*
+- **M1** — ◐ **document content** (worksheets, templates, fixtures, the Meridian workbook) authored
+  in the editor + agent, rendered live; ◐ **document test runs** become in-platform *by
+  construction* the moment the engine lands (S2). ✗ the engine/report-view **source** CI gates
+  (build/lint/vitest — S4) stay external; source *editing* is ✅ (S1).
+- **M2** — ◐ the assistant realm *is* the in-platform authoring agent (dogfooding the agent on
+  its own document); ◐ freeze/fixture-capture and the review surface exercised in-platform. ✗
+  mutation-testing CI (S4).
+- **M3** — ◐ running the **real four-realm composite** in-platform becomes possible as D1–D9 land
+  (S6, the recursion resolves here); the connector/tiering/powerbox are exercised on the host,
+  not a stub.
+- **Cross-cutting self-hosting asks** surfaced by the above: **S4** (an in-platform Node-equivalent
+  gate) and **S5** (dep resolution for SES/CodeMirror) are the two gaps that keep source-level work
+  external; booking them is the Axis-2 forcing-function contribution. **S3** (in-platform
+  commit/push via the editor's VCS surface) is partial and worth closing early — it removes the
+  last routine reason to leave the platform for content work.
 
 ---
 
