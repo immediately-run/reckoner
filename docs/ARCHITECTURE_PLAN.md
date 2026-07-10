@@ -555,24 +555,38 @@ capabilities; every channel is host-brokered.
   `e` exceeds a feed's conflation interval `c` — unconditional cancel-and-restart (the naïve
   reading of Bazel restarting semantics) would perpetually cancel such a formula before it
   finished (a livelock). Purity makes each *would-be* result correct; the supersession rule
-  is what makes one *land*. The published freshness bound is therefore `max(c, e)`, not `c`
-  (§5.3).
-- **Watchdog:** per-evaluation budget at the worker boundary bounding **async wall-clock**,
-  not just synchronous CPU (review-1 L5) — an evaluation that awaits/schedules microtasks is
-  bounded across the whole async span. A formula that exceeds it is terminated. **Error is a
-  first-class lattice value** (review-1 F6): a terminated cell enters an error state that
-  *resolves* every suspended dependent with a propagated error — a waiter is never left
-  pending on a value that will never arrive. And the watchdog verdict is **memoized
-  host-side, keyed by `(cell, input-hash)`**: because a synchronous runaway in the
-  single-context worker can only be stopped by `worker.terminate()` — which destroys all
-  in-flight state and the in-memory memo — a rebuilt worker must not re-demand a
-  known-diverging cell against unchanged inputs (else it relaunches into a livelock). The
-  host-side sticky verdict converts that relaunch into a one-shot error. SES does not protect
-  availability (report RQ-A4 residual); these three rules are how the engine survives it.
+  is what makes one *land*. **Freshness bound: `critical-path-depth · max(c, e)`, not
+  `max(c, e)`** (review-2 C-1 — the earlier draft's `max(c,e)` was the *single-cell* bound
+  mis-stated as the workbook bound; a depth-`d` serial chain under a never-stopping feed lags
+  `d·max(c,e)` and never closes while the feed runs — the irreducible cost of a serial
+  pipeline with `e>c`, §5.3). Throughput is unaffected (supersession skips intermediate
+  snapshots); the lever for deep-chain latency is reducing `d` (pre-aggregate in the
+  connector, flatten the hot path).
+- **Watchdog — split hard from soft** (review-2 C-2/C-3, replacing the earlier
+  `(cell,input-hash)` sticky memo, which **failed under a live feed**: every tick is a fresh
+  input-hash so the memo never hits, and a diverging cell would tear down the whole context
+  every `e`, forever — a live relaunch livelock, plus unbounded memo growth). The budget
+  bounds **async wall-clock** (review-1 L5). Two distinct failure classes, handled
+  differently:
+  - **Hard runaway** (synchronous, CPU-bound; the context had to be `terminate()`d): governed
+    by a **per-cell circuit breaker** — after N terminations attributable to a cell within a
+    window (*regardless of input-hash*), the cell is **quarantined**: the scheduler stops
+    demanding it and resolves its dependents with the propagated lattice error, until an author
+    re-arms it. This is what makes progress hold when the diverging input keeps changing — the
+    property the input-keyed memo lacked. Any input-hash memo is an *optimization only*, LRU-bounded (bounded memory; re-derivation on eviction is safe, just costly).
+  - **Soft budget-exceed** (timing-dependent — machine load, GC, co-scheduled cells; **not** a
+    pure function of inputs): **confirm before sticking** (reuse the double-eval already run for
+    purity — a timeout counts only if it reproduces), and even then decay with TTL/backoff, never
+    permanent. A wall-clock outcome must never be memoized as a pure function of inputs (review-2
+    C-3 — that permanently poisons a fixture-driven test cell after one load spike).
+  **Error is a first-class lattice value**: a terminated/quarantined cell resolves every
+  suspended dependent with a propagated error — a waiter is never left pending on a value that
+  will never arrive. SES does not protect availability (report RQ-A4 residual); the circuit
+  breaker + error-as-value are how the engine survives it.
 - **Single evaluator context for v1** (RQ-B3), with the blast radius owned explicitly: a
   synchronous divergence terminates and rebuilds the *whole* context, and survivors are
-  re-scheduled from the host-side memo (which is why memo lives outside the worker — it ties
-  to the versioned publication of §5.2). The scheduler is written so independent subgraphs
+  re-scheduled from host-side state (which is why memo/epoch state lives outside the worker —
+  it ties to the versioned publication of §5.2). The scheduler is written so independent subgraphs
   *could* be partitioned to a worker pool later, with data movement as transferable
   ArrayBuffers / OPFS — **never** assuming SharedArrayBuffer (the `crossOriginIsolated`
   constraint in opaque-origin sandboxed iframes is architecturally fragile; report caveats).
@@ -599,10 +613,23 @@ Carte*.
   param write is a **dirty signal**, not a value-delivery path: it marks inputs dirty and
   the scheduler rebuilds each dependent **once, after its transitive inputs settle**, then
   publishes the settled `(value, tier)`. Components subscribe to the *settled* result, never
-  to per-arm intermediate notifications — so a diamond (A→B, A→C, B→D, C→D) with early cutoff
-  on one arm rebuilds D once against fully-settled B and C, never glitching on (B_old,
-  C_new). Push language elsewhere ("a notification wakes the scheduler", §5.2) means exactly
-  this dirty-then-pull, not FRP-style per-arm propagation.
+  to per-arm intermediate notifications.
+- **Glitch-freedom via a common-epoch barrier** (review-2 C-R-B — the decisive fix). The
+  earlier "settle = each input has *a* landed value" was per-input and let a cell assemble
+  `B@epoch-1 + C@epoch-2` of a shared ancestor A when the arms have different eval times (B
+  slow, C fast, feed re-fires while B grinds; B@e1 is not superseded from B's own view, so the
+  epoch-drop rule misses it) — the classic glitch, relocated from within-pair to
+  across-inputs. **Fix: a cell assembles its inputs only at the greatest ancestor epoch `k`
+  for which *every* transitive input has a landed result, publishes `D@k`, and holds faster
+  arms until the slow arm reaches `k`.** No cell ever observes mixed-epoch inputs.
+  - **The load-bearing trade, stated as a decision (review-2 C-R-B):** per-cell `max(c,e)`
+    freshness and glitch-freedom are **mutually exclusive** on an asymmetric diamond under a
+    continuous feed — you either publish the fast arm early (glitch) or hold it (stale).
+    **Reckoner chooses glitch-free** (§13): a cell's freshness therefore equals its *slowest
+    transitive path* (`critical-path-depth · max(c,e)`, §4.1), and the report never shows a
+    number computed from inconsistent inputs. Correctness over latency — the right default for
+    numbers people act on. The barrier subsumes the edit-path diamond (A→B, A→C, B→D, C→D)
+    that F5 already handled.
 - **Cycles are always an error** with the full cycle path reported (SCC decomposition,
   HyperFormula-style diagnostics); no iterative/fixpoint calc in v1 (RQ-B2 — recorded as a
   known cost for converging financial models; additive opt-in later is compatible).
@@ -615,15 +642,27 @@ Carte*.
   every declared namespace to be **statically enumerable** at graph-publish time (asserted),
   and it owns a false-positive cost — a `focus` selector plus a summary tile referencing it
   is a *static* cycle even when no runtime configuration is cyclic — surfaced as a clear
-  cycle diagnostic (there is no `INDIRECT()` escape by design).
-- Mid-session tier change: **feed tier is monotone non-increasing per session** (review-1
-  F7 — carried from research_proposal line 329, dropped from the earlier draft). A tier drop
-  fires flush-then-restart of the affected subgraph; monotonicity bounds this to **at most
-  once per tier level** (lattice height, ~2–3), which is the termination guarantee — a
-  re-raisable tier could oscillate like the F2 livelock. The restart is softened by value
-  cutoff (only the cheap tier fold re-runs) but never below the pair rule. A tier that
-  *should* rise (a feed re-consented higher) waits for a new session / re-mount, never
-  mid-session.
+  cycle diagnostic (there is no `INDIRECT()` escape by design). **Two enumerability
+  invariants the earlier draft omitted (review-2 C-4):** (a) **`params.*` are graph leaves** —
+  widget/host-written only, never cell-produced; a `params.metric ← cellC` producer edge would
+  be invisible to the static SCC and reopen the C→params→D→…→C deadlock (if cell→param binding
+  is ever allowed, it must be a *statically declared* edge included in the SCC); (b) a
+  namespace token in an `inputs` declaration must be a **compile-time literal**
+  (`candidates: "revenue.*"`), never a runtime expression (`params.whichNs + ".*"`), so the
+  set is enumerable at publish. Both are checked at graph-publish, fail-closed.
+- Mid-session tier change, **scoped by source** (review-2 C-6 — the earlier blanket
+  monotonicity contradicted the plan's own mid-session consent-elevation affordance, §3.3):
+  - **Autonomous** tier changes are **monotone non-increasing per session** (research_proposal
+    line 329). An autonomous drop fires flush-then-restart of the affected subgraph, bounded to
+    **at most once per tier level** (lattice height ~2–3) — the termination guarantee; a
+    re-raisable *autonomous* tier could oscillate like the F2 livelock. Softened by value cutoff
+    (only the cheap tier fold re-runs), never below the pair rule.
+  - **User-consent elevations are permitted mid-session** (a viewer clicks "needs feed access"
+    → grants → the feed rises to elevated, §3.3). This is deliberate, human-rate, and cannot
+    oscillate, so it does not threaten termination. It applies as a **surgical in-place
+    flush-then-rebuild of the affected feed subgraph** (O(1) per session), not a whole-dashboard
+    re-mount — the long-lived subscriptions, window buffers/gap-markers (§5.3), and param state
+    survive. "Re-mount" means a scheduler subgraph re-mount, not a teardown.
 - Budget (from the research proposal): p95 < 100 ms recompute for a single-cell edit on a
   10⁴-cell workbook; glitch-freedom (no cell ever observes mixed pre/post inputs) proven by
   a property test over random DAGs (§11 E-2). **Honesty note (review-1):** the recompute
@@ -692,11 +731,12 @@ building the deferred tiered message bus is the envelope failing at ≤30 Hz mid
   marker**; windows spanning the gap surface as partial, never fabricated continuity.
 - **Cadence = conflation** (RQ-C3): coalesce writes per feed (keep-latest), recompute
   immediately on the coalesced frame, align *rendering* to rAF. The published freshness
-  bound is **`max(conflation interval, eval time) + one paint`** (review-1 F2 — not
-  `interval + recompute` alone, which is only valid when eval time ≤ interval; §4.1's
-  run-to-completion supersession is what makes the bound hold otherwise). No
-  debounce-the-recompute — the progress guarantee lives in the supersession rule, not a
-  debounce knob.
+  bound is **`critical-path-depth · max(conflation interval, eval time) + one paint`**
+  (review-2 C-1 — the single-hop bound is `max(c,e)`, but a bound cell downstream of a depth-`d`
+  chain, and the glitch-free common-epoch barrier (§4.2) which holds fast arms to the slow arm's
+  epoch, together make the honest end-to-end bound depth-scaled; it does not close while the
+  feed runs). No debounce-the-recompute — the progress guarantee lives in the run-to-completion
+  supersession rule (§4.1), not a debounce knob.
 - **Param writes share this conflation** (review-1 F8): a dragged `Range`/slider emits
   60–120 Hz writes into the *same single-context evaluator*, so `params.*` writes are
   coalesced keep-latest and recompute once per coalesced value, exactly like feeds —
@@ -734,43 +774,58 @@ spec's implied sequence, on the report's explicit recommendation.
 The mainline workflow is **infer-then-fortify** (report workstream D preamble): the
 assistant infers a formula from observed data, then fortifies it with tests. This workflow
 is structurally circular unless the platform breaks the circle, so the following are core
-architecture, not test-infra niceties:
+architecture, not test-infra niceties.
+
+> *(Adversarial-review-2 re-scoping, 2026-07-09 — the load-bearing correctness signal moved.
+> The review showed **example-based holdout cannot carry the weight the earlier draft assigned
+> it**: (a) the agent authors the tests that run over the holdout and reads their result —
+> pass/fail, the failure diagnostic, and trace-replay of declared inputs are a *literal read*
+> of the held-out rows (D9-1, the test-oracle channel); and (b) for the affine/aggregate/lookup
+> formulas that are Reckoner's explicit target (§7.1), the training split *determines* the
+> holdout outcome by ordinary fitting, so holdout adds ~0 bits even perfectly sealed (D9-2).
+> Decision (user, 2026-07-09): **the metamorphic + property + mutation legs are the stated
+> load-bearing correctness signal; holdout is re-scoped to a best-effort regression/tripwire,
+> not a correctness proof.** D9 stays as the best-effort defense it can honestly be, no longer
+> the linchpin. See `ADVERSARIAL_REVIEW_2.md` §B.)*
 
 1. **Test-kind labels** (`characterization` / `specification` / `metamorphic` /
    `property`) are mandatory on every test cell (§3.1) and drive the review surface: a
    formula covered only by characterization tests derived from its own fitting data is
-   **visibly unvalidated** — a distinct visual state between "untested" and "validated."
-2. **Holdout is a first-class affordance, enforced by the host — not by the agent's
-   restraint** (review-1 H3, resolved by delta D9). When the assistant infers a formula
-   from column data, the platform withholds a slice of rows from the fitting context and
-   emits them as `specification` tests automatically. **This is only real if the agent
-   *cannot* read the withheld rows** — but the assistant holds `rw@self` over the document,
-   which contains the fixtures, so "the harness withholds a slice from you" is not free from
-   G12. It requires the **redacted-mount-view mechanism (D9,
-   `docs/specs/HOLDOUT_REDACTED_MOUNT_SPEC.md`)**: held-out rows live at an ungranted
-   `.holdout/` scope the assistant's `rw@self` (defined as the enumerated authoring subtrees,
-   never whole-root) does not cover, and are resolved into test-cell evaluation only by the
-   engine's host-brokered injection — the agent *names* `fixtures.orders_holdout` but cannot
-   read its bytes or list it via `readdir` (the `synthesizedChildren` leak is closed by
-   keeping `.holdout/` a top-level sibling). The split is host-performed and pre-agent, so no
-   window exists in which the agent held the full set. Held-out rows are the only
-   example-based tests carrying genuine correctness weight, so this enforcement is
-   load-bearing, not a nicety. Until D9 lands (M2), holdout is prompt discipline with known
-   erosion and must be labeled as such — never presented as enforced. Named residual (spec
-   §5): the agent still sees the *training* split and could model its distribution to
-   reconstruct likely holdout values — weaker than a direct read, backstopped by the
-   metamorphic/mutation legs that hide nothing.
-3. **Metamorphic relations and PBT are stdlib citizens** (§3.2) — non-circular, oracle-free
-   correctness checks that agents state well.
-4. **Independent authoring:** the assistant can invoke a second agent that writes
-   specification tests and synthetic fixtures from a cell's *stated intent* (its `doc`),
-   without seeing the implementation or fitting data — "without seeing" enforced by the
-   same D9 redacted-mount-view (the second agent runs with a read view narrowed to the
-   intent, not the document that holds the implementation and fitting data). Same caveat:
-   prompt discipline until D9 (review-1 H3).
-5. **Mutation testing** is the offline CI signal (Stryker-style over worksheet formulas,
-   run outside the browser in CI): does the pinned suite kill mutants? Mutation score per
-   cell feeds the review surface.
+   **visibly unvalidated** — a distinct visual state between "untested" and "validated." An
+   example-based `specification` test over holdout no longer promotes a cell to "validated" on
+   its own (review-2 D9-1/D9-2); "validated" now requires a **non-example-based** leg
+   (metamorphic/property, or a passing mutation score).
+2. **The oracle-free legs are load-bearing** (review-2, re-scoped). **Metamorphic relations
+   and PBT** (`conservation`, `permutationInvariance`, `scaleInvariance`, `property` — §3.2)
+   are non-circular, oracle-free, need no hidden data, and are what an agent states well; a
+   uniformly-wrong formula (e.g. a wrong FX rate) is *not* caught by these alone, which is why
+   **mutation testing** (item 5) is the offline check that the suite has teeth. These carry the
+   correctness weight the report originally hoped holdout would.
+3. **Holdout — best-effort regression/tripwire, not a correctness proof** (review-2 D9-1/D9-2).
+   The host still withholds a slice and emits `specification` tests, enforced by the D9
+   redacted-mount-view (`docs/specs/HOLDOUT_REDACTED_MOUNT_SPEC.md`: held-out rows at an
+   ungranted `.holdout/` scope, resolved only by the engine's host-brokered injection). D9 is
+   worth building — it closes the *trivial* direct-`readFile` leak and the readdir/`exists`
+   metadata leak (with deny-by-default fs enforcement, review-2 CODE-GAP A) — but it is
+   honestly bounded: it does **not** close the **test-oracle channel** (the agent reads its
+   authored test's result/trace over the holdout), and it adds little for low-parameter
+   formulas. So holdout is presented as a **tripwire** (a held-out row that a later edit breaks
+   is a useful regression signal) — never as the thing that certifies an inferred formula. The
+   report's "the only example-based tests carrying genuine correctness weight" claim does *not*
+   survive the oracle; the review surface must not show a holdout-only cell as validated.
+4. **Independent authoring — with an honest limit** (review-2 D9-3). The assistant can invoke
+   a second agent that writes specification tests and synthetic fixtures from a cell's *stated
+   intent* (its `doc`), with its read view narrowed to the intent (D9 redacted-mount-view), not
+   the implementation or fitting data. **But agent-1 authors that `doc`** — a complete intent
+   over-determines the implementation (that is what a doc is *for*), so "independent
+   reproduction from intent" is only as independent as the doc is under-specified, which the
+   design cannot enforce. Independence is therefore a *weak* signal, not a strong lever; treat a
+   second-agent-authored test as corroboration, not proof.
+5. **Mutation testing is the primary teeth** (review-2 — promoted). Stryker-style over
+   worksheet formulas, run outside the browser in CI: does the pinned suite kill mutants?
+   Mutation score per cell feeds the review surface and is a **non-example-based, non-oracle,
+   agent-uncircumventable** signal (the agent cannot fit to mutants it never sees) — which is
+   why, with metamorphic/property, it carries the correctness weight holdout cannot.
 
 Tests-as-cells (RQ-D1) means incremental re-run rides the recalc graph for free: editing a
 formula re-runs exactly the tests whose transitive inputs changed. A full-workbook test run
@@ -937,7 +992,7 @@ while its gating rows are open.
 | D6 | Composite: manifest resolution, composite-aware powerbox (un-bundled TS-5b line, mobile one-member-per-card), inspector + aggregate reach view, **host-rendered tier/trust badges** (H2), **manifest↔launch-graph reconciliation** (L2) | site-main | net-new (spec §6) | powerbox tests (badge integrity, un-bundled elevated line); run-mode-first gate (static doc → zero powerbox, desktop + mobile); **reconciliation gate: an undeclared sandbox spawned under the composite root is flagged** (RS-9/RS-11); **tier badge is host-drawn, not app-emittable** | shared/live (M3) |
 | D7 | **AA-01 program-identity `appKey`** (per-entry-point identity) | site-main | V2 design of record exists (AGENT_AUTHORING §5.1); unbuilt | sibling-isolation gate: two entry points of one repo hold disjoint grant bundles; engine entry point resolves to an empty bundle | realm isolation being real — anything shared (M2→M3 boundary) |
 | D8 | **Launch-to-run / standing-app-lifecycle** (per-instance delegated launch + keep-warm/teardown that per-instance `capDir` delegation and composite lifecycle ride) | site-main | **design-pending** (STANDING_APP_LIFECYCLE §4.1/§5.1, Open Q#10; rides AA-01) | per-instance-delegation gate: two live instances of one connector `appKey` hold disjoint source grants and independent lifecycle | D1 per-instance tiering + D6 composite lifecycle (live/shared, M3) |
-| D9 | **Redacted-mount-view for holdout** (held-out fixtures live at an ungranted `.holdout/` scope; resolved into test evaluation only by the engine's host-brokered injection, never readable by the assistant) | site-main (+ SDK fs surface) | **designed 2026-07-09** (`docs/specs/HOLDOUT_REDACTED_MOUNT_SPEC.md`); path-level, reuses `scopedFs` + `attenuateDelta`, no new fs primitive | holdout-enforcement gate: an agent with `rw@self` cannot read the withheld rows or list them via readdir (G-HRM-1..6); blind second-agent scope is intent-only | holdout + blind-authoring being real, not prompt discipline (H3) — testing story (M2) |
+| D9 | **Redacted-mount-view for holdout** (held-out fixtures at an ungranted `.holdout/` scope; resolved only by the engine's host-brokered injection) + **deny-by-default fs** (review-2 CODE-GAP A: path-bearing/unmodeled methods like `exists` must throw, not pass through) | site-main (+ SDK fs surface) | **designed 2026-07-09, re-scoped by review-2** (`docs/specs/HOLDOUT_REDACTED_MOUNT_SPEC.md`); path-level, reuses `scopedFs` + `attenuateDelta` | holdout-enforcement gate: an agent with `rw@self` cannot read the withheld rows, list them via readdir, **or probe them via `exists`/`stat`** (G-HRM-1..6). **Honestly bounded** (review-2 D9-1): does *not* close the test-oracle channel — holdout is a tripwire, not a correctness proof (§6); the load-bearing signal is metamorphic/mutation | closes the *trivial* read leak; best-effort, not the testing linchpin (M2) |
 
 The D2 design sprint ran 2026-07-09 → `docs/specs/CONNECTOR_EGRESS_FIXING_SPEC.md`. It found
 the framing sharper than "undesigned": the **SSRF/DNS-rebinding/redirect-resistant proxy is
@@ -1112,7 +1167,7 @@ over R-2.
 | ID | Experiment | Decides / validates | Threshold that changes a call |
 |---|---|---|---|
 | E-1 | A1 surface bake-off (M0) + **raw-loop-fallback rate** + **edge-case axis over planted fixtures** (review-1 DSL-meta) | PD-4 validation; catch a still-missing stdlib family before the freeze | SQL-hybrid ≥10 pts better first-attempt AND comparable diff auditability → promote to co-equal surface; **any primitive hallucinated by ≥2 agents → additive-inclusion candidate before M1 freeze**; high raw-loop rate on a task class → missing primitive |
-| E-2 | B1 graph benchmark + glitch property test (M0/M1) **plus five targeted tests the random-DAG/single-edit harness structurally cannot catch (review-1)**: (i) liveness/termination — high-rate conflated feed with eval time > interval, assert the cell lands in O(eval) and the workbook settles; (ii) dynamic-dependency cycle via selector indirection, assert static SCC catches it; (iii) cross-realm frame-race, assert no torn read; (iv) concurrent tier+value, assert atomic pair + epoch-drop; (v) watchdog-under-single-context, assert survivors re-scheduled from host memo + suspended dependents get a propagated error, not a hang | scheduler liveness + glitch-freedom, not just the value model | p95 ≥ 100 ms @ 10⁴ cells (or cold full-recompute budget on the join-heavy sheets) → revisit (subgraph partitioning first, never SAB); any liveness test livelocks/hangs → the progress invariant is wrong, not just slow |
+| E-2 | B1 graph benchmark + glitch property test (M0/M1) **plus targeted tests the random-DAG/single-edit harness cannot catch — hardened after review-2 found the review-1 five certified only happy paths**: (i) **running-feed steady-state** freshness on a depth-`d` chain, assert the *composed* `d·max(c,e)` bound (not just "settles when input stops"); (ii) dynamic-dependency cycle via selector indirection **+ a param-produced-by-cell edge and a computed namespace token**, assert static SCC / publish-time enumerability catches each (C-4); (iii) cross-realm frame-race, assert no torn read; (iv) **shared-ancestor asymmetric-async-arm glitch** (B slow, C fast, ancestor re-fires mid-flight), assert the common-epoch barrier holds — D never mixes epochs (C-R-B, the single most important gap); (v) **live-feed divergence** — a diverging cell driven by a *live* feed (fresh input-hash each tick), assert the per-cell circuit breaker quarantines it, other cells keep progressing, and the memo stays bounded (C-R-A); (vi) **soft-timeout recovery** — a transient load-induced timeout, assert it does *not* permanently poison the cell (C-3) | scheduler liveness + glitch-freedom under a *live* feed, not just the value model | p95 ≥ 100 ms @ 10⁴ cells (or cold full-recompute budget on the join-heavy sheets) → revisit (subgraph partitioning first, never SAB); any liveness test livelocks/hangs/leaks → the progress invariant is wrong, not just slow |
 | E-3 | Early-cutoff hit-rate on realistic edits (M1) | whether hashing pays | hit rate ~0 on real workbooks → keep hashing only at snapshot boundaries |
 | E-4 | C1 transport sweep (M0) | v1 live envelope | loop exceeds freshness budget at ≤30 Hz mid-size → tiered message bus moves into M3 |
 | E-5 | F4 per-dimension κ (M0) | which dimensions judges may score | κ below threshold on a dimension → human review required for that dimension |
@@ -1255,7 +1310,48 @@ Recorded so they are not relitigated; full findings in `ADVERSARIAL_REVIEW_1.md`
   per-instance delegation's unbuilt lifecycle dependency into D1 and under-counting the
   unbuilt platform surface.
 - **State the recalc liveness invariants (F1–F8) explicitly** — run-to-completion
-  supersession, error-as-lattice-value + host-side sticky watchdog memo, conservative-set
-  subset, atomic `(value,tier)` + epoch, demand-driven live path, tier monotone-per-session,
-  versioned atomic frame publication, param conflation. *Rejected:* "sound because pure" as a
-  stand-in for a progress argument (it proves values correct, never that one lands).
+  supersession, error-as-lattice-value, conservative-set subset, atomic `(value,tier)` + epoch,
+  demand-driven live path, tier handling, versioned atomic frame publication, param conflation.
+  *Rejected:* "sound because pure" as a stand-in for a progress argument (it proves values
+  correct, never that one lands). *(Several of these were themselves corrected by review-2 —
+  see below.)*
+
+### Decisions from adversarial review 2 (2026-07-09)
+
+The third fresh-agent pass attacked the D2/D9 design sprints and the review-1 recalc fixes
+with code anchors; three findings were premise-level and decided by the user. Full findings in
+`ADVERSARIAL_REVIEW_2.md`.
+
+- **Re-scope holdout to a best-effort regression/tripwire; metamorphic + property + mutation
+  are the load-bearing correctness signal (review-2 D9-1/D9-2, §6).** *Rejected:* keeping
+  holdout as "the only example-based correctness weight" (the test-oracle channel — the agent
+  reads its own test's result/trace over the holdout — and affine-formula reconstruction defeat
+  it for the mainline); building a full bandwidth-bounded output-channel policy over all test
+  results/traces just to save holdout (bigger than path separation, still beaten by
+  reconstruction); dropping holdout entirely (it is a useful *tripwire*, worth D9's best-effort
+  defense).
+- **The engine guarantees glitch-freedom and accepts depth staleness; per-cell `max(c,e)`
+  freshness and glitch-freedom are mutually exclusive under a continuous feed (review-2 C-R-B,
+  §4.2).** *Rejected:* claiming both (impossible on an asymmetric diamond); fast-but-glitchy
+  with an "updating" marker (gives up the glitch-freedom the proposal asserted, on numbers
+  people act on). Chose the common-epoch barrier; freshness = critical-path-depth · max(c,e),
+  stated honestly.
+- **Full D2 revision now** — author-hostile template in the threat model + write-sink consent,
+  secret feeds back on a pinned path, the opaque-cursor/§1 contradiction resolved, the residual
+  restated as a fast write-channel (review-2 D2-F2/F4/F5, `CONNECTOR_EGRESS_FIXING_SPEC.md`).
+  *Rejected:* honesty-fixes-now-redesign-later (the holes are BLOCKERs on the load-bearing
+  backstop; a "known-BLOCKERs" marker is not enough for the one delta everything shared rests
+  on).
+- **Recalc corrections (review-2, applied §4.1/§4.2/§5.3/§11):** per-cell **circuit breaker**
+  replaces the `(cell,input-hash)` sticky memo (which never hit under a live feed → live
+  relaunch livelock + unbounded-memo DoS); **soft vs hard** timeout split (never memoize a
+  wall-clock outcome as pure-in-inputs); **common-epoch barrier** for glitch-freedom;
+  freshness bound corrected to **depth·max(c,e)**; **`params.*` are leaves** + **literal
+  namespace tokens** (enumerability); **user-consent tier elevation permitted mid-session**
+  (only *autonomous* changes are monotone). *Rejected:* the review-1 formulations, which closed
+  each per-cell failure and relocated the composition failure.
+- **Two shipped-code bugs filed, not folded into a spec** (review-2): the SSRF blocklist's
+  `fe80`-only IPv6 link-local (misses `fe80::/10`) in `netFetch.ts`/`netFetchPolicy.ts`, and the
+  `filteredFs`/`scopedFs` fail-open method allowlist (`exists`/unmodeled path methods bypass the
+  classifier) in site-main — real platform bugs surfaced by the pass, tracked separately from
+  the Reckoner design.
