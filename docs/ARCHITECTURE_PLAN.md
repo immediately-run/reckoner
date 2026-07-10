@@ -55,6 +55,54 @@ record; findings that resolved it are in `ADVERSARIAL_REVIEW_1.md`.
 
 ---
 
+## 0.1 Design order — what to specify up-front vs. at implementation time
+
+Reckoner is the most ambitious immediately.run app so far and deliberately pushes the
+platform's boundary, so some corners are unavoidably under-specified. The discriminator for
+**up-front** design is: *a cross-realm data contract, a hard-to-reverse format/protocol, or the
+thing the confidentiality property rests on — where guessing wrong forces rework beyond one
+realm.* Everything else is deferrable. Tellingly, **both adversarial-review-2 BLOCKERs and the
+recalc glitch were failures of the first spine below** — not a wrong fragment, but fragments
+that didn't compose. The gaps that hurt are all at the **seams**, not within a realm.
+
+**Three spines to design up-front (in this order):**
+
+1. **Engine information-flow — the epoch × tier × egress-channel contract.** *Spec:*
+   `docs/specs/ENGINE_INFORMATION_FLOW_SPEC.md` (drafted). The unifying contract the per-channel
+   specs lacked: every value leaving the engine (result, diagnostic, trace, frozen fixture, test
+   verdict) is a controlled channel carrying `(epoch, tier)` and declaring `(audience,
+   bandwidth)`. Owns the fixes the review found by *composition*: the D9 test-oracle
+   (trace/verdict channels) and the recalc mixed-epoch glitch (the result channel to a
+   subscriber). **Reckoner-internal, so we own it end to end — do it first.**
+2. **Composite capability & lifecycle topology.** *Not yet drafted; likely a platform spec.*
+   The realm × capability × minting-authority matrix + the launch / keep-warm / teardown state
+   machine, resolving how D1 (per-instance delegation), D7 (AA-01 appKeys), D8 (launch-to-run),
+   and D9 (redacted mount) **compose**. This *is* the isolation property; every realm's
+   "can't reach X" claim depends on it, and it rides the design-pending D8. Platform work — needs
+   the roadmap conversation.
+3. **Document durability & evolution — the version envelope.** *Fold into the M1 format freeze.*
+   Only the envelope + compatibility policy (how a document declares the format/stdlib/catalog
+   version it needs; how an old document is resolved; what "additive-only" must guarantee) — not
+   the migration machinery. Cheap now, a per-document migration later. Subsumes the parked
+   reproducibility question ("which numbers did we report last quarter" falls out if the envelope
+   records provenance) and must decide the **constraint** that the format does not preclude a
+   later concurrent-multi-author merge (a one-line constraint, not a v1 design).
+
+**Safe to defer to implementation time** (realm-local, additive-safe, or a well-understood
+pattern behind a clear interface): exact stdlib signatures (bake-off validates; additive-only —
+*given* spine 3's envelope); component visual design (briefs; additive catalog); diagnostics
+record format + source-map plumbing; per-API pagination extraction rules (per-feed trusted
+config); mobile chrome specifics (D6); chart drill gestures + freeze UX; BYOK cost/quota.
+
+**Decide the constraint now, design later:** concurrent multi-author editing (constrain spine 3's
+format to not preclude it); reproducibility (a corollary of spine 3's versioning + the freeze
+model).
+
+The within-realm design (formula language §3, recalc algorithm §4, catalog §3.3, testing loop §6)
+is specified enough to build. The seams are the up-front work.
+
+---
+
 ## 1. Product decisions recorded (2026-07-09)
 
 Six scope decisions were made in the planning session. They are recorded here with their
