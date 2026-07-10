@@ -74,19 +74,20 @@ that didn't compose. The gaps that hurt are all at the **seams**, not within a r
    bandwidth)`. Owns the fixes the review found by *composition*: the D9 test-oracle
    (trace/verdict channels) and the recalc mixed-epoch glitch (the result channel to a
    subscriber). **Reckoner-internal, so we own it end to end — do it first.**
-2. **Composite capability & lifecycle topology.** *Not yet drafted; likely a platform spec.*
-   The realm × capability × minting-authority matrix + the launch / keep-warm / teardown state
+2. **Composite capability & lifecycle topology.** *Spec:*
+   `docs/specs/COMPOSITE_CAPABILITY_TOPOLOGY_SPEC.md` (drafted, as a platform spec). The realm ×
+   capability × minting-authority × lifetime matrix + the launch / keep-warm / teardown state
    machine, resolving how D1 (per-instance delegation), D7 (AA-01 appKeys), D8 (launch-to-run),
-   and D9 (redacted mount) **compose**. This *is* the isolation property; every realm's
-   "can't reach X" claim depends on it, and it rides the design-pending D8. Platform work — needs
-   the roadmap conversation.
-3. **Document durability & evolution — the version envelope.** *Fold into the M1 format freeze.*
-   Only the envelope + compatibility policy (how a document declares the format/stdlib/catalog
-   version it needs; how an old document is resolved; what "additive-only" must guarantee) — not
-   the migration machinery. Cheap now, a per-document migration later. Subsumes the parked
-   reproducibility question ("which numbers did we report last quarter" falls out if the envelope
-   records provenance) and must decide the **constraint** that the format does not preclude a
-   later concurrent-multi-author merge (a one-line constraint, not a v1 design).
+   and D9 (redacted mount) **compose** — and the invariant that turns the no-both isolation from
+   app-discipline into structural enforcement only when all four hold. This *is* the isolation
+   property; it rides the design-pending D8. Platform work — needs the roadmap conversation.
+3. **Document durability & evolution — the version envelope.** *Spec:*
+   `docs/specs/DOCUMENT_VERSIONING_SPEC.md` (drafted; fold into the M1 format freeze). The
+   envelope + compatibility policy only (a `reckoner.json` `compat` block + the resolution rule),
+   not migration machinery. Cheap now, a per-document migration later. Closes the parked
+   reproducibility question (`authoredWith` + freeze + the Spine-1 capture epoch) and decides the
+   **constraint** that name-based cell identity keeps a later per-cell concurrent merge from being
+   precluded (a constraint, not a v1 design).
 
 **Safe to defer to implementation time** (realm-local, additive-safe, or a well-understood
 pattern behind a clear interface): exact stdlib signatures (bake-off validates; additive-only —
@@ -1289,7 +1290,10 @@ needs S4/S5 (external CI/deps until self-hosting closes the gap).
   gate) and **S5** (dep resolution for SES/CodeMirror) are the two gaps that keep source-level work
   external; booking them is the Axis-2 forcing-function contribution. **S3** (in-platform
   commit/push via the editor's VCS surface) is partial and worth closing early — it removes the
-  last routine reason to leave the platform for content work.
+  last routine reason to leave the platform for content work. The first Axis-2 work items are
+  scoped in `docs/AXIS2_SELF_HOSTING_WORKITEMS.md` (S3 first — the editor's `VcsControl` reads a
+  diff but cannot commit/push; then S4a — formalize the in-platform document-test gate; then an
+  S5 spike).
 
 ---
 
