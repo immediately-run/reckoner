@@ -1,0 +1,40 @@
+{
+  "seed": 20260709,
+  "months": 36,
+  "subscription_rows": 2175,
+  "customers": 150,
+  "latest_month": "2026-06",
+  "latest_mrr_eur": 409994.48,
+  "latest_nrr_pct": 105.4,
+  "top10_concentration_pct": 59.3,
+  "other_arr_eur": 2001923.43,
+  "waterfall_max_abs_recon_delta": 0.0,
+  "fx_gap": {
+    "currency": "GBP",
+    "missing_month": "2024-02",
+    "carry_forward_from": "2024-01"
+  },
+  "spot_checks": {
+    "mov_2024_06": {
+      "month": "2024-06",
+      "start_mrr": 130932.42,
+      "new": 11609.51,
+      "expansion": 71.85,
+      "contraction": -1086.05,
+      "churned": -45919.44,
+      "reactivation": 0.0,
+      "end_mrr": 95608.31,
+      "recon_delta": 0.0
+    },
+    "exec_2025_12": {
+      "month": "2025-12",
+      "mrr": 328067.55,
+      "mom_growth_pct": 1.2,
+      "nrr_pct": 96.1,
+      "grr_pct": 95.0,
+      "quick_ratio": 1.2452,
+      "gross_churn_pct": 3.5,
+      "vs_target_base_pct": 2.1567
+    }
+  }
+}
