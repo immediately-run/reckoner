@@ -1,6 +1,6 @@
 # Reckoner — Architecture Plan
 
-**Status:** plan / draft — scope decisions made 2026-07-09 (recorded in §1); design mechanisms adopted from `reckoner_research_report_v2.md`; nothing here is built · **Updated:** 2026-07-09
+**Status:** plan / draft — scope decisions made 2026-07-09 (recorded in §1); design mechanisms adopted from `reckoner_research_report_v2.md`; **adversarial-review-1 findings incorporated** (`ADVERSARIAL_REVIEW_1.md`); nothing here is built · **Updated:** 2026-07-09
 
 > **Drafted for:** peter@peterneumark.com
 >
@@ -298,12 +298,29 @@ export const by_month_order_free = testCell({
 ### 3.2 The formula API surface (committed, PD-4)
 
 Minimal core: a formula is `({inputs}) => value` over plain JS values. One stdlib, small
-enough to hold (**well under 20 top-level callables**, report RQ-A5), additive-only forever:
+enough to hold (**at the ~20 top-level-callable ceiling**, report RQ-A5), additive-only
+forever:
 
-- **Shaping:** `table()` (the fluent sugar), `groupBy`, `rollup`/`aggregate` (with `sum`,
-  `mean`, `median`, `count`, `min`, `max`, `quantile`), `join` (inner/left, explicit
-  semantics), `pivot`, `window` (event-time, for feed history), `sort`, `topN` (with
-  "other" bucket), `derive`, `filter`.
+- **Shaping (reductive):** `table()` (the fluent sugar), `groupBy`, `rollup`/`aggregate`
+  (with `sum`, `mean`, `median`, `count`, `min`, `max`, `quantile`), `join` (inner / left /
+  **`how:"full"`** + **`antiJoin`**, with documented **composite `on`**), `pivot`, `window`
+  (event-time, for feed history), `sort`, `topN` (with "other" bucket), `derive`, `filter`.
+- **Shaping (ordered / relational-across-rows) — added by adversarial-review-1 (DSL-1/2/3):**
+  `lag`/`lead` (prior/next row within a sorted partition), `scan`/`cumulative` (running
+  fold: `cumsum`, `cummax`, running-mean, EMA), `asofJoin` (nearest-preceding key match —
+  the FX carry-forward). These are the SQL window-function + as-of set; without them the
+  case study's defining logic (month-over-month movement, running retention, gapped-FX
+  normalization) collapses to the hand-rolled reduce loops the design exists to prevent.
+- **Dates (pure) — added by review-1 (DSL-5):** `monthsBetween`, `monthKey`/`truncate`,
+  `addMonths`/`addDays`, `fiscalPeriod`, `resolveRange("last-90d", now)`. Explicit,
+  timezone-safe, no ambient clock (the clock stays a declared `params.now` input).
+- **Null / empty semantics (specified, not left implicit) — review-1 (DSL-6):** `rollup`
+  over an **empty group returns `null`, not `0`** (0 is a wrong answer for `mean`/`median`);
+  a left/`asof` join miss yields `null`, not an absent row; arithmetic in `derive`
+  propagates `null` (never `NaN`/`Infinity` silently). `coalesce`/`orElse` and `safeDiv`
+  (÷0 → `null`) are stdlib citizens. This is a correctness gate, not a convenience: an
+  undefined empty-group return lets a fitting fixture with no empty group pass green while a
+  `NaN` bug hides (the RQ-D5 mis-inference class).
 - **Testing:** `testCell()`, `expectEqual`/`expectClose`, `property()` (PBT),
   `conservation()`, `permutationInvariance()`, `scaleInvariance()` — metamorphic relations
   as named stdlib citizens (report RQ-D5): they are the non-circular correctness evidence
@@ -311,11 +328,24 @@ enough to hold (**well under 20 top-level callables**, report RQ-A5), additive-o
 - **Screening (assistant-facing, §8.3):** `trend()`, `outliers()`, `deltas()` — the
   computed message-finding tools, themselves pure formulas.
 
+> *(Adversarial-review-1, 2026-07-09 — the prior surface was "well under 20 callables" with
+> only the reductive shaping set. The DSL pass showed it covered the reductive half of the
+> case study cleanly but had **no primitive for the ordered/relational-across-rows half**,
+> so exactly that logic fell to hand-rolled reduce loops. The window/as-of/date/null
+> additions above (user decision: add now, ahead of the M0 bake-off, since the additive-only
+> freeze makes a missing family permanent) are the standard, boring SQL-window set — still
+> at/under the RQ-A5 ceiling because they replace loops, not add surface area. See
+> `ADVERSARIAL_REVIEW_1.md` DSL-1..8.)*
+
 Every callable ships a JSON-Schema-typed self-description with purpose line, per-parameter
 descriptions, enums for closed choices, and 1–2 worked examples (RQ-A5); the catalog of
 self-descriptions is a first-class evaluated artifact with its own gate test (§11). The
 fluent `table()` API is a thin layer over the plain-value core — `table(rows)…rows()` in,
-plain rows out; same semantics, no second engine, no separate columnar runtime.
+plain rows out; same semantics, no second engine, no separate columnar runtime. Two naming
+notes from review-1: `window` (event-time feed buffering) is distinct from the window
+*functions* `lag`/`scan` — the self-descriptions must disambiguate (DSL-8); and a cohort-%
+that pivots before normalizing forces an `Object.keys` loop, so the `pivot` self-description
+steers **normalize-before-pivot** (DSL-4).
 
 **Deliberately absent — the absences are findings too:**
 
@@ -357,7 +387,13 @@ changes what the syntax means:
   arrays/objects (`options={["all","emea"]}` is captured as plain data by the
   render-as-data path). Anything non-literal is inert text.
 
-Opening a stranger's dashboard is therefore safe **by grammar**, not by sandbox heroics.
+Rendering a stranger's *template* is therefore safe **by grammar** — the template
+contributes no executable code. (This is a claim about the template layer only. Opening the
+whole dashboard also *runs the author's worksheet formulas* in the engine; that is safe by
+SES starvation + the tier backstops — the app-structural discipline the spec (§3.2) marks
+unbuilt and fork-weakenable, and which is fiction until D7 per PD-6. Do not launder
+template-grammar safety into whole-dashboard safety — see §7's trust claim, corrected by
+review-1 H1.)
 
 **Data binding: the `source` attribute.** All data flows through declarative attribute
 references resolved by the renderer — never interpolation
@@ -372,8 +408,12 @@ Resolution mechanics, all load-bearing:
    it can only display what it names, and the host knows the full set statically.
 2. When the engine recomputes a bound cell, the component re-renders. Liveness is entirely
    the binding's doing; the template stays a static document.
-3. Values arrive **with their tier**, so shared-view chrome can badge low-trust-derived
-   tiles; a template never touches values (only names them), so it cannot launder.
+3. Values arrive **with their tier**. The tier/trust **badge is host-rendered chrome, not
+   Reckoner's** (review-1 H2): a trust signal drawn by app code is forgeable by a malicious
+   fork (receive `tier=M3`, render an M1 badge). Reckoner reserves the layout slot and
+   supplies the value; the host draws the badge, exactly as it draws the aggregate reach
+   badge (§7). A template never touches values (only names them), so it cannot launder — but
+   the *signal that conveys tier* must be host-owned or it carries no weight on a fork.
 4. **Shape contracts are the component's job** (`Kpi` wants a scalar, `Chart` wants rows
    with the encoded fields); a mis-shaped binding is an authoring-time diagnostic and a
    marked broken tile in view mode — never a blank or a crash.
@@ -469,17 +509,36 @@ capabilities; every channel is host-brokered.
   snapshots and injects exactly those. Feeds appear as **frozen snapshots per
   recalculation** (RQ-A3) — within one evaluation a feed is an immutable value; history is
   the explicit `window()` abstraction over the connector's retained buffer.
-- **Async formulas:** allowed (a formula may return a promise for chunked computation);
-  inputs changing mid-flight cancel and reschedule the evaluation (sound because pure —
-  Bazel restarting semantics, report RQ-B1).
-- **Watchdog:** per-evaluation time budget at the worker boundary; a formula that exceeds
-  it is terminated and its cell enters the error state (SES does not protect availability —
-  report RQ-A4 residual).
-- **Single evaluator context for v1** (RQ-B3). The scheduler is written so independent
-  subgraphs *could* be partitioned to a worker pool later, with data movement as
-  transferable ArrayBuffers / OPFS — **never** assuming SharedArrayBuffer (the
-  `crossOriginIsolated` constraint in opaque-origin sandboxed iframes is architecturally
-  fragile; report caveats).
+- **Async formulas:** allowed (a formula may return a promise for chunked computation).
+  Cancellation is **bounded, not unconditional** (review-1 F2 — the load-bearing progress
+  invariant): an in-flight evaluation is **run to completion against its snapshot**, never
+  cancelled by a newer input; at most one "newest pending snapshot" is queued per cell, and
+  when the running eval lands, if a newer snapshot exists it re-evaluates exactly once
+  (single-slot supersession). This is what makes progress hold when a formula's eval time
+  `e` exceeds a feed's conflation interval `c` — unconditional cancel-and-restart (the naïve
+  reading of Bazel restarting semantics) would perpetually cancel such a formula before it
+  finished (a livelock). Purity makes each *would-be* result correct; the supersession rule
+  is what makes one *land*. The published freshness bound is therefore `max(c, e)`, not `c`
+  (§5.3).
+- **Watchdog:** per-evaluation budget at the worker boundary bounding **async wall-clock**,
+  not just synchronous CPU (review-1 L5) — an evaluation that awaits/schedules microtasks is
+  bounded across the whole async span. A formula that exceeds it is terminated. **Error is a
+  first-class lattice value** (review-1 F6): a terminated cell enters an error state that
+  *resolves* every suspended dependent with a propagated error — a waiter is never left
+  pending on a value that will never arrive. And the watchdog verdict is **memoized
+  host-side, keyed by `(cell, input-hash)`**: because a synchronous runaway in the
+  single-context worker can only be stopped by `worker.terminate()` — which destroys all
+  in-flight state and the in-memory memo — a rebuilt worker must not re-demand a
+  known-diverging cell against unchanged inputs (else it relaunches into a livelock). The
+  host-side sticky verdict converts that relaunch into a one-shot error. SES does not protect
+  availability (report RQ-A4 residual); these three rules are how the engine survives it.
+- **Single evaluator context for v1** (RQ-B3), with the blast radius owned explicitly: a
+  synchronous divergence terminates and rebuilds the *whole* context, and survivors are
+  re-scheduled from the host-side memo (which is why memo lives outside the worker — it ties
+  to the versioned publication of §5.2). The scheduler is written so independent subgraphs
+  *could* be partitioned to a worker pool later, with data movement as transferable
+  ArrayBuffers / OPFS — **never** assuming SharedArrayBuffer (the `crossOriginIsolated`
+  constraint in opaque-origin sandboxed iframes is architecturally fragile; report caveats).
 
 ### 4.2 Recalculation scheduler
 
@@ -492,15 +551,48 @@ Carte*.
 - **The cutoff equality is over the pair `(value-hash, tier)`** — never value alone, or
   early cutoff becomes a tier-laundering hole (RQ-B4). Tier propagates as a second product
   of the same traversal: tier = floor (greatest lower bound) over input *tiers*, so an
-  unchanged value with a changed tier still re-labels downstream.
+  unchanged value with a changed tier still re-labels downstream. **`(value, tier)` is one
+  atomic result record** published together (review-1 F4): a subscriber on the result
+  channel never observes a value from one epoch with a tier from another — the pair rule
+  governs *publication atomicity*, not only cutoff equality. Each result carries an
+  **epoch/generation stamp**; a late-landing async result from a superseded epoch is
+  dropped, not published (this is where §4.1's single-slot supersession meets the tier
+  fold).
+- **Demand-driven on both the edit path and the live path** (review-1 F5). A feed change or
+  param write is a **dirty signal**, not a value-delivery path: it marks inputs dirty and
+  the scheduler rebuilds each dependent **once, after its transitive inputs settle**, then
+  publishes the settled `(value, tier)`. Components subscribe to the *settled* result, never
+  to per-arm intermediate notifications — so a diamond (A→B, A→C, B→D, C→D) with early cutoff
+  on one arm rebuilds D once against fully-settled B and C, never glitching on (B_old,
+  C_new). Push language elsewhere ("a notification wakes the scheduler", §5.2) means exactly
+  this dirty-then-pull, not FRP-style per-arm propagation.
 - **Cycles are always an error** with the full cycle path reported (SCC decomposition,
   HyperFormula-style diagnostics); no iterative/fixpoint calc in v1 (RQ-B2 — recorded as a
   known cost for converging financial models; additive opt-in later is compatible).
-- Mid-session tier change (a feed's tier drops): flush-then-restart of the affected
-  subgraph, softened by cutoff but never below the pair rule.
+  Dynamic-dependency deadlock-freedom rests on one stated invariant (review-1 F1): **the
+  runtime dependency set of any cell is a subset of its statically cycle-checked conservative
+  set, and the scheduler never suspends on an edge outside that set.** SCC runs over the
+  namespace-*expanded* conservative graph (`candidates: "revenue.*"` → all of `revenue.*`)
+  before the scheduler ever demands a cell, so a runtime cycle formed through
+  `candidates[which]` is always contained in a static cycle and errored first. This requires
+  every declared namespace to be **statically enumerable** at graph-publish time (asserted),
+  and it owns a false-positive cost — a `focus` selector plus a summary tile referencing it
+  is a *static* cycle even when no runtime configuration is cyclic — surfaced as a clear
+  cycle diagnostic (there is no `INDIRECT()` escape by design).
+- Mid-session tier change: **feed tier is monotone non-increasing per session** (review-1
+  F7 — carried from research_proposal line 329, dropped from the earlier draft). A tier drop
+  fires flush-then-restart of the affected subgraph; monotonicity bounds this to **at most
+  once per tier level** (lattice height, ~2–3), which is the termination guarantee — a
+  re-raisable tier could oscillate like the F2 livelock. The restart is softened by value
+  cutoff (only the cheap tier fold re-runs) but never below the pair rule. A tier that
+  *should* rise (a feed re-consented higher) waits for a new session / re-mount, never
+  mid-session.
 - Budget (from the research proposal): p95 < 100 ms recompute for a single-cell edit on a
   10⁴-cell workbook; glitch-freedom (no cell ever observes mixed pre/post inputs) proven by
-  a property test over random DAGs (§11 E-2).
+  a property test over random DAGs (§11 E-2). **Honesty note (review-1):** the recompute
+  budget is stated in *cells*, but the case study's cost is *data-volume*-dominated (a 5k-row
+  join across 36 months) — E-2 budgets both a single-cell edit (riding cutoff) and a cold
+  full recompute of the join-heavy sheets.
 
 ### 4.3 Diagnostics and debugging across the starved boundary
 
@@ -511,9 +603,14 @@ Carte*.
   only, never in shared-view mode.
 - **Trace replay (RQ-D3):** authoring mode can record an evaluation (declared inputs →
   stdlib-call intermediates → output) and replay it *outside* the sandbox — sound because
-  formulas are pure. This is the primary agent-facing debugging surface (agents consume
-  structured traces better than steppers). Layered under it: rich structured errors are
-  expected to cover ~90% of need.
+  formulas are pure. **A trace carries the tier of its originating evaluation and is
+  confined and suppressed exactly as the diagnostics channel is** (review-1 M5): its
+  intermediates can contain M3 feed data, so it must not be the one engine-egress path that
+  escapes the caps the diagnostics channel imposes. Surfaced in authoring only, never in
+  shared-view mode; a diagnostic/trace from a *cancelled* eval is marked `cancelled` so
+  replay never reconstructs a phantom evaluation. This is the primary agent-facing debugging
+  surface (agents consume structured traces better than steppers). Layered under it: rich
+  structured errors are expected to cover ~90% of need.
 - The "debug evaluator with author authority" idea stays **out of plan** until it passes a
   P1 security review (it reintroduces the exact combination the architecture exists to
   prevent).
@@ -535,6 +632,13 @@ if fully compromised (the metacircular-fork containment, spec §3.2).
 v1 = **materialize-to-mount + change notification**: binary/columnar frames written via an
 OPFS sync access handle in the connector's worker; a lightweight notification
 (BroadcastChannel/postMessage-scale) wakes the scheduler; the engine reads its snapshot.
+**Publication is versioned and atomic** (review-1 F3): the connector writes each new frame
+to a **new content-addressed/versioned path** — never an in-place overwrite of a frame that
+may be open — and the change notification carries the **frame id**; the engine opens *that*
+id. This is what makes "frozen snapshot per recalculation" true at the byte level across the
+two realms (connector writer, engine reader are different workers sharing a mount): no torn
+read of half-of-frame-N/half-of-N+1, and no exclusive-lock contention on a shared OPFS sync
+handle. Conflation is the natural implementation — keep-latest = advance the published id.
 No message bus in v1. The C1 benchmark (§11 E-4) measures the end-to-end
 connector-receipt→chart-paint loop (p95, copy-vs-transfer-vs-OPFS swept) and publishes the
 supported envelope ("live means ≤ N Hz / ≤ M KB per feed"); the written trigger for
@@ -550,8 +654,18 @@ building the deferred tiered message bus is the envelope failing at ≤30 Hz mid
 - Backgrounded tab / mobile reconnect: rejoin is a fresh subscription with a **gap
   marker**; windows spanning the gap surface as partial, never fabricated continuity.
 - **Cadence = conflation** (RQ-C3): coalesce writes per feed (keep-latest), recompute
-  immediately on the coalesced frame, align *rendering* to rAF. A stated freshness bound is
-  published (conflation interval + one recompute + one paint). No debounce-the-recompute.
+  immediately on the coalesced frame, align *rendering* to rAF. The published freshness
+  bound is **`max(conflation interval, eval time) + one paint`** (review-1 F2 — not
+  `interval + recompute` alone, which is only valid when eval time ≤ interval; §4.1's
+  run-to-completion supersession is what makes the bound hold otherwise). No
+  debounce-the-recompute — the progress guarantee lives in the supersession rule, not a
+  debounce knob.
+- **Param writes share this conflation** (review-1 F8): a dragged `Range`/slider emits
+  60–120 Hz writes into the *same single-context evaluator*, so `params.*` writes are
+  coalesced keep-latest and recompute once per coalesced value, exactly like feeds —
+  otherwise a fast drag floods the evaluator or (under naïve cancel-restart) livelocks like
+  F2. Interaction is "data flow the graph already understands" (§3.3) *into the same
+  evaluator*, so it needs the same backpressure.
 
 ### 5.4 Freeze, and fixture capture as freeze (RQ-C4/D4)
 
@@ -566,7 +680,11 @@ RS-10 resolution). The two explicit materialization gestures:
   (`fixtures/*.frame.json`) and is a **mainline** flow (the infer-then-fortify workflow
   makes it routine, not an edge case — report D4 revision). Captured frames carry their
   source tier; a viewer without feed consent can still run the full test suite over
-  fixtures — that is a feature, and the tier tag is what makes it safe.
+  fixtures — that is a feature. **What makes a shared fixture safe is the D4 mount refloor
+  at capture time, not the tier tag traveling in the file** (review-1 L1): §3's rule stands —
+  the in-file tier tag is *advisory display metadata*, the host's mount tier is
+  authoritative, and content may not self-declare an output tier (spec §4.2). An implementer
+  must attribute the safety to the refloor, never trust the file tag.
 
 Because infer-then-fortify makes capture mainline, the freeze UX ships in **M2** (with
 authoring), not with the live plane in M3 — the one place this plan re-orders the platform
@@ -585,16 +703,26 @@ architecture, not test-infra niceties:
    `property`) are mandatory on every test cell (§3.1) and drive the review surface: a
    formula covered only by characterization tests derived from its own fitting data is
    **visibly unvalidated** — a distinct visual state between "untested" and "validated."
-2. **Holdout is a first-class affordance.** When the assistant infers a formula from
-   column data, the platform withholds a slice of rows from the fitting context and emits
-   them as `specification` tests automatically. Held-out rows are the only example-based
-   tests carrying genuine correctness weight; the affordance is in the assistant harness
-   (§8.3), not left to prompt discipline alone.
+2. **Holdout is a first-class affordance, enforced by the host — not by the agent's
+   restraint** (review-1 H3, resolved by delta D9). When the assistant infers a formula
+   from column data, the platform withholds a slice of rows from the fitting context and
+   emits them as `specification` tests automatically. **This is only real if the agent
+   *cannot* read the withheld rows** — but the assistant holds `rw@self` over the document,
+   which contains the fixtures, so "the harness withholds a slice from you" is not free from
+   G12. It requires the **redacted-mount-view mechanism (D9)**: during inference the agent's
+   read tool returns only the training split; the held-out fixtures are unreadable even
+   under `rw@self`. Held-out rows are the only example-based tests carrying genuine
+   correctness weight, so this enforcement is load-bearing, not a nicety. Until D9 lands
+   (M2), holdout is prompt discipline with known erosion and must be labeled as such —
+   never presented as enforced.
 3. **Metamorphic relations and PBT are stdlib citizens** (§3.2) — non-circular, oracle-free
    correctness checks that agents state well.
 4. **Independent authoring:** the assistant can invoke a second agent that writes
    specification tests and synthetic fixtures from a cell's *stated intent* (its `doc`),
-   without seeing the implementation or fitting data.
+   without seeing the implementation or fitting data — "without seeing" enforced by the
+   same D9 redacted-mount-view (the second agent runs with a read view narrowed to the
+   intent, not the document that holds the implementation and fitting data). Same caveat:
+   prompt discipline until D9 (review-1 H3).
 5. **Mutation testing** is the offline CI signal (Stryker-style over worksheet formulas,
    run outside the browser in CI): does the pinned suite kill mutants? Mutation score per
    cell feeds the review surface.
@@ -628,10 +756,18 @@ The composite root and the only realm a pure viewer ever needs.
 - **Observability chrome:** the composite inspector integration — per-member status and
   revoke, and the **aggregate reach view** ("9 sources · 2 elevated" badge + consent
   screens showing the *new total*, not the delta — RQ-E3, platform delta D6). The viewer
-  trust claim (RQ-E5) ships as report candidate #1: *"Static reports run none of the
-  author's code in your browser; live reports fetch only from sources you approve, and
-  nothing here can reach your other data."* — written into chrome last, in M4, when it is
-  true (research proposal sequencing).
+  trust claim (RQ-E5) states a **reach** bound, not a *no-execution* bound (review-1 H1 —
+  the earlier wording "runs none of the author's code" was literally false: a static report
+  *does* run the author's formulas in the engine; what is true is that they run starved).
+  Corrected claim, shipped last (M4) once true: *"The author's formulas run sandboxed —
+  with no access to your files, accounts, or network. Live reports fetch only from sources
+  you approve, and nothing here can reach your other data."* The provenance inspector (V3)
+  lets a viewer watch those formulas compute, so the sentence must survive that scrutiny.
+- **Value inspector (V3) is subgraph-legible, not one-hop-modal** (review-1 UX-4): walking a
+  4-deep precedent chain one panel at a time is worse than Excel's spatial Trace-Precedents,
+  so the inspector offers a whole precedent-neighborhood view alongside hop-by-hop. The
+  brief's "≤2 taps from any value" acceptance means *opening* the inspector; *traversing* the
+  chain is the neighborhood view, not N sequential taps.
 - **Key user flows and UI design:** the enumerated flows (zero-consent open, params
   drill, value-provenance inspection via the cell inspector, histogram
   re-bin/`drillTo`, worksheet navigation, assistant/form/editor authoring paths, freeze
@@ -639,6 +775,29 @@ The composite root and the only realm a pure viewer ever needs.
   `design-briefs/reckoner/00-reckoner-ui.md`, with the benchmark port case study
   (the Meridian SaaS exec-metrics workbook — also the E-1 bake-off corpus and an F1
   catalog stress test) in `design-briefs/reckoner/01-benchmark-case-study.md`.
+
+### 7.1 Scope: report-authoring and delegation, not ad-hoc exploration (review-1 UX-1/UX-2)
+
+The UX pass found a genuine regression for one of the three named users and it is scoped
+out here honestly rather than papered over. **Reckoner is a reporting/authoring and
+sharing tool, not an exploratory-analysis surface.** Two spreadsheet flows have *no*
+equivalent and deliberately won't in v1:
+
+- **No scratch / range-select-sum / multi-cell scan.** Every computation is a durable,
+  named, declared, tested cell; there is no anonymous throwaway cell and no
+  "select-a-range-and-read-the-sum-off-the-status-bar." Ad-hoc "poke at the data" work
+  stays in a spreadsheet — Reckoner is where a *result* is authored, tested, and shared,
+  not where a hypothesis is explored. (If usage shows this scope cut is untenable for the
+  RevOps persona the case study invokes, the fix is a real ephemeral-cell scratch surface +
+  a tabular multi-cell inspector — a booked *future* item, R-6, not a v1 hand-wave.)
+- **Agent-first for non-trivial logic, and honest that the direct path is for simple
+  edits + review.** Changing a *number* or an assumption (`static.*`, a `Params` widget) is
+  first-class and instant. Changing *logic* by hand is a code-editing task (the quick-add
+  form covers single aggregates only; beyond that is tested JS in the platform editor). The
+  plan does **not** claim the direct hand-authoring path is a co-equal peer of the agent
+  path for mid-complexity work — it is deliberately the delegate-or-review path. This is the
+  "back-to-Excel" failure mode Problem 2 names, converted from an unadmitted risk into a
+  stated scope choice.
 
 ---
 
@@ -658,9 +817,13 @@ Two write classes, marked **at compose time** in the assistant UI:
 
 - **Live Class-A edits** (formulas, tests, templates): un-gated; the human sees the result
   render immediately. A persistent affordance marks drafted actions as "applies live."
-- **Publishing to a shared space, source/component edits, feed-config edits:** routed
-  through the attended full-diff gate (TS-19b), marked "will require your approval" before
-  the agent accumulates twenty silent live edits.
+- **Tier-consequential and gated actions** — **publishing to a shared space, source/component
+  edits, feed-config edits, and fixture *capture*** (review-1 M4): routed through the
+  attended full-diff gate (TS-19b), marked "will require your approval" before the agent
+  accumulates twenty silent live edits. Fixture capture belongs here, not in the live class:
+  it is a freeze that can refloor the document's tier (§5.4), so the agent must surface the
+  tier consequence before it happens — a live-edit classification would let it capture M3
+  rows silently.
 
 ### 8.3 The authoring loop (infer-then-fortify, operationalized)
 
@@ -674,9 +837,11 @@ The draft **standing system prompt** for the formula-authoring agent is
 [assistant/FORMULA_AUTHORING_PROMPT.md](assistant/FORMULA_AUTHORING_PROMPT.md) — it encodes
 the syntax contract (§3.1), the authoring loop, the test-kind rules, fenced-data handling,
 and the live/gated write boundary, with a design-rationale section mapping each part to its
-finding. Load-bearing behaviors (holdout, kind-weighted review) are stated there as facts
-about the environment and *enforced by the harness*, not left to prompt discipline. The
-prompt is part of the surface E-6 (the RQ-A5 agent-loop gate) evaluates.
+finding. Load-bearing behaviors that must *not* rest on prompt discipline — holdout, blind
+second-agent authoring — are enforced by the **D9 redacted-mount-view** (review-1 H3), not
+by the prompt telling the agent not to peek; kind-weighted review is host-rendered in the
+review surface regardless of what the agent claims. The prompt states these as facts about
+the environment and is part of the surface E-6 (the RQ-A5 agent-loop gate) evaluates.
 
 ### 8.4 Report generation (PD-3), sequenced honestly inside v1
 
@@ -724,13 +889,16 @@ while its gating rows are open.
 | D3 | Non-executable-MDX safe renderer | immediately-run-sdk | designed + empirically verified (TRUST_MODES §5.1), unbuilt | `f={fetch("/x")}` captured as inert string; no evaluator in the pipeline | all rendering (M1) |
 | D4 | Freeze/write-laundering enforcement (RS-10; rides R3-156 track) | site-main | designed direction, unbuilt | write-laundering gate: silent persist refused; explicit freeze refloors or is refused | freeze UX (M2), shared (M3) |
 | D5 | Hardened sandbox profile (per-frame CSP delta on G1a) | sandbox, site-main | needs per-frame-CSP infra | connector frame: `connect-src 'none'` with `net:fetch` surviving via host proxy | live (M3) |
-| D6 | Composite: manifest resolution, composite-aware powerbox (un-bundled TS-5b line, mobile one-member-per-card), inspector + aggregate reach view | site-main | net-new (spec §6) | powerbox tests (badge integrity, un-bundled elevated line); run-mode-first gate (static doc → zero powerbox, desktop + mobile) | shared/live (M3) |
+| D6 | Composite: manifest resolution, composite-aware powerbox (un-bundled TS-5b line, mobile one-member-per-card), inspector + aggregate reach view, **host-rendered tier/trust badges** (H2), **manifest↔launch-graph reconciliation** (L2) | site-main | net-new (spec §6) | powerbox tests (badge integrity, un-bundled elevated line); run-mode-first gate (static doc → zero powerbox, desktop + mobile); **reconciliation gate: an undeclared sandbox spawned under the composite root is flagged** (RS-9/RS-11); **tier badge is host-drawn, not app-emittable** | shared/live (M3) |
 | D7 | **AA-01 program-identity `appKey`** (per-entry-point identity) | site-main | V2 design of record exists (AGENT_AUTHORING §5.1); unbuilt | sibling-isolation gate: two entry points of one repo hold disjoint grant bundles; engine entry point resolves to an empty bundle | realm isolation being real — anything shared (M2→M3 boundary) |
 | D8 | **Launch-to-run / standing-app-lifecycle** (per-instance delegated launch + keep-warm/teardown that per-instance `capDir` delegation and composite lifecycle ride) | site-main | **design-pending** (STANDING_APP_LIFECYCLE §4.1/§5.1, Open Q#10; rides AA-01) | per-instance-delegation gate: two live instances of one connector `appKey` hold disjoint source grants and independent lifecycle | D1 per-instance tiering + D6 composite lifecycle (live/shared, M3) |
 | D9 | **Redacted-mount-view for holdout** (the assistant's read tool returns only the training split during inference, so held-out fixtures are unreadable even under `rw@self`) | site-main (+ SDK fs surface) | **UNDESIGNED** — net-new; fights the standing `rw@self` grant | holdout-enforcement gate: an inference-mode agent with `rw@self` over the document cannot read the withheld rows; blind second-agent authoring cannot read the implementation/fitting data | holdout + blind-authoring being real, not prompt discipline (H3) — testing story (M2) |
 
-Design content for D2 is already fixed by the report (RQ-E1) — the sprint's job is the
-host-side design doc + adversarial pass, not research: allowlist of scheme+host+port;
+The D2 *recipe* is known from the report (RQ-E1), but the **host-enforced design is not
+done** — spec §0/§4.5/§12 Q3 call it the single most load-bearing gap and mark it UNDESIGNED
+(review-1 M3 corrected the earlier "already fixed" phrasing, which undersold the residual).
+The M0 sprint's job is the host-integrated design doc + adversarial pass, not literature
+research; the recipe it must integrate: allowlist of scheme+host+port;
 resolve-then-pin the IP; re-validate the resolved IP after **every** redirect hop (or
 disable redirects); block RFC1918/loopback/link-local/CGNAT/ULA/metadata ranges;
 single egress proxy (Smokescreen as reference); per-instance fetch budgets (rate + volume)
@@ -768,17 +936,37 @@ run-mode-first value ordering implies.
 - **B1 scheduler spike:** suspending-vs-restarting benchmark over synthetic graph families
   (deep chains, wide fan-out, diamonds, 10³–10⁵ cells); early-cutoff hit rate on typical
   edits. Exit: engine design note with measured numbers.
-- **A1 bake-off (validation, PD-4):** ~50 shaping tasks, three surfaces, driven from
-  self-descriptions alone; measures first-attempt correctness, hallucinated-API rate, diff
-  size on follow-up edit. Exit: numbers vs. the promotion rule.
+- **A1 bake-off (validation, PD-4 + the review-1 stdlib additions):** ~50 shaping tasks,
+  three surfaces, driven from self-descriptions alone; measures first-attempt correctness,
+  hallucinated-API rate, diff size — **plus the two review-1 metrics**: a **raw-loop /
+  stdlib-fallback rate** (did the solution shape with stdlib primitives or escape to an
+  imperative `.reduce`?) and an **edge-case-correctness axis** over the planted boundary
+  fixtures (empty cohort, single-row customer, FX gap). Exit: numbers vs. the promotion
+  rule; **a primitive hallucinated by ≥2 independent agents is an additive-inclusion
+  candidate before the M1 freeze** (the mechanism that catches a still-missing family).
 - **C1 transport rig:** the write-notify-read loop measured end-to-end (p95), rate × size
   × transport swept. Exit: the v1 envelope numbers.
-- **AA-01 (D7) implementation start** in site-main (design of record exists).
+- **AA-01 (D7) implementation start** in site-main (design of record exists); **D9
+  redacted-mount-view design** (net-new; the holdout enforcer) and **D8 launch-to-run
+  design** advanced far enough to unblock M2/M3.
+- **E3 reach-view efficacy study designed and started** (review-1 M6): moved ahead of M4 so
+  M3 sharing can gate on it (below), mirroring the F4-before-generation rule.
 
-### M1 — The static core (first shippable: static dashboards, shareable, zero-consent)
+### M1 — The static core (first shippable: static dashboards, zero-consent)
+
+**On "shareable" (review-1 M1):** M1 static reports *can* be shared, and this does **not**
+contradict R-2's "nothing shared before D7" — because in M1 no realm holds Class-B caps,
+egress, or an agent, and viewers get `ro`, so the shared-appKey fiction has nothing to grab.
+Sharing that carries *live feeds or the assistant* waits for D7 (M2) and the D-row gates
+(M3). M1's shareability is the static-only case, stated as *why* it is safe, not asserted
+over R-2.
 
 - Engine: SES compartment, worksheet loading, explicit-input injection, suspending
-  scheduler with (value-hash, tier) cutoff, cycles-as-error, watchdog.
+  scheduler with (value-hash, tier) cutoff, cycles-as-error, watchdog — including the
+  review-1 recalc invariants: run-to-completion supersession (F2), error-as-lattice-value +
+  host-side sticky watchdog memo (F6), conservative-set subset invariant (F1), atomic
+  `(value,tier)` + epoch publication (F4), demand-driven live path (F5), tier
+  monotone-per-session (F7), versioned atomic frame publication (F3), param conflation (F8).
 - Document model v1 (§3) frozen at format-version 1; stdlib core + self-descriptions.
 - Report view + catalog on the **SDK safe renderer (D3 — must land here)**; responsive +
   themed + degraded states; params/drill-down.
@@ -797,25 +985,36 @@ run-mode-first value ordering implies.
   second-agent test authoring.
 - Generation pipeline (brief → layout → mechanical lints → anchored critique), quality
   claims gated on M0's κ numbers; F6 edit-loop benchmark ≥90%.
-- **AA-01 (D7) lands** — realm isolation becomes real. Everything before this in M2 is
-  dev-mode only with respect to isolation claims.
+- **AA-01 (D7) lands** — realm isolation becomes real. **D9 redacted-mount-view lands** —
+  holdout and blind-authoring become host-enforced (before that they are prompt discipline,
+  §6). Everything before D7/D9 in M2 is dev-mode only with respect to isolation and holdout
+  claims, and **that window runs the author's *own* documents only** (review-1 M7): no
+  third-party document is opened while the content-executing engine shares an appKey with
+  the assistant's `llm:chat` grant, and demo/marketing material is forbidden from doing so —
+  not merely required to "not claim isolation."
 - **Exit gates:** RQ-A5 agent-loop gate (an agent completes create→declare→test→run→read
   failure→fix cold from the published catalog, zero out-of-catalog guesses); D7
-  sibling-isolation gate; freeze-UX usability pass (users predict the tier consequence);
-  F4-scored generation baseline published.
+  sibling-isolation gate; **D9 holdout-enforcement gate** (an inference-mode agent with
+  `rw@self` cannot read the withheld rows); freeze-UX usability pass (users predict the tier
+  consequence); F4-scored generation baseline published.
 
 ### M3 — The live, shared product
 
 - Connector realm + feeds config; materialize-to-OPFS + notification; retention,
   conflation, freshness bound per the M0 envelope.
 - Platform: **D2 egress proxy built** (gate test passing), D1 output tiering +
-  per-instance delegation, D5 hardened profile, D6 composite powerbox + inspector +
-  aggregate reach view (mobile-complete: one-member-per-card, connector as its own
-  full-screen step).
+  per-instance delegation, **D8 launch-to-run/standing-app-lifecycle** (which per-instance
+  delegation + composite lifecycle ride), D5 hardened profile, D6 composite powerbox +
+  inspector + aggregate reach view + host-rendered tier badges (mobile-complete:
+  one-member-per-card, connector as its own full-screen step).
 - Tier-on-the-graph live end to end; over-tainting instrumentation on.
-- **Exit gates:** all seven D-rows' gate tests green; the spec's must-establish table
-  (spec §13) green in CI; C1 envelope published in docs; mobile real-device pass for
-  consent + drill-down (emulators insufficient, platform practice).
+- **Exit gates:** all **nine** D-rows' gate tests green; the spec's must-establish table
+  (spec §13) green in CI; C1 envelope published in docs; **E3 reach-view efficacy result in
+  hand and M3 sharing gated on it** (review-1 M6 — the sole confidentiality-legibility
+  mechanism does not ship as load-bearing against an uncalibrated ruler; if E3 shows the
+  new-total reach view does not improve detection, the shared path is held/redesigned before
+  live ship); mobile real-device pass for consent + drill-down (emulators insufficient,
+  platform practice).
 
 ### M4 — Hardening, measurement, and the trust claim
 
@@ -824,19 +1023,27 @@ run-mode-first value ordering implies.
   target ≥80% catch on the full loop; if holdout+metamorphic catches <60%, the
   publish-to-shared path gains a mandatory second-agent specification-test gate (report
   threshold).
-- E3 consent A/B (delta-only vs. new-total, grant/deny + comprehension), E2 over-taint
-  verdict written, E4 real-device consent validation.
-- Viewer trust claim (§7) shipped in chrome — last, once true.
-- Third fresh-agent adversarial pass on the spec + this plan's implementation deltas.
+- E3 consent A/B *final verdict* (the study started in M0 and gated M3; M4 writes the
+  durable comprehension result), E2 over-taint verdict written, E4 real-device consent
+  validation.
+- Viewer trust claim (§7, corrected to the reach/starvation wording — review-1 H1) shipped
+  in chrome — last, once true.
+- Third fresh-agent adversarial pass on the spec + this plan's implementation deltas
+  (this document is adversarial-review-1; the spec's requested third pass runs against the
+  D2 design-sprint output — §9).
 
 ### Sequencing rationale in one line each
 
 - F4 before any generation claim: the report's non-negotiable (uncalibrated rulers).
+- E3 before M3 sharing (review-1 M6): the reach view is the *sole* confidentiality-legibility
+  mechanism and confidentiality is the one property that must hold — the same uncalibrated-ruler
+  logic as F4, applied to the more dangerous property.
 - D2 design in M0 even though the proxy ships in M3: undesigned + load-bearing means its
   design risk must be retired first, not discovered late.
 - Freeze/fixtures in M2 not M3: infer-then-fortify makes capture mainline (report D4).
-- AA-01 inside M2: the last point where "realms share an appKey" is honest, because M3 is
-  where strangers' documents and real credentials arrive.
+- AA-01 + D9 inside M2: the last point where "realms share an appKey" and "holdout is
+  prompt discipline" are honest, because M3 is where strangers' documents and real
+  credentials arrive.
 
 ---
 
@@ -844,15 +1051,15 @@ run-mode-first value ordering implies.
 
 | ID | Experiment | Decides / validates | Threshold that changes a call |
 |---|---|---|---|
-| E-1 | A1 surface bake-off (M0) | PD-4 validation | SQL-hybrid ≥10 pts better first-attempt AND comparable diff auditability → promote to co-equal surface |
-| E-2 | B1 graph benchmark + glitch property test (M0/M1) | scheduler choice details; budget | p95 ≥ 100 ms @ 10⁴ cells → revisit (subgraph partitioning first, never SAB) |
+| E-1 | A1 surface bake-off (M0) + **raw-loop-fallback rate** + **edge-case axis over planted fixtures** (review-1 DSL-meta) | PD-4 validation; catch a still-missing stdlib family before the freeze | SQL-hybrid ≥10 pts better first-attempt AND comparable diff auditability → promote to co-equal surface; **any primitive hallucinated by ≥2 agents → additive-inclusion candidate before M1 freeze**; high raw-loop rate on a task class → missing primitive |
+| E-2 | B1 graph benchmark + glitch property test (M0/M1) **plus five targeted tests the random-DAG/single-edit harness structurally cannot catch (review-1)**: (i) liveness/termination — high-rate conflated feed with eval time > interval, assert the cell lands in O(eval) and the workbook settles; (ii) dynamic-dependency cycle via selector indirection, assert static SCC catches it; (iii) cross-realm frame-race, assert no torn read; (iv) concurrent tier+value, assert atomic pair + epoch-drop; (v) watchdog-under-single-context, assert survivors re-scheduled from host memo + suspended dependents get a propagated error, not a hang | scheduler liveness + glitch-freedom, not just the value model | p95 ≥ 100 ms @ 10⁴ cells (or cold full-recompute budget on the join-heavy sheets) → revisit (subgraph partitioning first, never SAB); any liveness test livelocks/hangs → the progress invariant is wrong, not just slow |
 | E-3 | Early-cutoff hit-rate on realistic edits (M1) | whether hashing pays | hit rate ~0 on real workbooks → keep hashing only at snapshot boundaries |
 | E-4 | C1 transport sweep (M0) | v1 live envelope | loop exceeds freshness budget at ≤30 Hz mid-size → tiered message bus moves into M3 |
 | E-5 | F4 per-dimension κ (M0) | which dimensions judges may score | κ below threshold on a dimension → human review required for that dimension |
 | E-6 | RQ-A5 agent-loop gate (M2) | catalog self-description quality | any out-of-catalog guess → description iteration before ship (descriptions rot; budget for it) |
 | E-7 | D5 four-arm injected-bug study (M4) | test-loop teeth | full loop <80% or holdout+metamorphic <60% → mandatory second-agent gate on publish |
 | E-8 | E2 over-taint instrumentation (M3→M4) | tier granularity | >~20% shareable reports over-tainted by one non-flowing input → build per-column tiers |
-| E-9 | E3 consent A/B + comprehension (M4) | aggregate-reach presentation | new-total consent fails to improve detection → redesign before relying on it |
+| E-9 | E3 consent A/B + comprehension — **started M0, gates M3, verdict M4** (review-1 M6) | aggregate-reach presentation; **whether the sole reach-bound legibility works before it ships live** | new-total consent fails to improve detection → **hold/redesign the shared path before M3 live ship**, not after |
 | E-10 | F6 edit-instruction benchmark (M2) | iteration loop format | <90% targeted-diff success → tighten template determinism / fall back whole-file more aggressively |
 
 ---
@@ -867,16 +1074,20 @@ sprint (D2).
 
 **Plan-specific risks:**
 
-- **R-1 (schedule, from PD-1):** seven platform deltas gate M3; one undesigned. The
-  dependency itself is intentional — Reckoner is the forcing function for these platform
+- **R-1 (schedule, from PD-1):** **nine** platform deltas gate M3; two undesigned (D2, D9).
+  The dependency itself is intentional — Reckoner is the forcing function for these platform
   capabilities (§1), so "blocked on platform work" is the program working as designed, not
   a planning failure. The residual risk is purely schedule-shaped, and the fallback is
-  explicit: if D2's design sprint uncovers a blocker, ship M1/M2 (static + authoring) as
-  the public product and hold live behind the gate — the milestone structure makes this a
-  scope cut, not a redesign.
-- **R-2 (isolation honesty, from PD-6):** between M1 and AA-01 landing, the four "realms"
-  share an appKey. Nothing shared ships in that window; dev/demo materials must not claim
-  isolation before D7's gate is green.
+  explicit: if a design sprint uncovers a blocker, the **genuinely-safe public fallback is
+  M1 only** (static, no assistant, no egress) — *not* "M1/M2" (review-1 M1), because M2's
+  isolation depends on D7 and its holdout on D9. M1 as the public product with authoring and
+  live held behind the gates is a scope cut, not a redesign.
+- **R-2 (isolation honesty, from PD-6):** between M1 and AA-01/D9 landing, the four "realms"
+  share an appKey — which means the content-executing engine effectively shares the
+  assistant's `llm:chat` egress (review-1 M7, a concrete exfil path, not an abstract one).
+  In that window Reckoner runs the **author's own documents only**: no third-party document
+  is opened, and dev/demo/marketing material is *forbidden* from running one — stronger than
+  "must not claim isolation." Nothing shared ships before D7's gate is green.
 - **R-3 (generation quality, from PD-3):** if M0's κ shows judges unusable on core
   dimensions, generation still ships but its quality bar rests on human evaluation
   throughput — slower iteration, same gate.
@@ -885,7 +1096,23 @@ sprint (D2).
   silent truncation.
 - **R-5 (additive-only stdlib):** a mis-designed stdlib function can never be removed.
   The v1 surface stays deliberately small (§3.2); every addition needs the anti-affordance
-  review + self-description eval.
+  review + self-description eval. Tension with the review-1 additions: adding the
+  window/as-of/date families *before* the M0 bake-off trades bake-off-validation for
+  freeze-safety — accepted because a missing family is permanent and the additions are the
+  boring, well-benchmarked SQL set (they replace loops, not expand scope).
+- **R-6 (UX regression for the solo hand-author, review-1 UX-1/UX-2):** core spreadsheet
+  flows (scratch cells, range-select-sum, multi-cell scan, in-place hand-authoring of
+  non-trivial logic) have no v1 equivalent — a real regression for one of the three named
+  users, scoped out in §7.1 rather than resolved. If usage shows the RevOps persona won't
+  accept the scope cut, the fix (ephemeral scratch surface + tabular multi-cell inspector +
+  a wider structured no-code path) is a booked future item, not a v1 hand-wave. Named here
+  so it is not the one un-scrutinized corner it was in the pre-review draft.
+- **R-7 (recalc liveness, review-1 F2/F6 — now mitigated, tracked):** the engine's value
+  model was always sound; its *liveness* rested on invariants the earlier draft left
+  implicit. Those are now stated in §4.1/§4.2 (run-to-completion supersession; error-as-value
+  + host-side sticky watchdog memo; atomic pair publication) and gated by the five E-2
+  liveness tests. Risk downgraded from "possible livelock" to "invariants must be verified
+  by the E-2 additions before M1 exit."
 
 **Parked (from the research proposal's known-unknowns, unchanged):** concurrent multi-author
 editing semantics; workbook versioning / "which numbers did we report last quarter"
@@ -938,5 +1165,35 @@ catalog/stdlib versioning across long-lived shared documents; BYOK quota/cost be
   mechanical lints + externally-anchored critique (report workstream F).** *Rejected:*
   raw grammar-of-graphics exposure; per-form-factor variants as the norm; vibes-based
   self-critique.
-- **Viewer trust claim: report candidate #1, shipped last.** *Rejected:* over-claiming
-  "safe" (Gatekeeper pattern); shipping the sentence before it is true.
+- **Viewer trust claim: a *reach/starvation* bound, not a *no-execution* bound, shipped
+  last (review-1 H1).** *Rejected:* "runs none of the author's code" (literally false — a
+  static report runs the author's formulas, starved); over-claiming "safe" (Gatekeeper
+  pattern); shipping the sentence before it is true.
+
+### Decisions from adversarial review 1 (2026-07-09)
+
+Recorded so they are not relitigated; full findings in `ADVERSARIAL_REVIEW_1.md`.
+
+- **Expand the stdlib now** with the window/as-of/date/null families (DSL-1/2/3/5/6), ahead
+  of the M0 bake-off. *Rejected:* holding for the bake-off to decide — a raw `.reduce` passes
+  on fitting data so the bake-off could under-surface the gap, and the additive-only freeze
+  makes a missing family permanent. Mitigation kept: E-1 gains a raw-loop-fallback metric and
+  an edge-case axis so a *still*-missing family is caught before the freeze.
+- **Book D9, a host redacted-mount-view, to make holdout real (H3).** *Rejected:* leaving
+  holdout/blind-authoring as "harness-enforced" when the assistant's `rw@self` over the
+  fixtures defeats it (that is prompt discipline mislabeled as enforcement); silently
+  downgrading the testing story's strongest leg.
+- **Scope Reckoner as report-authoring-not-exploration, agent-first for logic (UX-1/UX-2),
+  §7.1.** *Rejected:* pretending the direct hand-author path is a co-equal peer for
+  non-trivial logic; building the scratch/multi-cell surfaces in v1 (booked as R-6 instead).
+- **Gate M3 sharing on the E3 reach-view efficacy result (M6).** *Rejected:* shipping the
+  sole confidentiality-legibility mechanism in M3 and validating it only in M4 — the
+  uncalibrated-ruler pattern the plan forbids for generation, on the more dangerous property.
+- **Book D8 (launch-to-run) and count nine deltas, not seven (H4).** *Rejected:* folding
+  per-instance delegation's unbuilt lifecycle dependency into D1 and under-counting the
+  unbuilt platform surface.
+- **State the recalc liveness invariants (F1–F8) explicitly** — run-to-completion
+  supersession, error-as-lattice-value + host-side sticky watchdog memo, conservative-set
+  subset, atomic `(value,tier)` + epoch, demand-driven live path, tier monotone-per-session,
+  versioned atomic frame publication, param conflation. *Rejected:* "sound because pure" as a
+  stand-in for a progress argument (it proves values correct, never that one lands).
