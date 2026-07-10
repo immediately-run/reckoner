@@ -23,6 +23,38 @@ cites the finding and moves on.
 
 ---
 
+## 0. Provenance map — what carries research weight, what is spec-derived, what is a decision
+
+So a reader can tell at a glance which claims are *research-backed*, which are *inherited
+from the platform spec*, and which are *product/engineering decisions* made here (and
+therefore re-openable by decision, not by re-reading the report). Verdict from the
+rootedness audit (2026-07-09): the plan is **near-1:1 faithful to the research report at the
+recommendation and threshold level** — so faithful that two recalc BLOCKERs found in
+adversarial-review-1 were *inherited* from the report's own unexamined corners, not
+introduced by drifting from it. Its independent content is spec- and decision-rooted.
+
+| Area | Primary root | Fidelity / note |
+|---|---|---|
+| Formula surface, dependency model, purity (§3.1–3.2) | **Report RQ-A1/A2/A4/A5** | Principle faithful. The *enumerated stdlib* is the plan's extrapolation beyond the report's five-family sketch — and exactly where the DSL review drew blood (the sketch never reached ordered/relational ops). Review-1 additions close it. |
+| Recalculation engine (§4) | **Report RQ-B1/B2/B3/B4** | Verbatim adoption. The "no debounce" cadence (RQ-C3) + watchdog (RQ-A4) were adopted *too* faithfully — the report never worked out the eval-time>interval progress case, so the plan inherited the F2/F6 livelocks. Now fixed with stated invariants (§4.1/§4.2). |
+| Streaming / data plane (§5) | **Report RQ-C1/C2/C3/C4** | Faithful; the F3 atomic-frame and F8 param-conflation invariants are the plan's own engineering the report left implicit. |
+| Testing architecture (§6) | **Report RQ-D1–D5** | Faithful, including the D4 "fixture-capture-is-mainline" revision (which is *why* freeze moves to M2). H3's holdout-enforcement gap is the plan's own (the report assumed enforcement; the plan's `rw@self` grant defeats it → D9). |
+| Generation pipeline (§8.4) | **Report RQ-F1–F6** | Faithful; F4-harness-first preserved as the report's non-negotiable. |
+| Egress-fixing, tiering, reach view, trust claim (§7, §9 D2/E-rows) | **Report RQ-E1–E5** | The only security content the report supplies. Recipe faithful; the *host-enforced design* (D2) and the trust-claim wording (H1) are the plan's/​review's, not the report's. |
+| **Four-realm decomposition, safe renderer, composite manifest (§2, §3.3)** | **Platform spec** (REPORTING_SPREADSHEET_SPEC §2/§3, TRUST_MODES §5.1) | Not from the report — the report has no architecture. |
+| **Platform workstream, repo topology, AA-01, the nine deltas, milestones (§9, §10)** | **Platform spec + product decisions** | Not from the report. Rooted in the spec's §8 dependency ladder and PD-5/PD-6. |
+| **The six product decisions (PD-1…6, §1)** | **The 2026-07-09 planning session** | *Not* from the report — and PD-1 (full-live v1) and PD-3 (generation in v1) are **bolder than the report's cautious staging**, which files those as Phase 2/3 and "the softest evidence." Reconciled by keeping the report's *internal sequencing* (F4-first, D2-first, E3-gates-M3) while overriding its *scope* caution on the user's authority. |
+| Concrete syntax, file formats, worked examples (§3) | **The plan's own construction** | Consistent with the report's principles; the report showed no code. |
+| Adversarial-review-1 invariants + the two added platform deltas (D8/D9) | **This program's review** | Neither report nor spec; found by the 2026-07-09 fresh-agent passes. |
+
+**The one honest tension:** the plan is more report-faithful than it is report-*cautious*.
+Where it steps past the research it does so on scope (PD-1/PD-3), not on mechanism — and it
+pays for that by carrying the report's own blind spots (stdlib completeness, recalc
+liveness) until the adversarial review surfaced them. Full audit reasoning is in the session
+record; findings that resolved it are in `ADVERSARIAL_REVIEW_1.md`.
+
+---
+
 ## 1. Product decisions recorded (2026-07-09)
 
 Six scope decisions were made in the planning session. They are recorded here with their

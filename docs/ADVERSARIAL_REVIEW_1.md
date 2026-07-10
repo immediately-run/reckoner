@@ -268,22 +268,26 @@ real one hiding in the un-scrutinized corner.
 
 ---
 
-## Disposition tracker
+## Disposition tracker — all resolved and applied 2026-07-09
 
-**Apply as doc-corrections (validated, no decision needed):** H1, H2, H4, M1, M2, M3, M4,
-M5, M7, L1–L5; recalc F1, F2, F3, F4, F5, F6, F7, F8 (state the invariants + the two progress
-guarantees); E-2 five added tests; DSL-4, DSL-6 (null semantics), DSL-8; E-1 metric additions;
-UX-3, UX-4, UX-6 (acceptance reword), UX-7, UX-8, UX-9, UX-10.
+**Applied as doc-corrections** (plan commit `8e70236`, prompt `e13062d`, briefs `00a9341`):
+H1, H2, H4, M1, M2, M3, M4, M5, M7, L1–L5; recalc F1–F8 (invariants + the two progress
+guarantees stated in plan §4.1/§4.2, gated by five added E-2 tests); DSL-4, DSL-6, DSL-8;
+E-1 metric additions; UX-3, UX-4, UX-6, UX-7, UX-8, UX-9, UX-10.
 
-**Decisions owed (product/scope/platform — do not apply unilaterally):**
+**Decisions owed — all made by the user 2026-07-09, applied, recorded in plan §13:**
 
-1. **DSL surface expansion (DSL-1/2/3/5):** add the ~5 window/as-of/date/full-join primitives
-   to the committed v1 stdlib before the additive-only freeze? (Expands PD-4's surface.)
-2. **H3 holdout enforceability [BLOCKER]:** commit to a harness-mediated redacted-mount-view
-   mechanism (likely a new platform delta), or downgrade holdout/blind-authoring from
-   "harness-enforced" to "prompt discipline" and re-weight the testing story accordingly?
-3. **UX-1 / UX-2 scope:** add a scratch/exploration surface + widen the direct no-code
-   authoring path, or explicitly scope Reckoner as report-authoring-not-exploration and
-   agent-first-for-logic?
-4. **M6 sequencing:** gate M3 sharing on the E3 reach-view efficacy result, or ship the
-   unvalidated reach view and accept the residual?
+1. **DSL surface expansion (DSL-1/2/3/5):** ✅ **Add now** — window (`lag`/`lead`/`scan`/
+   `cumulative`), `asofJoin`, pure date stdlib, `join how:"full"`/`antiJoin` + `coalesce`/
+   `safeDiv` added to §3.2 ahead of the M0 bake-off; E-1 gains a raw-loop-fallback metric as
+   the backstop for a still-missing family.
+2. **H3 holdout enforceability [BLOCKER]:** ✅ **Redacted-mount-view delta** — booked as D9
+   (plan §9); holdout/blind-authoring labeled prompt-discipline-until-D9.
+3. **UX-1/UX-2 scope:** ✅ **Scope out honestly** — new plan §7.1 + R-6; Reckoner is
+   report-authoring-not-exploration, agent-first for non-trivial logic; scratch/multi-cell
+   surfaces are a booked future item, not v1.
+4. **M6 sequencing:** ✅ **Gate M3 on E3** — E3 moved to M0/started, M3 sharing gated on its
+   result (plan §10 M3, §11 E-9).
+
+Also booked from the review: **D8 launch-to-run** (the unbuilt lifecycle H4 surfaced), taking
+the platform-delta count to nine.
