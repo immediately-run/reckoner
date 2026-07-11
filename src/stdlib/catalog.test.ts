@@ -12,6 +12,7 @@ const NOT_DESCRIBED = new Set([
   'normalizeInputs',
   'dependencies',
   'deepEqual',
+  'parseDuration', // a duration-parsing utility; `window` is the formula-facing surface
 ]);
 
 const exportedCallables = Object.entries(stdlib)
