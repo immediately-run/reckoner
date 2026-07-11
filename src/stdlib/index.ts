@@ -6,11 +6,11 @@
 // toward too little. Everything here is a pure function of plain values → plain values;
 // there is no ambient `fetch`/`console`/clock/random and no cell registry.
 //
-// This M1 slice is the computational core. Still to land (tracked, follow-up PRs):
-// the `cell()`/`testCell()` registration constructors, the metamorphic testing
-// relations (`conservation`/`permutationInvariance`/`scaleInvariance`/`property`/
-// `expectClose`), the assistant-facing screening tools (`trend`/`outliers`/`deltas`),
-// event-time feed `window` buffering, and the JSON-Schema self-description catalog.
+// Still to land (tracked, follow-up PRs): the assistant-facing screening tools
+// (`trend`/`outliers`/`deltas`) and event-time feed `window` buffering. The formula
+// engine (SES compartment, scheduler) that *evaluates* these descriptors is M1 engine
+// work; the metamorphic relations here carry their pure transform + comparison, and the
+// M2 test runner supplies the re-evaluation (see relations.ts).
 
 export type { Aggregator, Predicate, Projection, Row, Scalar, Value } from './types.ts';
 
@@ -62,3 +62,31 @@ export type { DateInput, DateRange, FiscalPeriod } from './dates.ts';
 
 // Null / empty semantics.
 export { coalesce, orElse, safeDiv } from './nulls.ts';
+
+// Cell registration constructors (the document-model contract the engine reads).
+export { cell, testCell } from './cell.ts';
+export type {
+  CellDef,
+  CellInit,
+  ExpectFn,
+  Formula,
+  TestCellDef,
+  TestCellInit,
+  TestKind,
+} from './cell.ts';
+
+// Input-spec parsing (dependency extraction for the scheduler/taint fold/test runner).
+export { dependencies, normalizeInputs, parseInput } from './inputs.ts';
+export type { InputSpec, Namespace, WindowedFeed } from './inputs.ts';
+
+// Test assertions.
+export { deepEqual, expectClose, expectEqual } from './testing.ts';
+export type { CloseTolerance, TestResult } from './testing.ts';
+
+// Metamorphic / property relations (the load-bearing, oracle-free correctness signal).
+export { conservation, permutationInvariance, property, scaleInvariance } from './relations.ts';
+export type { Relation, RelationContext } from './relations.ts';
+
+// The agent-facing self-description catalog.
+export { catalog, catalogNames } from './catalog.ts';
+export type { CallableKind, ParamDesc, SelfDescription } from './catalog.ts';
