@@ -12,12 +12,13 @@ working conventions, the environment quirks, and the concrete next steps. · **U
 
 ---
 
-## 1. Current state — the pure spine, engine shell, and report-view shell (A) are built
+## 1. Current state — the spine + engine + report-view (A) + a runnable report (B) are built
 
-Reckoner went from the starter template to a tested formula-engine core plus the report-view
-render surface. Everything below is on `main` (PRs #2–#10; #9 is the S5 spike doc) except the
-report-view render layer (shell A), which is in its own PR. **242 vitest cases**; every merge was
-green on `tsc -b` + `npm test` + `npm run lint` + `npm run build`.
+Reckoner went from the starter template to a tested formula-engine core, the report-view render
+surface, and a runnable static report. The spine/engine/report-types are on `main` (PRs #2–#10;
+#9 is the S5 spike doc); shell A (render surface) and shell B (`App.tsx` integration) are in
+stacked PRs. **248 vitest cases**; every merge is green on `tsc -b` + `npm test` + `npm run lint`
++ `npm run build`, and shell B is additionally live-verified in a browser (§2.B).
 
 | Area | Where | What it provides |
 |---|---|---|
@@ -26,6 +27,7 @@ green on `tsc -b` + `npm test` + `npm run lint` + `npm run build`.
 | **engine** | `src/engine/` | The recalc core: `buildGraph` (wildcard expansion + enumerability guards), `analyze`/cycle detection, tier lattice (`meetTiers`), content-`hash`, `Scheduler` (topo order, tier fold, `(value,tier)` cutoff, incremental recompute), `runTest`/`classifyCell`/`runSuite` (review verdict). **Engine shell:** `evaluateWorksheet` (SES-confined worksheet eval, `compartment.ts`) + the `Engine` orchestrator (`engine.ts`) that runs the whole spine. |
 | **report — types + validation** | `src/report/` | The template layer contract: `nodes.ts` (render-as-data node model), `catalog.ts` (closed v1 component catalog + attribute schemas), `validateTemplate` (binding collection + authoring diagnostics + structural rules). |
 | **report — render shell (A)** | `src/report/render/` + `src/report/parse/` | The React render surface (§3.3). `ReportView` walks a parsed `TemplateNode[]` and draws the audited components, resolving every `source` through the injected **`Bindings` port** (value + tier; shell B supplies the engine adapter). One component per catalog entry — `Kpi`, `Chart` (SVG: bar grouped/stacked/normalized, line, area, scatter, histogram, pie ≤5+other), `Table` (sortable), `Value`, `Facets` (small-multiples), `Gauge`, `Map` (point + region-breakdown choropleth), `Callout`, `Section`/`Row`, `ShowAbove`/`ShowBelow` (ResizeObserver/matchMedia), `Params` + `Select`/`Toggle`/`Range`/`DateRange`. Degraded states are component-owned (broken tile / needs-access / placeholder); the tier badge slot is **reserved** for the host (review-1 H2, never drawn here). Plus the safe MDX-subset parser (`parse/mdx.ts` + `parse/literal.ts`) — the dev stand-in for the platform D3 renderer; it **never evaluates** (`f={fetch("/x")}` → inert). Unit-rendered against mock engine results via `react-dom/server` (`render.test.tsx`) + parser/chart-math/format/shape tests. **Known v1 gap:** an inline component *within a prose line* parses to separate block nodes (block-level is covered); real polygon-geography Map and Kpi `spark` are deferred (see `src/report/render/index.ts`). |
+| **app integration (B)** | `src/app/`, `src/seed/`, `src/hooks/useReport.ts`, `App.tsx` | The runnable report. `buildReportSession` loads the bundled demo document (`loadDocument` over `memoryReader`) → `Engine.fromSources` → `run` → `parseTemplate` → `<ReportView>`; `sessionBindings` is the **engine→`Bindings` adapter** (cell result / external / `missing`, and `setParam` → `engine.update` → re-render). `src/seed/` is the portable bundled **Meridian demo** (no Vite macros). Integration-tested end-to-end (`reportSession.test.ts`) + live-verified in a browser. |
 
 **S5 is closed positive** (`spikes/S5_SES_MODULE_RESOLUTION.md`): the platform module-fetch
 path resolves SES + CodeMirror and a starved SES `Compartment` runs in-platform, so the engine
@@ -36,9 +38,14 @@ pipeline in Node with the real `ses` package.
 
 ## 2. What remains — the effectful shells (in recommended order)
 
-The pure spine and the **report-view render shell (A, done — §1)** are built; a runnable M1
-static report now needs shell B (wire it into `App.tsx`) and shell C (the engine worker). Each
-plugs into the existing pure modules — **do not rewrite the core; wrap it.**
+The pure spine, the **report-view render shell (A, done — §1)**, and the **`App.tsx`
+integration + a runnable static report (B, done — §1)** are built. **M1's exit gate is met:**
+the bundled Meridian demo document opens with zero prompts and renders a full report (KPIs,
+line/bar/pie charts, region map, faceted retention, sortable table) desktop + mobile, with the
+**SES-confined engine running in-browser** — live-verified via `vite dev` + headless Chrome, and
+the full document→engine→bindings→param-recompute pipeline locked by `reportSession.test.ts`.
+What remains is shell C (the engine worker) to make the four-realm composite real and unlock
+live feeds. Each shell plugs into the existing pure modules — **do not rewrite the core; wrap it.**
 
 ### A. Report-view React components + MDX→node parse — **DONE** (`src/report/render`, `src/report/parse`)
 
@@ -50,23 +57,31 @@ status}` and `setParam(name, value)`. Shell B supplies a `Bindings` adapter over
 enrichments are listed in `src/report/render/index.ts` (host tier badge is a reserved slot; real
 polygon Map; Kpi `spark`; full inline-MDX = the platform D3 renderer's remit).
 
-### B. `App.tsx` integration — a runnable static report (§2.1, §7)  ← **next**
+### B. `App.tsx` integration — a runnable static report — **DONE** (`src/app`, `src/seed`, `src/hooks/useReport.ts`)
 
-Wire it together: `App.tsx` loads a document (`loadDocument` over the app's fs mount) →
-`Engine.fromSources(worksheetSources, stdlib)` → `engine.run(externals)` → parse each template
-(`parseTemplate` from `src/report/parse`) → render via `<ReportView nodes bindings />` (A). This
-is the **M1 exit gate**: a static doc opens with zero prompts and renders, desktop + mobile.
+Shipped (stacked on shell A's PR). The pipeline: `App.tsx` → `useReport` → `buildReportSession`
+(`src/app/reportSession.ts`) loads the bundled demo document via `loadDocument` over an in-memory
+reader (`src/app/memoryReader.ts`) → `Engine.fromSources` → `engine.run(externals)` → `parseTemplate`
+→ `<ReportView nodes bindings />`. The one new integration piece is `sessionBindings` — the
+**`Bindings` adapter over the engine**: `resolve(source)` returns the scheduler's published
+`{value, tier}` for a cell (or the external for a `fixtures.*`/`params.*` name, or `missing`/`error`);
+`setParam(name, value)` writes the param, calls `engine.update(...)`, and bumps a re-render tick.
 
-- **Build the `Bindings` adapter** (the one new integration piece): implement
-  `src/report/render/bindings.ts`'s `Bindings` over the engine — `resolve(source)` returns the
-  engine's published `{value, tier}` for a cell id / external key (or a `missing`/`error`
-  status), and `setParam(name, value)` writes `params.<name>` and calls `engine.update(...)`,
-  then re-renders. Keep it a thin adapter (the render side is already unit-tested against a
-  hand-built port).
-- **Verify live** on `immediately.run` via the local provider + Chrome MCP (or the puppeteer-core
-  fallback — see §4). The Meridian case study (`docs/case-study/meridian/`) is the corpus.
+- **The demo document** is `src/seed/` — a **portable, bundled** Meridian monthly review
+  (`document.ts` = manifest + a plain-JS `review.sheet.js` worksheet + the MDX template + frozen
+  fixtures; `data.ts` = real Meridian figures sliced to the last 12 months, regenerable via
+  `scratchpad/gen-seed.mjs` from `docs/case-study/meridian/data/*.csv`). **No Vite-only macros**
+  (`?raw`/`import.meta.glob`) — those break on immediately.run; the files are string/object
+  constants so the same code runs on both.
+- **Not yet wired:** loading a document from a *user-granted mount* (needs mount consent — M2);
+  the app ships the bundled seed so it renders with zero prompts. A real fs-backed `DocumentReader`
+  over the platform `fs`/local `dev-fs` slots in where `memoryReader` is today.
+- **Live-verified** at `vite dev` (headless Chrome, desktop + 390px): the SES engine runs
+  in-browser, all catalog components render, the span widget recomputes. immediately.run
+  local-provider verification (the platform sandbox path) is the remaining live check — S5 already
+  proved SES resolves + runs in-platform, so this is expected-green, not de-risking.
 
-### C. Engine worker wiring (§4.1, §2.1)
+### C. Engine worker wiring (§4.1, §2.1)  ← **next**
 
 Make the engine a sibling entry point (`src/entry/engine.tsx`) hosting a Web Worker; in the
 worker, `lockdown()` then a `Compartment` per document (the S5-proven pattern), with

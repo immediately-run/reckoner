@@ -85,6 +85,12 @@ describe('ReportView', () => {
     expect(facets).toHaveLength(2);
   });
 
+  it('renders a single-slice pie as a full circle (not a degenerate arc)', () => {
+    const rows = [{ seg: 'a', share: 100 }];
+    const html = render('<Chart source="mix" kind="pie" value="share" label="seg" />', { mix: ok(rows) });
+    expect(html).toContain('<circle'); // a lone 100% slice draws a circle, not an empty arc
+  });
+
   it('renders markdown prose as markup', () => {
     const html = render('# Weekly revenue.\n\nSome **bold** prose.', {});
     expect(html).toContain('<h1>');

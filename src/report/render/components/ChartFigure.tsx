@@ -231,20 +231,28 @@ function HistogramChart({ rows, enc }: { rows: Row[]; enc: ChartEncoding }) {
   );
 }
 
-// Precompute wedge paths without mutating render-scope state (react-hooks/immutability).
-function pieArcs(slices: { label: string; value: number }[], cx: number, cy: number, r: number): string[] {
+// Precompute wedge paths without mutating render-scope state (react-hooks/immutability). Each
+// entry is a full-circle flag (a lone slice ≈ the whole pie — a single `A` arc from start to
+// the identical end point is degenerate and draws nothing) or a wedge path string.
+type Wedge = { full: true } | { full: false; d: string };
+function pieArcs(slices: { label: string; value: number }[], cx: number, cy: number, r: number): Wedge[] {
   const total = slices.reduce((acc, s) => acc + s.value, 0) || 1;
-  const paths: string[] = [];
+  const out: Wedge[] = [];
   let a0 = -Math.PI / 2;
   for (const s of slices) {
-    const a1 = a0 + (s.value / total) * Math.PI * 2;
+    const frac = s.value / total;
+    if (frac >= 0.9999) {
+      out.push({ full: true });
+      continue;
+    }
+    const a1 = a0 + frac * Math.PI * 2;
     const large = a1 - a0 > Math.PI ? 1 : 0;
     const p0 = [cx + r * Math.cos(a0), cy + r * Math.sin(a0)];
     const p1 = [cx + r * Math.cos(a1), cy + r * Math.sin(a1)];
-    paths.push(`M ${cx} ${cy} L ${p0[0].toFixed(1)} ${p0[1].toFixed(1)} A ${r} ${r} 0 ${large} 1 ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} Z`);
+    out.push({ full: false, d: `M ${cx} ${cy} L ${p0[0].toFixed(1)} ${p0[1].toFixed(1)} A ${r} ${r} 0 ${large} 1 ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} Z` });
     a0 = a1;
   }
-  return paths;
+  return out;
 }
 
 function PieChart({ rows, enc, density }: { rows: Row[]; enc: ChartEncoding; density: Density }) {
@@ -254,13 +262,17 @@ function PieChart({ rows, enc, density }: { rows: Row[]; enc: ChartEncoding; den
   const cx = M.left + PW / 2;
   const cy = M.top + PH / 2;
   const r = Math.min(PW, PH) / 2 - 6;
-  const arcs = pieArcs(slices, cx, cy, r);
+  const wedges = pieArcs(slices, cx, cy, r);
   return (
     <>
       <g>
-        {arcs.map((d, i) => (
-          <path key={i} d={d} fill={seriesColor(i)} stroke="var(--panel, #13141d)" strokeWidth={1.5} />
-        ))}
+        {wedges.map((w, i) =>
+          w.full ? (
+            <circle key={i} cx={cx} cy={cy} r={r} fill={seriesColor(i)} stroke="var(--panel, #13141d)" strokeWidth={1.5} />
+          ) : (
+            <path key={i} d={w.d} fill={seriesColor(i)} stroke="var(--panel, #13141d)" strokeWidth={1.5} />
+          ),
+        )}
       </g>
       <Legend names={slices.map((s) => s.label)} density={density} />
     </>
