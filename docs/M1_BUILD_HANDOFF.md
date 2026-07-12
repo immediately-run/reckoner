@@ -65,15 +65,34 @@ renders, desktop + mobile.
 - **Verify live** on `immediately.run` via the local provider + Chrome MCP (or the puppeteer-core
   fallback — see §4). The Meridian case study (`docs/case-study/meridian/`) is the corpus.
 
-### C. Engine worker wiring (§4.1, §2.1)
+### C. Engine worker wiring — **mostly DONE** (`src/engine/worker/`, `src/engine/asyncEngine.ts`, `src/entry/engine.ts`)
 
-Make the engine a sibling entry point (`src/entry/engine.tsx`) hosting a Web Worker; in the
-worker, `lockdown()` then a `Compartment` per document (the S5-proven pattern), with
-host-brokered input/result channels over `postMessage`. Wrap the pure `Scheduler` +
-`compartment.ts`. Implement the async invariants deferred from the scheduler:
-**single-slot run-to-completion supersession, the common-epoch barrier (glitch-freedom under
-live feeds), and the watchdog circuit breaker** (§4.1). This is the step that makes the real
-four-realm composite shape (`ARCHITECTURE_PLAN` §2.1) real.
+The executor realm is built and tested. The worker (`worker/engineWorker.ts` + the real
+`entry/engine.ts` that `lockdown()`s and serves `build`/`eval` over `postMessage`) is a
+terminable formula executor; the host `AsyncEngine` owns all scheduling + epoch/breaker state
+(§4.1) and drives it over a `WorkerTransport` port (real Web Worker or an in-process double).
+Delivered async invariants:
+
+- **Watchdog circuit breaker** (§4.1) — a per-eval wall-clock budget; exceeding it is a hard
+  runaway → the worker is `terminate()`d + rebuilt and the pure `CircuitBreaker` counts it;
+  after `hardLimit` the cell **quarantines** and dependents resolve to the propagated **lattice
+  error** (a re-arm recovers). Soft budget-exceed = confirm-before-stick + TTL decay. This is
+  the availability protection SES cannot give (RQ-A4 residual).
+- **Single-slot run-to-completion supersession** — overlapping `update()`s never cancel an
+  in-flight pass; they coalesce to one follow-up with the latest externals (no cancel-restart
+  livelock). Async formulas (a formula may return a promise) are awaited.
+- Shared input resolution (`resolve.ts`) — one path with the sync `Scheduler` (refactored to
+  use it), tier fold + `(value,tier)` publish, cycle→error-every-cell.
+
+**Deferred (documented in `asyncEngine.ts`): the common-epoch barrier** for glitch-freedom
+across asymmetric diamonds under a *continuous* live feed (§4.2 C-R-B). It is unexercised and
+un-testable without feed connectors/conflation/windowing (none exist yet); with fixtures + user
+param writes every pass settles at one epoch, so no cell assembles mixed-epoch inputs. It lands
+with the live-feed workstream. **Also remaining:** wiring `AsyncEngine` into `App.tsx` in place
+of the sync `Engine` (so even the static render runs off-main-thread with watchdog protection),
+and the real-`Worker` E2E in a browser (the `entry/engine.ts` shim + `lockdown()` — thin, and
+S5 already proved SES resolves + runs in-platform). Verified by the engine test suite
+(sync-equivalence, error propagation, cycles, watchdog→quarantine→recover, supersession).
 
 ---
 
@@ -125,12 +144,15 @@ four-realm composite shape (`ARCHITECTURE_PLAN` §2.1) real.
 - **document model** — host-side `compat` *derivation* by static analysis at save time (this
   module validates/resolves an existing envelope); cross-reference validation (an input naming a
   missing feed/fixture). (`src/document/index.ts`.)
-- **engine scheduler** — the async half: single-slot supersession, common-epoch barrier,
-  watchdog circuit breaker (`src/engine/scheduler.ts` header; do these in shell C).
-- **engine shell** — worker/iframe host-brokered channels + `lockdown()` in the worker; the
-  transpiled-module **linker** (the current evaluator uses a source transform + `Compartment.evaluate`;
-  in-platform the sandbox transpiles and the Compartment module loader links); holdout-fixture
-  **substitution** test semantics — running a subject over a test's own fixture inputs (§6). (`src/engine/engine.ts`/`compartment.ts`.)
+- **engine scheduler** — shell C shipped single-slot supersession + the watchdog circuit
+  breaker (`src/engine/asyncEngine.ts` + `circuitBreaker.ts`). **Still deferred: the
+  common-epoch barrier** (glitch-freedom under continuous live feeds — needs the feed machinery;
+  see `asyncEngine.ts` header).
+- **engine shell** — worker built (`src/engine/worker/`, `src/entry/engine.ts`). Remaining:
+  wire `AsyncEngine` into `App.tsx`; real-`Worker` E2E in a browser; the transpiled-module
+  **linker** (the evaluator uses a source transform + `Compartment.evaluate`; in-platform the
+  sandbox transpiles and the Compartment module loader links); holdout-fixture **substitution**
+  test semantics — running a subject over a test's own fixture inputs (§6). (`src/engine/engine.ts`/`compartment.ts`.)
 - **report** — the React component implementations + MDX→node parser (shell A); host-rendered
   tier badges; data-shape contracts needing the resolved value. (`src/report/index.ts`.)
 - **relations** — the M2 test runner supplies the metamorphic re-evaluation; the relation
