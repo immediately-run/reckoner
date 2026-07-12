@@ -1,0 +1,194 @@
+/* Report-view styling (§3.3.1). Responsiveness lives here and in the components — never in the
+   template: fluid grids (tiles add/drop columns continuously), container queries for
+   component-level reflow, and a prose max-width. Colors/radii/fonts pull from the design-system
+   tokens (src/index.css) with safe fallbacks so a bare render still reads. */
+
+.rk-report {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 3vw, 28px);
+  color: var(--ink, #ecebf4);
+  font-family: var(--sans, system-ui, sans-serif);
+}
+
+/* Prose ---------------------------------------------------------------------------- */
+.rk-prose {
+  max-width: 72ch;
+  line-height: 1.6;
+}
+.rk-prose h1,
+.rk-prose h2,
+.rk-prose h3 {
+  font-family: var(--disp, system-ui, sans-serif);
+  line-height: 1.15;
+  margin: 0.2em 0 0.4em;
+}
+.rk-prose h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); }
+.rk-prose h2 { font-size: clamp(1.35rem, 3vw, 1.8rem); }
+.rk-prose p { margin: 0.5em 0; }
+.rk-prose code {
+  font-family: var(--mono, ui-monospace, monospace);
+  background: var(--panel-2, #191b26);
+  padding: 0.1em 0.35em;
+  border-radius: var(--r-xs, 5px);
+  font-size: 0.9em;
+}
+.rk-prose a { color: var(--accent-pink, #f49ad4); }
+.rk-prose blockquote {
+  margin: 0.6em 0;
+  padding-left: 0.9em;
+  border-left: 2px solid var(--line-2, rgba(180,170,225,.22));
+  color: var(--ink-2, #9b97b3);
+}
+
+/* Layout primitives ---------------------------------------------------------------- */
+.rk-section { display: flex; flex-direction: column; gap: clamp(14px, 2.4vw, 22px); }
+.rk-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: clamp(12px, 2vw, 18px);
+  align-items: stretch;
+}
+
+/* Tiles ---------------------------------------------------------------------------- */
+.rk-tile {
+  position: relative;
+  background: var(--panel, #13141d);
+  border: 1px solid var(--line, rgba(180,170,225,.14));
+  border-radius: var(--r-lg, 16px);
+  padding: clamp(14px, 2vw, 20px);
+  container-type: inline-size;
+}
+.rk-tier-slot {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Kpi ------------------------------------------------------------------------------ */
+.rk-kpi { display: flex; flex-direction: column; gap: 6px; }
+.rk-kpi-value {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: clamp(1.8rem, 5cqw, 2.6rem);
+  font-weight: 700;
+  line-height: 1;
+}
+.rk-kpi-delta { font-family: var(--mono, monospace); font-size: 0.85rem; }
+.rk-kpi-delta[data-direction='up'] { color: #6bd6a3; }
+.rk-kpi-delta[data-direction='down'] { color: #ff8f8f; }
+.rk-kpi-delta[data-direction='flat'] { color: var(--ink-3, #6a677f); }
+
+/* Value (inline) ------------------------------------------------------------------- */
+.rk-value { font-weight: 600; color: var(--accent-pink, #f49ad4); }
+.rk-value-missing { color: var(--ink-3, #6a677f); }
+
+/* Charts --------------------------------------------------------------------------- */
+.rk-chart, .rk-chart-tile { width: 100%; }
+.rk-chart-svg { width: 100%; height: auto; display: block; }
+.rk-chart-empty { display: grid; place-items: center; min-height: 120px; color: var(--ink-3, #6a677f); }
+.rk-chart-grid { stroke: var(--line, rgba(180,170,225,.14)); stroke-width: 1; }
+.rk-chart-tick { fill: var(--ink-3, #6a677f); font-family: var(--mono, monospace); font-size: 12px; }
+.rk-chart-legend text { fill: var(--ink-2, #9b97b3); font-family: var(--sans, sans-serif); font-size: 12px; }
+
+/* Gauge ---------------------------------------------------------------------------- */
+.rk-gauge { display: flex; flex-direction: column; align-items: center; }
+.rk-gauge-svg { width: min(240px, 100%); height: auto; }
+.rk-gauge-track { stroke: var(--panel-2, #191b26); }
+.rk-gauge-fill { stroke: var(--accent-pink, #f49ad4); }
+.rk-gauge-value {
+  font-family: var(--mono, monospace);
+  font-size: clamp(1.3rem, 4cqw, 1.8rem);
+  font-weight: 700;
+  margin-top: -8px;
+}
+
+/* Table ---------------------------------------------------------------------------- */
+.rk-table-scroll { overflow-x: auto; }
+.rk-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.rk-table th, .rk-table td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line, rgba(180,170,225,.14));
+  white-space: nowrap;
+}
+.rk-table th { color: var(--ink-2, #9b97b3); font-weight: 600; }
+.rk-table[data-sortable] th { cursor: pointer; user-select: none; }
+.rk-table td[data-numeric] { font-family: var(--mono, monospace); text-align: right; }
+
+/* Facets --------------------------------------------------------------------------- */
+.rk-facets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.rk-facet-title { font-family: var(--mono, monospace); font-size: 0.8rem; color: var(--ink-2, #9b97b3); margin-bottom: 4px; }
+
+/* Map ------------------------------------------------------------------------------ */
+.rk-map-bg { fill: var(--panel-2, #191b26); }
+.rk-map-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rk-map-row { display: grid; grid-template-columns: minmax(80px, 1fr) 3fr auto; gap: 10px; align-items: center; }
+.rk-map-region { color: var(--ink-2, #9b97b3); font-size: 0.9rem; }
+.rk-map-bar { background: var(--panel-2, #191b26); border-radius: var(--r-pill, 30px); overflow: hidden; height: 12px; }
+.rk-map-fill { display: block; height: 100%; }
+.rk-map-val { font-family: var(--mono, monospace); font-size: 0.85rem; }
+
+/* Callout -------------------------------------------------------------------------- */
+.rk-callout {
+  border-radius: var(--r-md, 12px);
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent, #b285f2);
+  background: var(--panel, #13141d);
+}
+.rk-callout[data-tone='success'] { border-left-color: #6bd6a3; }
+.rk-callout[data-tone='warning'] { border-left-color: #ffce6b; }
+.rk-callout[data-tone='danger'] { border-left-color: #ff8f8f; }
+
+/* Params + widgets ----------------------------------------------------------------- */
+.rk-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--panel, #13141d);
+  border: 1px solid var(--line, rgba(180,170,225,.14));
+  border-radius: var(--r-lg, 16px);
+}
+.rk-widget { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; }
+.rk-widget-label { color: var(--ink-2, #9b97b3); font-family: var(--mono, monospace); font-size: 0.75rem; text-transform: lowercase; }
+.rk-widget-num { color: var(--accent-pink, #f49ad4); }
+.rk-widget select, .rk-widget input[type='range'] { min-width: 140px; }
+.rk-widget select {
+  background: var(--panel-2, #191b26);
+  color: var(--ink, #ecebf4);
+  border: 1px solid var(--line-2, rgba(180,170,225,.22));
+  border-radius: var(--r-sm, 6px);
+  padding: 6px 8px;
+}
+
+/* Degraded states ------------------------------------------------------------------ */
+.rk-broken {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line-2, rgba(180,170,225,.22));
+  border-radius: var(--r-md, 12px);
+  background: var(--panel, #13141d);
+}
+.rk-broken[data-variant='needs-access'] { border-style: solid; border-color: var(--accent-2, #b285f2); }
+.rk-broken-title { font-weight: 600; }
+.rk-broken-reason { color: var(--ink-3, #6a677f); font-size: 0.85rem; }
+.rk-placeholder {
+  padding: 14px 16px;
+  border: 1px dashed var(--line-2, rgba(180,170,225,.22));
+  border-radius: var(--r-md, 12px);
+  color: var(--ink-2, #9b97b3);
+  font-size: 0.9rem;
+}
+.rk-placeholder code { font-family: var(--mono, monospace); color: var(--accent-pink, #f49ad4); }
+
+/* A real block (not display:contents) so its own width/height is measurable by the
+   ResizeObserver that drives ShowAbove/ShowBelow. */
+.rk-responsive { display: block; width: 100%; }
