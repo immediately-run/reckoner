@@ -64,6 +64,12 @@ export class Scheduler {
     return this.#results.get(id);
   }
 
+  /** The resolved input values (local name → value) for a node, from current published state. */
+  inputsFor(id: string): Record<string, Value> {
+    const node = this.graph.nodes.get(id);
+    return node === undefined ? {} : this.#resolveInputs(node).values;
+  }
+
   /** Cold build: set all externals and recompute every node in topo order. */
   initial(externals: Record<string, ExternalValue>, evaluate: Evaluator): PassResult {
     this.#assertAcyclic();
