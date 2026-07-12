@@ -44,8 +44,18 @@ the bundled Meridian demo document opens with zero prompts and renders a full re
 line/bar/pie charts, region map, faceted retention, sortable table) desktop + mobile, with the
 **SES-confined engine running in-browser** — live-verified via `vite dev` + headless Chrome, and
 the full document→engine→bindings→param-recompute pipeline locked by `reportSession.test.ts`.
-What remains is shell C (the engine worker) to make the four-realm composite real and unlock
-live feeds. Each shell plugs into the existing pure modules — **do not rewrite the core; wrap it.**
+All three shells (A/B/C) are now merged to `main`. Each plugs into the existing pure modules —
+**do not rewrite the core; wrap it.**
+
+**M2 has started — the live-feed workstream (`src/feed/`).** The pure data-plane core (§5.3) is
+built + tested: content-addressed `Frame`s, the connector `RetentionBuffer` (`keepLast`/`keepFor`
++ gap markers), keep-latest `Conflator` (shared by feeds and param drags, §5.3 F8), and the
+static `checkBufferCoversWindows` coverage check. **Next feed increments (effectful, ports):** the
+connector realm (§5.1 — scheduled/subscription fetch via the host SSRF proxy), the OPFS
+materialize-to-mount transport + change notification (§5.2, versioned atomic publication), wiring
+feeds as live `feeds.*` externals into `AsyncEngine` (conflated `update`s, `feeds.*` tier =
+`live`/`pulled`), and finally the **common-epoch barrier** in `asyncEngine.ts` (now exercisable
+with a simulated continuous feed). See `src/feed/index.ts` for the scope + deferrals.
 
 ### A. Report-view React components + MDX→node parse — **DONE** (`src/report/render`, `src/report/parse`)
 
