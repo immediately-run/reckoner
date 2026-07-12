@@ -12,6 +12,8 @@ export { Scheduler, CycleError } from './scheduler.ts';
 export type { Evaluator } from './scheduler.ts';
 export { runTest, runSuite, classifyCell } from './testrunner.ts';
 export type { CellVerdict, SuiteResult, TestOutcome, TestRunContext } from './testrunner.ts';
+export { Engine } from './engine.ts';
+export { evaluateWorksheet, evaluateConfined } from './compartment.ts';
 export { meetTier, meetTiers, compareTier, isAutonomousMonotone } from './tier.ts';
 export type { Tier } from './tier.ts';
 export { contentKey } from './hash.ts';

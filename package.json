@@ -17,7 +17,8 @@
   "dependencies": {
     "@immediately-run/sdk": "^0.13.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "ses": "^1.15.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
