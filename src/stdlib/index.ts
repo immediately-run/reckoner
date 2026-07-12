@@ -6,11 +6,10 @@
 // toward too little. Everything here is a pure function of plain values → plain values;
 // there is no ambient `fetch`/`console`/clock/random and no cell registry.
 //
-// Still to land (tracked, follow-up PRs): the assistant-facing screening tools
-// (`trend`/`outliers`/`deltas`) and event-time feed `window` buffering. The formula
-// engine (SES compartment, scheduler) that *evaluates* these descriptors is M1 engine
-// work; the metamorphic relations here carry their pure transform + comparison, and the
-// M2 test runner supplies the re-evaluation (see relations.ts).
+// The pure formula vocabulary is now complete for M1. The formula engine (SES compartment,
+// scheduler) that *evaluates* these descriptors lives in `../engine`; the metamorphic
+// relations here carry their pure transform + comparison, and the M2 test runner supplies
+// the re-evaluation (see relations.ts).
 
 export type { Aggregator, Predicate, Projection, Row, Scalar, Value } from './types.ts';
 
@@ -62,6 +61,13 @@ export type { DateInput, DateRange, FiscalPeriod } from './dates.ts';
 
 // Null / empty semantics.
 export { coalesce, orElse, safeDiv } from './nulls.ts';
+
+// Screening (assistant-facing message-finding tools).
+export { trend, outliers, deltas } from './screening.ts';
+export type { Trend } from './screening.ts';
+
+// Event-time feed windowing (distinct from the window functions lag/lead/scan).
+export { window, parseDuration } from './window.ts';
 
 // Cell registration constructors (the document-model contract the engine reads).
 export { cell, testCell } from './cell.ts';

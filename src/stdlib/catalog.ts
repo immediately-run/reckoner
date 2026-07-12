@@ -24,7 +24,8 @@ export type CallableKind =
   | 'null'
   | 'constructor'
   | 'testing'
-  | 'relation';
+  | 'relation'
+  | 'screening';
 
 export interface SelfDescription {
   name: string;
@@ -554,6 +555,60 @@ const entries: SelfDescription[] = [
     ],
     returns: 'Relation.',
     examples: ['property("retention never exceeds 100%", r => r.every(x => x.pct <= 1))'],
+  },
+
+  // --- screening (assistant-facing) ----------------------------------------------
+  {
+    name: 'trend',
+    kind: 'screening',
+    summary: 'Summarize a numeric column trend: first/last, change, pct, least-squares slope, direction.',
+    params: [rows, { name: 'opts', type: '{ value }', doc: 'value: the numeric column, over the rows current order.' }],
+    returns: '{ first, last, change, pct, slope, direction: "up"|"down"|"flat" }.',
+    examples: ['trend(table(rows).sort("month").rows(), { value: "mrr" })'],
+  },
+  {
+    name: 'outliers',
+    kind: 'screening',
+    summary: 'The rows whose value is a statistical outlier (IQR by default, or z-score).',
+    params: [
+      rows,
+      {
+        name: 'opts',
+        type: '{ value, method?, k? }',
+        doc: 'value: numeric column; method: iqr|zscore; k: fence (1.5) or z threshold (3).',
+        enum: ['iqr', 'zscore'],
+      },
+    ],
+    returns: 'Row[] — the outlier rows.',
+    examples: ['outliers(rows, { value: "amount" })'],
+  },
+  {
+    name: 'deltas',
+    kind: 'screening',
+    summary: 'Add period-over-period delta (cur − prev) and pct columns over the rows current order.',
+    params: [
+      rows,
+      { name: 'opts', type: '{ value, as?, pctAs? }', doc: 'value: numeric column; as/pctAs: output column names.' },
+    ],
+    returns: 'Row[] with the delta/pct columns (first row null).',
+    examples: ['deltas(table(rows).sort("month").rows(), { value: "mrr" })'],
+  },
+
+  // --- event-time windowing ------------------------------------------------------
+  {
+    name: 'window',
+    kind: 'window',
+    summary: 'The events within the trailing duration ending at now (event-time feed history; NOT the lag/scan window functions).',
+    params: [
+      { name: 'events', type: 'Row[]', doc: 'Timestamped feed events.' },
+      {
+        name: 'opts',
+        type: '{ by, within, now }',
+        doc: 'by: event-time column; within: duration like "1h"/"7d"; now: a declared params.now.',
+      },
+    ],
+    returns: 'Row[] — the events in [now − within, now].',
+    examples: ['window(recent, { by: "at", within: "1h", now: params.now })'],
   },
 ];
 
