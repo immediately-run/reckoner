@@ -27,6 +27,7 @@ import { analyze } from './cycles.ts';
 import { contentKey } from './hash.ts';
 import { meetTiers } from './tier.ts';
 import type { Tier } from './tier.ts';
+import { resolveInputs } from './resolve.ts';
 
 /** The injected formula evaluator: pure value from resolved inputs (the SES eval in prod). */
 export type Evaluator = (node: GraphNode, inputs: Record<string, Value>) => Value;
@@ -146,34 +147,10 @@ export class Scheduler {
   }
 
   #resolveInputs(node: GraphNode): { values: Record<string, Value>; tiers: Tier[] } {
-    const values: Record<string, Value> = {};
-    const tiers: Tier[] = [];
-    for (const r of node.resolvers) {
-      if (r.kind === 'external') {
-        const ext = this.#externals.get(r.key);
-        values[r.name] = ext?.value ?? null;
-        tiers.push(ext?.tier ?? 'static');
-      } else if (r.kind === 'cell') {
-        const res = this.#results.get(r.nodeId);
-        values[r.name] = res?.value ?? null;
-        tiers.push(res?.tier ?? 'static');
-      } else {
-        // wildcard: an object of every cell in the worksheet, keyed by short cell name.
-        const cells = this.graph.worksheets.get(r.worksheet) ?? [];
-        const candidates: Record<string, Value> = {};
-        for (const cellId of cells) {
-          const res = this.#results.get(cellId);
-          candidates[shortName(cellId)] = res?.value ?? null;
-          tiers.push(res?.tier ?? 'static');
-        }
-        values[r.name] = candidates;
-      }
-    }
-    return { values, tiers };
+    return resolveInputs(node.resolvers, {
+      results: this.#results,
+      externals: this.#externals,
+      worksheets: this.graph.worksheets,
+    });
   }
-}
-
-function shortName(id: string): string {
-  const dot = id.indexOf('.');
-  return dot === -1 ? id : id.slice(dot + 1);
 }
