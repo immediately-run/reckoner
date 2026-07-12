@@ -106,6 +106,12 @@ export const movements = cell({
   inputs: { rows: "fixtures.mrr_movements" },
   formula: ({ rows }) => rows,
 });
+
+export const live_by_region = cell({
+  doc: "Active sessions per region right now, from the live feed",
+  inputs: { rows: "feeds.live_regions" },
+  formula: ({ rows }) => (Array.isArray(rows) ? rows : []),
+});
 `;
 
 // The report template — the MDX subset. Exercises the breadth of the catalog: KPIs (currency +
@@ -142,6 +148,12 @@ New, expansion and reactivation MRR by month.
 <Callout tone="info">
 Net revenue retention and gross churn are the two levers behind the trend above — watch them together.
 </Callout>
+
+## Live activity.
+
+Active sessions per region, streaming from a live feed — this chart recomputes on every frame.
+
+<Chart source="review.live_by_region" kind="bar" x="region" y="sessions" />
 
 ## Cohort retention.
 
