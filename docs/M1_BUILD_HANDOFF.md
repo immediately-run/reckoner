@@ -47,15 +47,20 @@ the full document→engine→bindings→param-recompute pipeline locked by `repo
 All three shells (A/B/C) are now merged to `main`. Each plugs into the existing pure modules —
 **do not rewrite the core; wrap it.**
 
-**M2 has started — the live-feed workstream (`src/feed/`).** The pure data-plane core (§5.3) is
-built + tested: content-addressed `Frame`s, the connector `RetentionBuffer` (`keepLast`/`keepFor`
-+ gap markers), keep-latest `Conflator` (shared by feeds and param drags, §5.3 F8), and the
-static `checkBufferCoversWindows` coverage check. **Next feed increments (effectful, ports):** the
-connector realm (§5.1 — scheduled/subscription fetch via the host SSRF proxy), the OPFS
-materialize-to-mount transport + change notification (§5.2, versioned atomic publication), wiring
-feeds as live `feeds.*` externals into `AsyncEngine` (conflated `update`s, `feeds.*` tier =
-`live`/`pulled`), and finally the **common-epoch barrier** in `asyncEngine.ts` (now exercisable
-with a simulated continuous feed). See `src/feed/index.ts` for the scope + deferrals.
+**M2 has started — the live-feed workstream (`src/feed/`).** Built + tested:
+- the pure data-plane core (§5.3) — content-addressed `Frame`s, the connector `RetentionBuffer`
+  (`keepLast`/`keepFor` + gap markers), keep-latest `Conflator` (shared by feeds and param drags,
+  §5.3 F8), and the static `checkBufferCoversWindows` coverage check;
+- the **connector port + `FeedRuntime`** (§5.1/§5.2/§5.3) — a `Connector` interface (`manualConnector`
+  for dev/tests, `pollingConnector` over an injected fetch) and the runtime that ties connectors →
+  buffers → conflation → **conflated `engine.update`s**, so a feed drives a live recompute
+  (E2E-tested against the real `AsyncEngine`; `feeds.*` tier folds through).
+
+**Next feed increments:** windowed-feed input resolution (`{ feed, window }` applying `window()`
+over the buffer with `params.now` — an engine input-resolver change); the real host-proxied
+connector (§5.1 — the SSRF-bounded fetch capability) + the OPFS materialize-to-mount transport
+(§5.2); wiring `FeedRuntime` into `App.tsx`/`reportSession`; and the **common-epoch barrier** in
+`asyncEngine.ts` (now exercisable with a simulated continuous feed). See `src/feed/index.ts`.
 
 ### A. Report-view React components + MDX→node parse — **DONE** (`src/report/render`, `src/report/parse`)
 

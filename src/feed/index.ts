@@ -13,3 +13,7 @@ export type { RetentionPolicy } from './buffer.ts';
 export { Conflator } from './conflation.ts';
 export { checkBufferCoversWindows } from './constraints.ts';
 export type { CoverageViolation, WindowDecl } from './constraints.ts';
+export { manualConnector, pollingConnector } from './connector.ts';
+export type { Connector, ConnectorSink, PollingOptions } from './connector.ts';
+export { FeedRuntime } from './runtime.ts';
+export type { FeedSpec, FeedEngine, FeedRuntimeDeps } from './runtime.ts';
