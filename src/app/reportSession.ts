@@ -1,13 +1,20 @@
-// Shell B integration (ARCHITECTURE_PLAN §2.1, §7) — the one new piece that ties the pure
-// spine to the render surface: load a document → build the SES-confined engine → run it →
-// parse the template → hand the renderer a `Bindings` adapter over the engine's results.
+// Shell B integration + shell C wiring (ARCHITECTURE_PLAN §2.1, §4, §7) — ties the pure spine
+// to the render surface: load a document → run the **worker-backed** engine → parse the
+// template → hand the renderer a `Bindings` adapter over the engine's results.
 //
-// `buildReportSession` is the full cold pipeline; `sessionBindings` is the engine adapter the
-// renderer resolves through (the render side is unit-tested against a hand-built port, so this
-// stays a thin adapter). Params close the interaction loop: a widget write updates the external
-// and calls the engine's incremental `update`, then the caller re-renders.
+// The engine is now the `AsyncEngine`: formula execution happens in a terminable, `lockdown()`-ed
+// SES Web Worker (`src/entry/engine.ts`), so a runaway formula is contained by the host watchdog
+// rather than wedging the UI thread. Where a real `Worker` is unavailable (SSR/tests) it falls
+// back to an in-process transport — same orchestration, main-thread execution.
+//
+// `sessionBindings` is the engine adapter the renderer resolves through (the render side is
+// unit-tested against a hand-built port, so this stays a thin adapter). Params close the
+// interaction loop: a widget write updates the external, calls the engine's async `update`, and
+// re-renders when the pass settles.
 
-import { Engine } from '../engine/engine.ts';
+import { AsyncEngine } from '../engine/asyncEngine.ts';
+import { workerTransport, inMemoryTransport } from '../engine/workerTransport.ts';
+import type { WorkerTransport } from '../engine/workerTransport.ts';
 import type { ExternalValue } from '../engine/types.ts';
 import type { Tier } from '../engine/tier.ts';
 import { loadDocument } from '../document/loader.ts';
@@ -17,7 +24,6 @@ import type { TemplateNode } from '../report/nodes.ts';
 import { missing } from '../report/render/bindings.ts';
 import type { Bindings, BoundValue } from '../report/render/bindings.ts';
 import type { Value } from '../stdlib/types.ts';
-import * as stdlib from '../stdlib/index.ts';
 import { memoryReader } from './memoryReader.ts';
 import { SEED_FILES, SEED_ROOT } from '../seed/document.ts';
 
@@ -25,7 +31,7 @@ const EXTERNAL_NAMESPACES = ['feeds.', 'fixtures.', 'static.', 'params.'];
 const TIERS: ReadonlySet<string> = new Set(['static', 'pulled', 'live']);
 
 export interface ReportSession {
-  engine: Engine;
+  engine: AsyncEngine;
   /** Live external inputs (fixtures + params), keyed by dotted binding name. */
   externals: Record<string, ExternalValue>;
   nodes: TemplateNode[];
@@ -49,16 +55,32 @@ function assembleExternals(loaded: LoadedDocument): Record<string, ExternalValue
   return externals;
 }
 
-/** Load the bundled demo document and run the full cold pipeline. */
-export async function buildReportSession(): Promise<ReportSession> {
+/**
+ * The engine's worker transport: a real module Web Worker (off-main-thread, `lockdown()`-ed)
+ * when available, else the in-process fallback. The `new URL(..., import.meta.url)` Worker form
+ * is a web standard (not a bundler macro), so it works on `vite` and immediately.run alike.
+ */
+export function makeTransport(): WorkerTransport {
+  if (typeof Worker !== 'undefined') {
+    try {
+      return workerTransport(() => new Worker(new URL('../entry/engine.ts', import.meta.url), { type: 'module' }));
+    } catch {
+      /* fall through to the in-process transport */
+    }
+  }
+  return inMemoryTransport();
+}
+
+/** Load the bundled demo document and run the full cold pipeline through the worker engine. */
+export async function buildReportSession(transport: WorkerTransport = makeTransport()): Promise<ReportSession> {
   const loaded = await loadDocument(memoryReader(SEED_FILES), SEED_ROOT);
 
   const worksheetSources: Record<string, string> = {};
   for (const w of loaded.worksheets) worksheetSources[w.name] = w.source;
 
-  const engine = Engine.fromSources(worksheetSources, { ...stdlib });
+  const engine = await AsyncEngine.fromSources(worksheetSources, { transport });
   const externals = assembleExternals(loaded);
-  engine.run(externals);
+  await engine.run(externals);
 
   const template = loaded.templates.find((t) => t.name === 'weekly') ?? loaded.templates[0];
   const nodes = template === undefined ? [] : parseTemplate(template.source);
@@ -74,19 +96,17 @@ export function sessionBindings(session: ReportSession, onChange: () => void): B
         const ext = session.externals[source];
         return ext === undefined ? missing(source) : { value: ext.value, tier: ext.tier, status: 'ok' };
       }
-      try {
-        const result = session.engine.scheduler.result(source);
-        return result === undefined ? missing(source) : { value: result.value, tier: result.tier, status: 'ok' };
-      } catch (e) {
-        return { value: null, tier: 'live', status: 'error', message: (e as Error).message };
-      }
+      const err = session.engine.error(source);
+      if (err !== undefined) return { value: null, tier: 'live', status: 'error', message: err };
+      const result = session.engine.result(source);
+      return result === undefined ? missing(source) : { value: result.value, tier: result.tier, status: 'ok' };
     },
     setParam(name, value) {
       const key = `params.${name}`;
-      const update: ExternalValue = { value, tier: 'static' };
-      session.externals[key] = update;
-      session.engine.update({ [key]: update });
-      onChange();
+      const ext: ExternalValue = { value, tier: 'static' };
+      session.externals[key] = ext;
+      // The engine recomputes off the main thread; re-render when the pass settles.
+      void session.engine.update({ [key]: ext }).then(onChange);
     },
   };
 }
