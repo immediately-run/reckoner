@@ -103,7 +103,7 @@ verified without external CI.
 | S2 | In-platform document-test execution | ◐ by construction at M1 | tests-as-cells run in the engine; S4a exposes it |
 | **S3** | **In-platform commit/push** | **partial → this doc** | `VcsControl` reads but doesn't write; the near-term item |
 | **S4** | **In-platform CI gate** | **S4a ◐ / S4b ✗ → this doc** | document tests in-platform; source CI is the tracked gap |
-| S5 | Dep resolution for SES / CodeMirror in-platform | ✗ unproven | rides the module-fetch path; unverified for these packages — spike before M1 source work |
+| S5 | Dep resolution for SES / CodeMirror in-platform | ✅ **proven** (2026-07-12) | live spike: the module-fetch path resolves `ses`+`@endo/*`+`@codemirror/*`, and a starved SES `Compartment` runs in-platform — see [`spikes/S5_SES_MODULE_RESOLUTION.md`](spikes/S5_SES_MODULE_RESOLUTION.md) |
 | S6 | Run the real four-realm composite in-platform | ✗ gated on D1–D9 | the recursion; resolves as the deltas land (M3) — and needs Spine 2's topology to express a multi-appKey launch (`COMPOSITE_CAPABILITY_TOPOLOGY_SPEC` OQ-3) |
 
 ## Recommended order
@@ -112,8 +112,8 @@ verified without external CI.
    (content authoring) fully in-platform. Do first.
 2. **S4a** — folds into the M1/M2 editor work; formalizes the document-test gate S2 already
    enables.
-3. **S5 spike** — a small investigation (does the module-fetch path resolve SES/CodeMirror?)
-   that de-risks whether *source* authoring can be in-platform at all; cheap, run before M1
-   source work.
+3. **S5 spike** — ✅ **DONE, positive** (2026-07-12): the module-fetch path resolves
+   SES + CodeMirror and a starved SES `Compartment` runs in-platform, so the engine realm is
+   buildable in-platform. Findings: [`spikes/S5_SES_MODULE_RESOLUTION.md`](spikes/S5_SES_MODULE_RESOLUTION.md).
 4. **S4b / S6** — tracked platform capabilities, not v1 Reckoner deliverables; the honest ✗
    items whose closure is the deeper Axis-2 forcing-function contribution.
