@@ -12,18 +12,20 @@ working conventions, the environment quirks, and the concrete next steps. · **U
 
 ---
 
-## 1. Current state — the pure spine + engine shell are built and merged
+## 1. Current state — the pure spine, engine shell, and report-view shell (A) are built
 
-Reckoner went from the starter template to a tested formula-engine core. Everything below is
-on `main` (PRs #2–#10; #9 is the S5 spike doc). **201 vitest cases**; every merge was green on
-`tsc -b` + `npm test` + `npm run lint` + `npm run build`.
+Reckoner went from the starter template to a tested formula-engine core plus the report-view
+render surface. Everything below is on `main` (PRs #2–#10; #9 is the S5 spike doc) except the
+report-view render layer (shell A), which is in its own PR. **242 vitest cases**; every merge was
+green on `tsc -b` + `npm test` + `npm run lint` + `npm run build`.
 
 | Area | Where | What it provides |
 |---|---|---|
 | **stdlib** (complete) | `src/stdlib/` | The entire pure formula vocabulary. `table()` fluent + free functions: shaping (`filter`/`derive`/`sort`/`groupBy`/`rollup`/`join`/`antiJoin`/`pivot`/`topN`), aggregators (`sum`/`mean`/`median`/`count`/`min`/`max`/`quantile`/`first`), ordered (`lag`/`lead`/`scan`+`cumsum`/`cummax`/`ema`/`asofJoin`), dates (`monthKey`/`addMonths`/`resolveRange`/…), nulls (`coalesce`/`safeDiv`), screening (`trend`/`outliers`/`deltas`), event-time `window()`. Plus `cell()`/`testCell()` constructors, input-spec parsing (`parseInput`), metamorphic relations (`conservation`/`permutationInvariance`/`scaleInvariance`/`property`), assertions (`expectClose`/`expectEqual`/`deepEqual`), and the self-description `catalog`. Barrel: `src/stdlib/index.ts`. |
 | **document model** | `src/document/` | `parseManifest` (`reckoner.json` + compat envelope), `parseFeedConfig` (inline-secret guard), `parseFixtureFrame`, `loadDocument(reader, root)` (port-injected fs), `resolveCompat` (run/degrade/refuse) on a minimal `semver` matcher. |
 | **engine** | `src/engine/` | The recalc core: `buildGraph` (wildcard expansion + enumerability guards), `analyze`/cycle detection, tier lattice (`meetTiers`), content-`hash`, `Scheduler` (topo order, tier fold, `(value,tier)` cutoff, incremental recompute), `runTest`/`classifyCell`/`runSuite` (review verdict). **Engine shell:** `evaluateWorksheet` (SES-confined worksheet eval, `compartment.ts`) + the `Engine` orchestrator (`engine.ts`) that runs the whole spine. |
-| **report** | `src/report/` | The template layer: `nodes.ts` (render-as-data node model), `catalog.ts` (closed v1 component catalog + attribute schemas), `validateTemplate` (binding collection + authoring diagnostics + structural rules). **Types + validation only — no React components yet.** |
+| **report — types + validation** | `src/report/` | The template layer contract: `nodes.ts` (render-as-data node model), `catalog.ts` (closed v1 component catalog + attribute schemas), `validateTemplate` (binding collection + authoring diagnostics + structural rules). |
+| **report — render shell (A)** | `src/report/render/` + `src/report/parse/` | The React render surface (§3.3). `ReportView` walks a parsed `TemplateNode[]` and draws the audited components, resolving every `source` through the injected **`Bindings` port** (value + tier; shell B supplies the engine adapter). One component per catalog entry — `Kpi`, `Chart` (SVG: bar grouped/stacked/normalized, line, area, scatter, histogram, pie ≤5+other), `Table` (sortable), `Value`, `Facets` (small-multiples), `Gauge`, `Map` (point + region-breakdown choropleth), `Callout`, `Section`/`Row`, `ShowAbove`/`ShowBelow` (ResizeObserver/matchMedia), `Params` + `Select`/`Toggle`/`Range`/`DateRange`. Degraded states are component-owned (broken tile / needs-access / placeholder); the tier badge slot is **reserved** for the host (review-1 H2, never drawn here). Plus the safe MDX-subset parser (`parse/mdx.ts` + `parse/literal.ts`) — the dev stand-in for the platform D3 renderer; it **never evaluates** (`f={fetch("/x")}` → inert). Unit-rendered against mock engine results via `react-dom/server` (`render.test.tsx`) + parser/chart-math/format/shape tests. **Known v1 gap:** an inline component *within a prose line* parses to separate block nodes (block-level is covered); real polygon-geography Map and Kpi `spark` are deferred (see `src/report/render/index.ts`). |
 
 **S5 is closed positive** (`spikes/S5_SES_MODULE_RESOLUTION.md`): the platform module-fetch
 path resolves SES + CodeMirror and a starved SES `Compartment` runs in-platform, so the engine
@@ -34,34 +36,33 @@ pipeline in Node with the real `ses` package.
 
 ## 2. What remains — the effectful shells (in recommended order)
 
-The pure spine is done; a runnable M1 static report needs three browser/SES shells. Each plugs
-into the existing pure modules — **do not rewrite the core; wrap it.**
+The pure spine and the **report-view render shell (A, done — §1)** are built; a runnable M1
+static report now needs shell B (wire it into `App.tsx`) and shell C (the engine worker). Each
+plugs into the existing pure modules — **do not rewrite the core; wrap it.**
 
-### A. Report-view React components + MDX→node parse (`ARCHITECTURE_PLAN` §3.3/§3.3.1)
+### A. Report-view React components + MDX→node parse — **DONE** (`src/report/render`, `src/report/parse`)
 
-Build the catalog components that render `src/report/nodes.ts` against `Engine` results.
+Shipped in its own PR. `ReportView` + one component per catalog entry + the safe MDX-subset
+parser, unit-rendered against mock engine results. The load-bearing seam shell B consumes: the
+injected **`Bindings` port** (`src/report/render/bindings.ts`) — `resolve(source) → {value, tier,
+status}` and `setParam(name, value)`. Shell B supplies a `Bindings` adapter over the engine's
+`PassResult` + `params` externals; the renderer needs no other engine knowledge. Deferred
+enrichments are listed in `src/report/render/index.ts` (host tier badge is a reserved slot; real
+polygon Map; Kpi `spark`; full inline-MDX = the platform D3 renderer's remit).
 
-- One React component per catalog entry (`catalog.ts` is the source of truth for names/attrs):
-  `Kpi`, `Chart` (SVG; the `kind` variants), `Table`, `Value`, `Facets`, `Params` + widgets,
-  `Section`/`Row`, `Callout`, `Map`, `Gauge`, `ShowAbove`/`ShowBelow`.
-- A **renderer** that walks `TemplateNode[]`, instantiates the audited component per node
-  name, and resolves each `source` binding to its `Engine` value **+ tier**. Collect the
-  binding set with the existing `validateTemplate(...).bindings`.
-- **Degraded states are component-owned** (§3.3): bound cell threw → marked broken tile; unknown
-  component → placeholder (already flagged by the validator); unconsented feed → "needs access".
-- **Do NOT draw your own tier/trust badge** — the host renders it (review-1 H2). Reserve the slot.
-- Responsive lives in the components (container queries, SVG-first), never in the template (§3.3.1).
-- A minimal MDX-subset → `TemplateNode[]` parser (platform delta D3 is the eventual home; for
-  dev, a small parser that captures literal vs inert attributes per `nodes.ts`).
-- **Verify:** unit-render components against mock `Engine` results; then live on the stack.
-
-### B. `App.tsx` integration — a runnable static report (§2.1, §7)
+### B. `App.tsx` integration — a runnable static report (§2.1, §7)  ← **next**
 
 Wire it together: `App.tsx` loads a document (`loadDocument` over the app's fs mount) →
-`Engine.fromSources(worksheetSources, stdlib)` → `engine.run(externals)` → render the template
-(A) against results. This is the **M1 exit gate**: a static doc opens with zero prompts and
-renders, desktop + mobile.
+`Engine.fromSources(worksheetSources, stdlib)` → `engine.run(externals)` → parse each template
+(`parseTemplate` from `src/report/parse`) → render via `<ReportView nodes bindings />` (A). This
+is the **M1 exit gate**: a static doc opens with zero prompts and renders, desktop + mobile.
 
+- **Build the `Bindings` adapter** (the one new integration piece): implement
+  `src/report/render/bindings.ts`'s `Bindings` over the engine — `resolve(source)` returns the
+  engine's published `{value, tier}` for a cell id / external key (or a `missing`/`error`
+  status), and `setParam(name, value)` writes `params.<name>` and calls `engine.update(...)`,
+  then re-renders. Keep it a thin adapter (the render side is already unit-tested against a
+  hand-built port).
 - **Verify live** on `immediately.run` via the local provider + Chrome MCP (or the puppeteer-core
   fallback — see §4). The Meridian case study (`docs/case-study/meridian/`) is the corpus.
 
@@ -131,8 +132,11 @@ four-realm composite shape (`ARCHITECTURE_PLAN` §2.1) real.
   transpiled-module **linker** (the current evaluator uses a source transform + `Compartment.evaluate`;
   in-platform the sandbox transpiles and the Compartment module loader links); holdout-fixture
   **substitution** test semantics — running a subject over a test's own fixture inputs (§6). (`src/engine/engine.ts`/`compartment.ts`.)
-- **report** — the React component implementations + MDX→node parser (shell A); host-rendered
-  tier badges; data-shape contracts needing the resolved value. (`src/report/index.ts`.)
+- **report** — shell A shipped the components + MDX parser. Remaining/deferred (in
+  `src/report/render/index.ts`): the **host-rendered tier badge** (the slot is reserved, we
+  supply the value); a real **polygon-geography Map** (v1 choropleth ships a region breakdown);
+  **Kpi `spark`** (needs a series binding the v1 catalog doesn't carry); full CommonMark +
+  **inline-component-in-prose** (the platform D3 renderer's remit — block-level is covered).
 - **relations** — the M2 test runner supplies the metamorphic re-evaluation; the relation
   descriptors carry only their pure transform + comparison (`src/stdlib/relations.ts`).
 

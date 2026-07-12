@@ -17,3 +17,13 @@ export type { AttrSchema, AttrType, ComponentSchema, Variants } from './catalog.
 
 export { validateTemplate } from './validate.ts';
 export type { TemplateDiagnostic, TemplateValidation } from './validate.ts';
+
+// The MDX-subset parser (dev stand-in for the platform D3 safe renderer) turns a template
+// document into the node model above.
+export { parseTemplate } from './parse/mdx.ts';
+
+// The React render surface (shell A): draws a parsed template against engine results via the
+// injected Bindings port. See ./render/index.ts for the deferred-enrichment notes.
+export { ReportView } from './render/index.ts';
+export type { Bindings, BoundValue, BindingStatus } from './render/index.ts';
+export { missing } from './render/index.ts';
