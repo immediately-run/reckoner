@@ -1,8 +1,9 @@
 # Reckoner M1 — build handoff
 
-**Purpose.** Pick up the Reckoner M1 build in a fresh session. This records what is built
-(the pure spine + the SES engine shell, all merged), how it is organized and verified, the
-working conventions, the environment quirks, and the concrete next steps. · **Updated:** 2026-07-12
+**Purpose.** Pick up the Reckoner build in a fresh session. This records what is built (M1 — the
+pure spine + all three effectful shells; and M2 — the live-feed workstream, underway), how it is
+organized and verified, the working conventions, the environment quirks, and the concrete next
+steps. · **Updated:** 2026-07-13
 
 > **Reads first, in order:** `product_definition.md` → `ARCHITECTURE_PLAN.md` §2 (the five
 > parts), §3 (document model + stdlib + templates), §4 (engine), §6 (testing), §10
@@ -12,13 +13,14 @@ working conventions, the environment quirks, and the concrete next steps. · **U
 
 ---
 
-## 1. Current state — the spine + engine + report-view (A) + a runnable report (B) are built
+## 1. Current state — M1 complete (all three shells) + M2 live-feed workstream underway
 
 Reckoner went from the starter template to a tested formula-engine core, the report-view render
-surface, and a runnable static report. The spine/engine/report-types are on `main` (PRs #2–#10;
-#9 is the S5 spike doc); shell A (render surface) and shell B (`App.tsx` integration) are in
-stacked PRs. **248 vitest cases**; every merge is green on `tsc -b` + `npm test` + `npm run lint`
-+ `npm run build`, and shell B is additionally live-verified in a browser (§2.B).
+surface, a runnable static report, the worker-backed async engine, and the live-feed data plane.
+**All of M1 (shells A/B/C) and four M2 feed increments are merged to `main`** (PRs #2–#19; #9 is
+the S5 spike doc). **286 vitest cases**; every merge is green on `tsc -b` + `npm test` +
+`npm run lint` + `npm run build`, and the app is live-verified in a browser (the report renders
+and a live feed recomputes it — §2.B / §2 M2 note).
 
 | Area | Where | What it provides |
 |---|---|---|
@@ -47,20 +49,30 @@ the full document→engine→bindings→param-recompute pipeline locked by `repo
 All three shells (A/B/C) are now merged to `main`. Each plugs into the existing pure modules —
 **do not rewrite the core; wrap it.**
 
-**M2 has started — the live-feed workstream (`src/feed/`).** Built + tested:
-- the pure data-plane core (§5.3) — content-addressed `Frame`s, the connector `RetentionBuffer`
-  (`keepLast`/`keepFor` + gap markers), keep-latest `Conflator` (shared by feeds and param drags,
-  §5.3 F8), and the static `checkBufferCoversWindows` coverage check;
-- the **connector port + `FeedRuntime`** (§5.1/§5.2/§5.3) — a `Connector` interface (`manualConnector`
-  for dev/tests, `pollingConnector` over an injected fetch) and the runtime that ties connectors →
+**M2 — the live-feed workstream (`src/feed/`) is underway; four increments merged to `main`:**
+- **Feed data-plane core** (§5.3, PR #16) — content-addressed `Frame`s, the connector
+  `RetentionBuffer` (`keepLast`/`keepFor` + gap markers), keep-latest `Conflator` (shared by feeds
+  and param drags, §5.3 F8), and the static `checkBufferCoversWindows` coverage check.
+- **Connector port + `FeedRuntime`** (§5.1/§5.2/§5.3, PR #17) — a `Connector` interface
+  (`manualConnector` for dev/tests, `pollingConnector` over an injected fetch) tying connectors →
   buffers → conflation → **conflated `engine.update`s**, so a feed drives a live recompute
   (E2E-tested against the real `AsyncEngine`; `feeds.*` tier folds through).
+- **Live feed wired into the app** (PR #18) — a synthetic demo feed (`src/app/demoFeed.ts`) +
+  a `feeds.live_regions` cell + a "Live activity" chart; `useReport` runs a `FeedRuntime` over the
+  session engine (rAF flush cadence) and re-renders on each settled recompute. Live-verified in a
+  real browser over CDP (the chart populates and its values change over time).
+- **Glitch-freedom proven** (§4.2 C-R-B, PR #19) — see §5; the common-epoch barrier is resolved
+  (satisfied by construction), not a pending item.
 
-**Next feed increments:** windowed-feed input resolution (`{ feed, window }` applying `window()`
-over the buffer with `params.now` — an engine input-resolver change); the real host-proxied
-connector (§5.1 — the SSRF-bounded fetch capability) + the OPFS materialize-to-mount transport
-(§5.2); wiring `FeedRuntime` into `App.tsx`/`reportSession`; and the **common-epoch barrier** in
-`asyncEngine.ts` (now exercisable with a simulated continuous feed). See `src/feed/index.ts`.
+**Genuinely-remaining feed increments:**
+- **Windowed-feed input resolution** — `{ feed, window }` applying `window()` over the buffer with
+  a `params.now` convention. Needs a small design decision (the event-time `by` field + the `now`
+  source), then an engine input-resolver change; the buffer already exposes the rows.
+- **The real host-proxied connector** (§5.1 — the SSRF-bounded fetch capability) + the **OPFS
+  materialize-to-mount transport** (§5.2). *Platform-blocked:* both need host services not present
+  in the standalone reckoner repo; the `Connector`/transport ports are the seams they slot into.
+
+See `src/feed/index.ts` for the scope map.
 
 ### A. Report-view React components + MDX→node parse — **DONE** (`src/report/render`, `src/report/parse`)
 
@@ -193,6 +205,10 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
   supply the value); a real **polygon-geography Map** (v1 choropleth ships a region breakdown);
   **Kpi `spark`** (needs a series binding the v1 catalog doesn't carry); full CommonMark +
   **inline-component-in-prose** (the platform D3 renderer's remit — block-level is covered).
+- **feed (M2)** — the data-plane core + connector/`FeedRuntime` are built and wired into the app
+  (#16–#18). Remaining: **windowed-feed input resolution** (`{ feed, window }` over the buffer —
+  needs the `by`/`now` convention + an input-resolver change) and, **platform-blocked**, the real
+  host-proxied connector (§5.1 SSRF fetch) + OPFS materialize-to-mount transport (§5.2). (`src/feed/index.ts`.)
 - **relations** — the M2 test runner supplies the metamorphic re-evaluation; the relation
   descriptors carry only their pure transform + comparison (`src/stdlib/relations.ts`).
 
