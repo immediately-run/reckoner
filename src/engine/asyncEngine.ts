@@ -13,12 +13,18 @@
 //     cancel an in-flight pass; they coalesce into one follow-up with the latest externals, so
 //     progress holds even when eval time exceeds the input change rate (no cancel-restart livelock).
 //
-// DEFERRED to the live-feed workstream (documented, not built): the **common-epoch barrier** for
-// glitch-freedom across asymmetric diamonds under a *continuous* feed (§4.2 C-R-B). It is
-// unexercised without feed connectors/conflation/windowing (none exist yet) and un-testable in
-// isolation; with only fixtures + user param writes, every pass settles at a single epoch, so a
-// cell never assembles mixed-epoch inputs. Per-pass supersession here is the coarse form; the
-// per-cell epoch gate is the refinement that lands with feeds.
+// GLITCH-FREEDOM (§4.2 C-R-B) is satisfied here **by construction**, not by an explicit
+// common-epoch barrier. A pass evaluates cells **sequentially in topo order over one externals
+// snapshot**, and passes are **strictly serialized** (single-slot supersession) — so within a
+// pass every cell reads inputs derived from a single epoch, and no new epoch starts mid-pass.
+// Even on an asymmetric diamond under a continuous feed (a slow arm B, a fast arm C, both under a
+// shared ancestor), C cannot race ahead to a newer epoch while B lags: C only runs *after* B in
+// the same pass. The freshness cost of that choice is exactly §4.2's stated trade — a cell's
+// freshness equals its slowest transitive path. This invariant is proven by the glitch-freedom
+// property test (asyncEngine.glitch.test.ts, spec §11 E-2), which watches every settled pass via
+// `onPass`. The **per-cell epoch-gate barrier becomes necessary only if concurrent arm evaluation
+// is introduced** (the deferred worker-pool partitioning, §4.1) — the single-context serial engine
+// does not need it. (An explicit epoch stamp would only add value under that future concurrency.)
 
 import type { Value } from '../stdlib/types.ts';
 import type { ExternalValue, PublishedResult } from './types.ts';
@@ -46,6 +52,12 @@ export interface AsyncEngineOptions {
   now?: () => number;
   /** Injected timer; returns a canceller. Default `setTimeout`/`clearTimeout`. */
   setTimer?: (fn: () => void, ms: number) => () => void;
+  /**
+   * Observe every settled pass (not just the coalesced final one) — the hook the
+   * glitch-freedom property test watches. A pass is internally single-epoch by construction
+   * (serial evaluation over one externals snapshot), so this exposes that invariant to a checker.
+   */
+  onPass?: (pass: AsyncPass) => void;
 }
 
 /** The settled state after a pass. */
@@ -71,6 +83,7 @@ export class AsyncEngine {
   readonly #breaker: CircuitBreaker;
   readonly #now: () => number;
   readonly #setTimer: (fn: () => void, ms: number) => () => void;
+  readonly #onPass: (pass: AsyncPass) => void;
 
   #sources: Record<string, string> = {};
   #order: string[] = [];
@@ -98,6 +111,7 @@ export class AsyncEngine {
     this.#breaker = new CircuitBreaker(opts.breaker ?? DEFAULT_BREAKER);
     this.#now = opts.now ?? (() => Date.now());
     this.#setTimer = opts.setTimer ?? defaultTimer;
+    this.#onPass = opts.onPass ?? (() => {});
     this.#transport.onMessage((msg) => this.#onMessage(msg));
   }
 
@@ -218,7 +232,7 @@ export class AsyncEngine {
       // so error *every* cell, not just the orderable ones.
       const path = this.#cycles.map((c) => c.join(' → ')).join('; ');
       for (const id of this.#nodesById.keys()) this.#errors.set(id, `dependency cycle: ${path}`);
-      return this.snapshot();
+      return this.#settle();
     }
 
     for (const id of this.#order) {
@@ -261,7 +275,14 @@ export class AsyncEngine {
         }
       }
     }
-    return this.snapshot();
+    return this.#settle();
+  }
+
+  /** Snapshot the settled pass and notify the observer (every pass, not just the coalesced last). */
+  #settle(): AsyncPass {
+    const pass = this.snapshot();
+    this.#onPass(pass);
+    return pass;
   }
 
   #evalWithWatchdog(id: string, inputs: Record<string, Value>): Promise<Value> {
