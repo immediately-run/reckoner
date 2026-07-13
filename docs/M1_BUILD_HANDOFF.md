@@ -115,11 +115,14 @@ Delivered async invariants:
 - Shared input resolution (`resolve.ts`) — one path with the sync `Scheduler` (refactored to
   use it), tier fold + `(value,tier)` publish, cycle→error-every-cell.
 
-**Deferred (documented in `asyncEngine.ts`): the common-epoch barrier** for glitch-freedom
-across asymmetric diamonds under a *continuous* live feed (§4.2 C-R-B). It is unexercised and
-un-testable without feed connectors/conflation/windowing (none exist yet); with fixtures + user
-param writes every pass settles at one epoch, so no cell assembles mixed-epoch inputs. It lands
-with the live-feed workstream. **Also remaining:** wiring `AsyncEngine` into `App.tsx` in place
+**Glitch-freedom (§4.2 C-R-B) is satisfied by construction, and now PROVEN.** The serial
+single-context engine (sequential topo eval over one externals snapshot + serialized passes)
+cannot assemble a cell from two epochs even on an asymmetric diamond under a continuous feed —
+`asyncEngine.glitch.test.ts` (spec §11 E-2: property test over random DAGs + bursty updates,
+watching every settled pass via the new `onPass` hook) demonstrates it. The **explicit per-cell
+epoch-gate barrier becomes necessary only if concurrent arm evaluation is introduced** (the
+deferred worker-pool partitioning, §4.1) — the single-context engine does not need it; that was
+the correction from treating it as an unbuilt gap. **Also remaining:** wiring `AsyncEngine` into `App.tsx` in place
 of the sync `Engine` (so even the static render runs off-main-thread with watchdog protection),
 and the real-`Worker` E2E in a browser (the `entry/engine.ts` shim + `lockdown()` — thin, and
 S5 already proved SES resolves + runs in-platform). Verified by the engine test suite
@@ -176,9 +179,10 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
   module validates/resolves an existing envelope); cross-reference validation (an input naming a
   missing feed/fixture). (`src/document/index.ts`.)
 - **engine scheduler** — shell C shipped single-slot supersession + the watchdog circuit
-  breaker (`src/engine/asyncEngine.ts` + `circuitBreaker.ts`). **Still deferred: the
-  common-epoch barrier** (glitch-freedom under continuous live feeds — needs the feed machinery;
-  see `asyncEngine.ts` header).
+  breaker (`src/engine/asyncEngine.ts` + `circuitBreaker.ts`). **Glitch-freedom (§4.2 C-R-B) is
+  satisfied by construction + proven** (`asyncEngine.glitch.test.ts`, spec §11 E-2); the explicit
+  per-cell epoch-gate barrier is needed only if concurrent arm evaluation is added (deferred
+  worker pool, §4.1) — see the `asyncEngine.ts` header.
 - **engine shell** — worker built + **wired into the app** (`AsyncEngine` now backs
   `reportSession`, real `Worker`+`lockdown()` with an in-process fallback). Remaining: the
   transpiled-module **linker** (the evaluator uses a source transform + `Compartment.evaluate`;
