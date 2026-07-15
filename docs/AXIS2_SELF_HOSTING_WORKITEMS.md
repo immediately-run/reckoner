@@ -4,20 +4,33 @@
 `ARCHITECTURE_PLAN.md` §0.2. Reckoner forces not only the platform's *runtime* capabilities
 (the nine deltas) but its ability to **host its own development**. These are the platform
 self-hosting gaps that keep Reckoner development from being fully in-platform, scoped as
-actionable items. · **Updated:** 2026-07-09
+actionable items. · **Updated:** 2026-07-15
 
 > **Reads first:** `ARCHITECTURE_PLAN.md` §0.2 (the dogfooding stance + the S1–S6 gradient),
 > §10 (the in-platform work-item tags); `LOCAL_DEVELOPMENT_SPEC.md`, `EDITOR_AS_APP_SPEC.md`,
 > `AGENT_AUTHORING_ARCHITECTURE.md` (the existing in-platform dev loop).
 
-The two gating gaps are **S3** (in-platform commit/push) and **S4** (an in-platform
-Node-equivalent CI gate). S3 is the high-leverage near-term item — it closes the loop for the
-most-dogfoodable, highest-volume work (content authoring). S4 splits into a cheap in-platform
+The remaining gating gap is **S4** (an in-platform Node-equivalent CI gate); **S3**
+(in-platform commit/push) was resolved by reconciliation 2026-07-15 — the loop already ships
+on `protocol-contribute` (see the §S3 correction note). S4 splits into a cheap in-platform
 win and a hard platform capability. S1/S2/S5/S6 are listed for context with their status.
 
 ---
 
 ## S3 — In-platform commit & push (close the content-authoring loop)  · **near-term, high-leverage**
+
+> *(Correction, 2026-07-15 — resolves roadmap R3-230 by reconciliation, not new code: the
+> "current state" below was stale at verification. The write half of VCS already ships on the
+> **`protocol-contribute`** surface, not `VcsControl`: `contribute()` (SDK) → `protocol-contribute
+> run` (site-main `requestDispatcher.ts`) → the contribution orchestrator, whose `direct-commit`
+> mode commits the CoW overlay and pushes (`updateRef`) to the mounted/designated branch —
+> host-driven, token host-held, typed error events with non-fast-forward recovery. The editor
+> affordance is the activity rail's "Source" panel (`panel.contribute`, the contribute-panel app,
+> build-default `contribute:any` + first-party `contribute:direct`) with a commit-message box and
+> a "Commit directly" mode, plus the `modal.contribute` save dialog. The acceptance bullets below
+> are therefore met today; extending `VcsControl` with a parallel `commit` was rejected — it would
+> add a second write path/gate for an authority whose single chokepoint is `protocol-contribute`
+> (docs `ways_of_working` §2/§5).)*
 
 **Goal.** An author editing Reckoner content (worksheets, templates, fixtures, docs) in the
 platform editor can **commit and push to the designated branch without leaving the platform** —
@@ -101,15 +114,15 @@ verified without external CI.
 |---|---|---|---|
 | S1 | Edit → live-preview loop for content & source | ✅ exists | editor + agent write-port + `local` provider host preview |
 | S2 | In-platform document-test execution | ◐ by construction at M1 | tests-as-cells run in the engine; S4a exposes it |
-| **S3** | **In-platform commit/push** | **partial → this doc** | `VcsControl` reads but doesn't write; the near-term item |
+| **S3** | **In-platform commit/push** | ✅ **delivered** (reconciled 2026-07-15) | ships on `protocol-contribute` + the `panel.contribute` affordance — see the §S3 correction note |
 | **S4** | **In-platform CI gate** | **S4a ◐ / S4b ✗ → this doc** | document tests in-platform; source CI is the tracked gap |
 | S5 | Dep resolution for SES / CodeMirror in-platform | ✅ **proven** (2026-07-12) | live spike: the module-fetch path resolves `ses`+`@endo/*`+`@codemirror/*`, and a starved SES `Compartment` runs in-platform — see [`spikes/S5_SES_MODULE_RESOLUTION.md`](spikes/S5_SES_MODULE_RESOLUTION.md) |
 | S6 | Run the real four-realm composite in-platform | ✗ gated on D1–D9 | the recursion; resolves as the deltas land (M3) — and needs Spine 2's topology to express a multi-appKey launch (`COMPOSITE_CAPABILITY_TOPOLOGY_SPEC` OQ-3) |
 
 ## Recommended order
 
-1. **S3** — highest leverage, no new dependency, makes the most-dogfoodable work
-   (content authoring) fully in-platform. Do first.
+1. **S3** — ✅ **delivered by reconciliation** (2026-07-15): the content-authoring commit/push
+   loop already ships on `protocol-contribute` (see the §S3 correction note); no new code.
 2. **S4a** — folds into the M1/M2 editor work; formalizes the document-test gate S2 already
    enables.
 3. **S5 spike** — ✅ **DONE, positive** (2026-07-12): the module-fetch path resolves
