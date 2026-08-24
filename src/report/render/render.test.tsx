@@ -103,3 +103,40 @@ describe('ReportView', () => {
     expect(html).toContain('Heads up.');
   });
 });
+
+describe('the on-pixel inspection affordance (V3)', () => {
+  const src = 'Recurring revenue.\n\n<Kpi source="rev.total" format="currency" />\n\n<Callout tone="info">Note.</Callout>';
+  const map = { 'rev.total': { value: 5, tier: 'static' as const, status: 'ok' as const } };
+
+  it('with an inspection port, bound elements carry the affordance; unbound ones do not', () => {
+    const html = renderToStaticMarkup(
+      createElement(ReportView, {
+        nodes: parseTemplate(src),
+        bindings: bindings(map),
+        inspection: { onInspect: () => {}, canInspect: () => true },
+      }),
+    );
+    expect(html).toContain('rk-inspectable');
+    expect(html).toContain('data-source="rev.total"');
+    expect(html).toContain('aria-label="Inspect rev.total"');
+    // exactly one affordance — the Callout (no source) has none
+    expect(html.match(/rk-inspect-btn/g)).toHaveLength(1);
+  });
+
+  it('the affordance hides for sources the port cannot inspect', () => {
+    const html = renderToStaticMarkup(
+      createElement(ReportView, {
+        nodes: parseTemplate(src),
+        bindings: bindings(map),
+        inspection: { onInspect: () => {}, canInspect: () => false },
+      }),
+    );
+    expect(html).not.toContain('rk-inspectable');
+  });
+
+  it('without a port (plain run mode) nothing renders — no tax on run mode', () => {
+    const html = renderToStaticMarkup(createElement(ReportView, { nodes: parseTemplate(src), bindings: bindings(map) }));
+    expect(html).not.toContain('rk-inspectable');
+    expect(html).not.toContain('rk-inspect-btn');
+  });
+});

@@ -46,3 +46,36 @@
   color: var(--ink);
   border-color: var(--line-2);
 }
+
+/* The value inspector dock — V3's landing surface (brief surface 2): fixed card,
+   bottom-right desktop / bottom sheet phone-width. */
+.rk-inspector-dock {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: min(440px, calc(100vw - 24px));
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+  z-index: 30;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.rk-inspector-dock .rk-ins {
+  border: none;
+  background: none;
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .rk-inspector-dock {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100vw;
+    max-height: 72vh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+}
