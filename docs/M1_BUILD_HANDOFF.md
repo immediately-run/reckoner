@@ -194,8 +194,14 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
 
 - **stdlib** — none outstanding (the tail — screening + `window()` — landed in #7).
 - **document model** — host-side `compat` *derivation* by static analysis at save time (this
-  module validates/resolves an existing envelope); cross-reference validation (an input naming a
-  missing feed/fixture). (`src/document/index.ts`.)
+  module validates/resolves an existing envelope). **Cross-reference validation shipped**
+  (`src/document/xref.ts`): a worksheet external naming a missing feed/fixture/static is an
+  **error** (a silent-null class killed); a param with no default and no widget is a
+  **warning**; fixture `sourceFeed` citations the document doesn't declare are **warnings**
+  (historical provenance — the frozen demo legitimately cites its capture source). Wired at
+  load (`validateFixtureProvenance`) and in `reportSession` (`xrefDiagnostics` over the
+  engine's `externalReferences()` + manifest params + template widget names + runtime feeds);
+  error-severity diagnostics render as a note above the report. (`src/document/index.ts`.)
 - **engine scheduler** — shell C shipped single-slot supersession + the watchdog circuit
   breaker (`src/engine/asyncEngine.ts` + `circuitBreaker.ts`). **Glitch-freedom (§4.2 C-R-B) is
   satisfied by construction + proven** (`asyncEngine.glitch.test.ts`, spec §11 E-2); the explicit

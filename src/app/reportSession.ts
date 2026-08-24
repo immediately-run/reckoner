@@ -18,7 +18,10 @@ import type { WorkerTransport } from '../engine/workerTransport.ts';
 import type { ExternalValue } from '../engine/types.ts';
 import type { Tier } from '../engine/tier.ts';
 import { loadDocument } from '../document/loader.ts';
+import { validateExternalReferences } from '../document/xref.ts';
+import type { ExternalReference } from '../document/xref.ts';
 import type { DocumentDiagnostic, LoadedDocument } from '../document/types.ts';
+import { WIDGETS } from '../report/catalog.ts';
 import { parseTemplate } from '../report/parse/mdx.ts';
 import type { TemplateNode } from '../report/nodes.ts';
 import { missing } from '../report/render/bindings.ts';
@@ -26,6 +29,7 @@ import type { Bindings, BoundValue } from '../report/render/bindings.ts';
 import type { Value } from '../stdlib/types.ts';
 import { memoryReader } from './memoryReader.ts';
 import { SEED_FILES, SEED_ROOT } from '../seed/document.ts';
+import { DEMO_FEED_NAME } from './demoFeed.ts';
 
 const EXTERNAL_NAMESPACES = ['feeds.', 'fixtures.', 'static.', 'params.'];
 const TIERS: ReadonlySet<string> = new Set(['static', 'pulled', 'live']);
@@ -71,6 +75,42 @@ export function makeTransport(): WorkerTransport {
   return inMemoryTransport();
 }
 
+/** The param names the template's input widgets can set (a `name`d widget declares one). */
+function widgetParamNames(nodes: readonly TemplateNode[]): Set<string> {
+  const names = new Set<string>();
+  const walk = (list: readonly TemplateNode[]): void => {
+    for (const n of list) {
+      if (n.type === 'component') {
+        if (WIDGETS.has(n.name) && n.attrs.name?.kind === 'literal' && typeof n.attrs.name.value === 'string') {
+          names.add(n.attrs.name.value);
+        }
+        walk(n.children);
+      }
+    }
+  };
+  walk(nodes);
+  return names;
+}
+
+/**
+ * Cross-reference diagnostics for a loaded document + the workbook the engine built from
+ * it: every worksheet external checked against what the document (and the running app)
+ * can supply. Exported for unit tests; `buildReportSession` wires it.
+ */
+export function xrefDiagnostics(
+  loaded: LoadedDocument,
+  references: readonly ExternalReference[],
+  nodes: readonly TemplateNode[],
+  runtimeFeeds: readonly string[] = [],
+): DocumentDiagnostic[] {
+  return validateExternalReferences(references, {
+    feeds: new Set([...loaded.feeds.map((f) => f.name), ...runtimeFeeds]),
+    fixtures: new Set(loaded.fixtures.map((f) => f.name)),
+    params: new Set([...Object.keys(loaded.manifest.params), ...widgetParamNames(nodes)]),
+    worksheetPaths: Object.fromEntries(loaded.worksheets.map((w) => [w.name, w.path])),
+  });
+}
+
 /** Load the bundled demo document and run the full cold pipeline through the worker engine. */
 export async function buildReportSession(transport: WorkerTransport = makeTransport()): Promise<ReportSession> {
   const loaded = await loadDocument(memoryReader(SEED_FILES), SEED_ROOT);
@@ -85,7 +125,15 @@ export async function buildReportSession(transport: WorkerTransport = makeTransp
   const template = loaded.templates.find((t) => t.name === 'weekly') ?? loaded.templates[0];
   const nodes = template === undefined ? [] : parseTemplate(template.source);
 
-  return { engine, externals, nodes, title: loaded.manifest.title ?? 'Reckoner report', diagnostics: loaded.diagnostics };
+  // Cross-reference validation: the demo feed is app-supplied runtime infra, not a document
+  // feed, so it counts as available here (and only here — a document-internal check, like
+  // fixture provenance, would rightly not see it).
+  const diagnostics = [
+    ...loaded.diagnostics,
+    ...xrefDiagnostics(loaded, engine.externalReferences(), nodes, [DEMO_FEED_NAME]),
+  ];
+
+  return { engine, externals, nodes, title: loaded.manifest.title ?? 'Reckoner report', diagnostics };
 }
 
 /** The engine adapter the renderer resolves `source` bindings through. */
