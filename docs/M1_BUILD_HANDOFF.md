@@ -18,7 +18,8 @@ steps. · **Updated:** 2026-08-24
 Reckoner went from the starter template to a tested formula-engine core, the report-view render
 surface, a runnable static report, the worker-backed async engine, and the live-feed data plane.
 **All of M1 (shells A/B/C) and four M2 feed increments are merged to `main`** (PRs #2–#19; #9 is
-the S5 spike doc). **352 vitest cases**; every merge is green on `tsc -b` + `npm test` +`npm run lint` + `npm run build`, and the app is live-verified in a browser (the report renders
+the S5 spike doc). **355 vitest cases**; every merge is green on `tsc -b` + `npm test` +
+`npm run lint` + `npm run build`, and the app is live-verified in a browser (the report renders
 and a live feed recomputes it — §2.B / §2 M2 note).
 
 | Area | Where | What it provides |
@@ -247,10 +248,15 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
   view** (review-1 UX-4) shipped with it (`src/engine/precedents.ts` + `PrecedentView`):
   the whole precedent subgraph at once — the DAG unrolled as a tree, externals as leaves,
   wildcards expanded, node-capped with an honest truncation flag — nested beneath the
-  inspector's chips, every cell node navigable. Remaining review-surface work: the
-  **on-pixel affordance** (V3's hover-reveal / long-press on bound elements),
-  edit/ask-assistant affordances (need a writable mount), and per-cell verdict marks
-  inside the report itself.
+  inspector's chips, every cell node navigable. The **on-pixel affordance** (V3)
+  shipped with it: `ReportView` takes an optional inspection port — bound elements (a
+  literal `source` attr) get a quiet hover/focus-reveal corner button (desktop) and a
+  ~450ms long-press opens directly (touch); without the port, run mode renders exactly as
+  before (no affordance, no tax). The inspected cell is app-level state shared by the pixel
+  affordance and the panel's cards; the inspector renders as a docked card (bottom-right
+  desktop / bottom-sheet phone). Remaining review-surface work: edit/ask-assistant
+  affordances (need a writable mount — platform), and per-cell verdict marks inside the
+  report itself.
 
 ## 6. Dogfooding note (Axis-2)
 
