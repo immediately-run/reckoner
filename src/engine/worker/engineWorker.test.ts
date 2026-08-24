@@ -107,3 +107,13 @@ export const other = cell({ doc: "untested", inputs: { b: "sheet.base" }, formul
     expect(out[0].outcomes.every((o) => !o.pass)).toBe(true);
   });
 });
+
+describe('createEngineWorker — formula source crosses the wire for the value inspector', () => {
+  it('the descriptor carries each formula\'s source text, clone-safe', () => {
+    const w = createEngineWorker();
+    const d = w.build(SOURCES);
+    const base = d.cells.find((c) => c.id === 'sheet.base')!;
+    expect(base.formulaSource).toContain('x + 1');
+    expect(() => structuredClone(d)).not.toThrow();
+  });
+});

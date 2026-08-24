@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import type { AsyncEngine } from '../engine/asyncEngine.ts';
 import type { SubjectResult } from '../engine/worker/protocol.ts';
 import WorkbookPanelBody from './WorkbookPanelBody.tsx';
+import ValueInspector from './ValueInspector.tsx';
 import './workbook-panel.css';
 
 interface WorkbookPanelProps {
@@ -21,6 +22,7 @@ interface WorkbookPanelProps {
 function WorkbookPanel({ engine, tick, onClose }: WorkbookPanelProps) {
   const [results, setResults] = useState<Map<string, SubjectResult> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [inspected, setInspected] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -40,6 +42,8 @@ function WorkbookPanel({ engine, tick, onClose }: WorkbookPanelProps) {
     };
   }, [engine, tick]);
 
+  const inspectedCell = inspected === null ? null : engine.cells().find((c) => c.id === inspected) ?? null;
+
   return (
     <aside className="rk-wb-panel" aria-label="Workbook review">
       <header className="rk-wb-head">
@@ -50,11 +54,22 @@ function WorkbookPanel({ engine, tick, onClose }: WorkbookPanelProps) {
       </header>
       {error !== null && <div className="rk-wb-error">{error}</div>}
       {results === null && error === null && <div className="rk-wb-note">Running suites…</div>}
+      {inspectedCell !== null && (
+        <ValueInspector
+          cell={inspectedCell}
+          tests={engine.tests().filter((t) => t.subject === inspectedCell.id)}
+          outcome={results?.get(inspectedCell.id)}
+          result={engine.result(inspectedCell.id)}
+          onNavigate={setInspected}
+          onClose={() => setInspected(null)}
+        />
+      )}
       <WorkbookPanelBody
         cells={engine.cells()}
         tests={engine.tests()}
         results={results}
         valueOf={(id) => engine.value(id)}
+        onInspect={setInspected}
       />
     </aside>
   );

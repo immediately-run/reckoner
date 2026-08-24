@@ -22,6 +22,8 @@ export interface CellDescriptor {
   cell: string;
   /** The one-line intent from `cell({ doc })` — the workbook panel's card subtitle. */
   doc: string;
+  /** The formula's source text (`Function.prototype.toString` at build) — read-only display. */
+  formulaSource: string;
   deps: string[];
   externals: string[];
   resolvers: InputResolver[];

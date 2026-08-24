@@ -8,9 +8,9 @@ import WorkbookPanelBody from './WorkbookPanelBody.tsx';
 import type { CellDescriptor, SubjectResult, TestDescriptor } from '../engine/worker/protocol.ts';
 
 const cells: CellDescriptor[] = [
-  { id: 'rev.nrr', worksheet: 'rev', cell: 'nrr', doc: 'net revenue retention', deps: [], externals: [], resolvers: [] },
-  { id: 'rev.total', worksheet: 'rev', cell: 'total', doc: 'the headline number', deps: [], externals: [], resolvers: [] },
-  { id: 'rev.raw', worksheet: 'rev', cell: 'raw', doc: '', deps: [], externals: [], resolvers: [] },
+  { id: 'rev.nrr', worksheet: 'rev', cell: 'nrr', doc: 'net revenue retention', formulaSource: '({ rows }) => rows[rows.length - 1].nrrPct / 100', deps: [], externals: [], resolvers: [] },
+  { id: 'rev.total', worksheet: 'rev', cell: 'total', doc: 'the headline number', formulaSource: '({ rows }) => rows[rows.length - 1].mrr', deps: [], externals: [], resolvers: [] },
+  { id: 'rev.raw', worksheet: 'rev', cell: 'raw', doc: '', formulaSource: '({ x }) => x', deps: [], externals: [], resolvers: [] },
 ];
 
 const tests: TestDescriptor[] = [

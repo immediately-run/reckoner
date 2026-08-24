@@ -196,3 +196,136 @@
     border-left: none;
   }
 }
+
+/* The value inspector — a detail region docked at the top of the workbook panel
+   (master-detail; the brief's standalone side-sheet form arrives with the V3 on-pixel
+   affordance). */
+
+.rk-ins {
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.rk-ins-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rk-ins-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rk-ins-doc {
+  font-size: 0.82rem;
+  color: var(--ink-2);
+  margin: 0 0 10px;
+}
+
+.rk-ins-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  align-items: flex-start;
+}
+
+.rk-ins-label {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  min-width: 52px;
+  padding-top: 3px;
+}
+
+.rk-ins-value {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  flex: 1;
+}
+
+.rk-ins-tier {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.rk-ins-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.rk-ins-none {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+
+.rk-chip {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+.rk-chip--nav {
+  color: var(--ink);
+  background: none;
+  cursor: pointer;
+}
+
+.rk-chip--nav:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.rk-ins-formula {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  padding: 8px 10px;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  flex: 1;
+}
+
+.rk-ins-tests {
+  flex: 1;
+  min-width: 0;
+}
+
+.rk-wb-name--link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline dotted var(--line-2);
+  text-underline-offset: 3px;
+}
+
+.rk-wb-name--link:hover {
+  color: var(--accent);
+}

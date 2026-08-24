@@ -18,8 +18,7 @@ steps. · **Updated:** 2026-08-24
 Reckoner went from the starter template to a tested formula-engine core, the report-view render
 surface, a runnable static report, the worker-backed async engine, and the live-feed data plane.
 **All of M1 (shells A/B/C) and four M2 feed increments are merged to `main`** (PRs #2–#19; #9 is
-the S5 spike doc). **337 vitest cases**; every merge is green on `tsc -b` + `npm test` +
-
+the S5 spike doc). **331 vitest cases**; every merge is green on `tsc -b` + `npm test` +
 `npm run lint` + `npm run build`, and the app is live-verified in a browser (the report renders
 and a live feed recomputes it — §2.B / §2 M2 note).
 
@@ -238,10 +237,17 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
   worker and rejects; the per-cell breaker does not yet count test-run terminations — a
   booked residual). Opened from the report header (author surface — viewers never see
   worksheets, brief A3). The demo worksheet carries an honest mix (a specification test →
-  `pinned`; a property relation → `validated`; the rest genuinely untested). Remaining
-  review-surface work: the **value inspector** (brief surface 2 — binding name, formula
-  source, input chips, precedent-neighborhood view), and per-cell verdict marks inside the
-  report itself.
+  `pinned`; a property relation → `validated`; the rest genuinely untested).
+- **value inspector — first slice shipped** (`src/app/ValueInspector.tsx`, brief surface 2):
+  binding name, `doc`, current value + tier (**plain data — the tier badge is host-drawn
+  chrome, review-1 H2; the app reserves the slot, never draws one**), read-only formula
+  source (`formulaSource` crosses the wire as `Function.prototype.toString` at worker
+  build), declared-input chips (cell refs navigable hop-by-hop — the V3 walk; windowed-feed
+  and wildcard chips inert), and the coverage state + this cell's test outcomes. Opens from
+  workbook-panel card clicks (master-detail in the panel). Remaining review-surface work:
+  the **precedent-neighborhood view** (review-1 UX-4), the **on-pixel affordance** (V3's
+  hover-reveal / long-press on bound elements), edit/ask-assistant affordances (need a
+  writable mount), and per-cell verdict marks inside the report itself.
 
 ## 6. Dogfooding note (Axis-2)
 

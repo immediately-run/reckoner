@@ -76,6 +76,9 @@ export function createEngineWorker(): EngineWorker {
           worksheet: n.worksheet,
           cell: n.cell,
           doc: n.def.kind === 'cell' ? n.def.doc : '',
+          // The formula itself stays in the worker; its source text crosses for the value
+          // inspector's read-only display. SES preserves function sources across lockdown.
+          formulaSource: n.def.kind === 'cell' ? n.def.formula.toString() : '',
           deps: n.deps,
           externals: n.externals,
           resolvers: n.resolvers,

@@ -29,9 +29,11 @@ interface WorkbookPanelBodyProps {
   results: ReadonlyMap<string, SubjectResult> | null;
   /** Current value lookup for the preview line. */
   valueOf: (id: string) => Value | undefined;
+  /** Open the value inspector on a cell (card click). */
+  onInspect?: (cellId: string) => void;
 }
 
-function WorkbookPanelBody({ cells, tests, results, valueOf }: WorkbookPanelBodyProps) {
+function WorkbookPanelBody({ cells, tests, results, valueOf, onInspect }: WorkbookPanelBodyProps) {
   const worksheets = [...new Set(cells.map((c) => c.worksheet))];
   const grouped = new Map<string, TestDescriptor[]>();
   for (const t of tests) grouped.set(t.subject, [...(grouped.get(t.subject) ?? []), t]);
@@ -49,7 +51,13 @@ function WorkbookPanelBody({ cells, tests, results, valueOf }: WorkbookPanelBody
               return (
                 <div key={cell.id} className="rk-wb-card">
                   <div className="rk-wb-card-top">
-                    <span className="rk-wb-name">{cell.cell}</span>
+                    {onInspect !== undefined ? (
+                      <button type="button" className="rk-wb-name rk-wb-name--link" onClick={() => onInspect(cell.id)}>
+                        {cell.cell}
+                      </button>
+                    ) : (
+                      <span className="rk-wb-name">{cell.cell}</span>
+                    )}
                     <span className={`rk-verdict ${VERDICT_CLASS[verdict]}`}>{verdict}</span>
                   </div>
                   {cell.doc !== '' && <div className="rk-wb-doc">{cell.doc}</div>}
