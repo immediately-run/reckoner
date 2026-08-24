@@ -157,6 +157,19 @@ export class AsyncEngine {
     return this.#results.get(id)?.value;
   }
 
+  /**
+   * Every external key the workbook reads, with the declaring cell — the input to
+   * load-time cross-reference validation (`validateExternalReferences`), so a typo'd
+   * feed/fixture name is a diagnostic instead of a silent null.
+   */
+  externalReferences(): { key: string; site: string }[] {
+    const out: { key: string; site: string }[] = [];
+    for (const node of this.#nodesById.values()) {
+      for (const key of node.externals) out.push({ key, site: node.id });
+    }
+    return out;
+  }
+
   /** Author re-arm of a quarantined cell (§4.1). */
   rearm(id: string): void {
     this.#breaker.rearm(id);

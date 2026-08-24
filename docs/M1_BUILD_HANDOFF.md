@@ -3,7 +3,7 @@
 **Purpose.** Pick up the Reckoner build in a fresh session. This records what is built (M1 — the
 pure spine + all three effectful shells; and M2 — the live-feed workstream, underway), how it is
 organized and verified, the working conventions, the environment quirks, and the concrete next
-steps. · **Updated:** 2026-07-13
+steps. · **Updated:** 2026-08-24
 
 > **Reads first, in order:** `product_definition.md` → `ARCHITECTURE_PLAN.md` §2 (the five
 > parts), §3 (document model + stdlib + templates), §4 (engine), §6 (testing), §10
@@ -18,7 +18,7 @@ steps. · **Updated:** 2026-07-13
 Reckoner went from the starter template to a tested formula-engine core, the report-view render
 surface, a runnable static report, the worker-backed async engine, and the live-feed data plane.
 **All of M1 (shells A/B/C) and four M2 feed increments are merged to `main`** (PRs #2–#19; #9 is
-the S5 spike doc). **286 vitest cases**; every merge is green on `tsc -b` + `npm test` +
+the S5 spike doc). **299 vitest cases**; every merge is green on `tsc -b` + `npm test` +
 `npm run lint` + `npm run build`, and the app is live-verified in a browser (the report renders
 and a live feed recomputes it — §2.B / §2 M2 note).
 
@@ -188,8 +188,14 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
 
 - **stdlib** — none outstanding (the tail — screening + `window()` — landed in #7).
 - **document model** — host-side `compat` *derivation* by static analysis at save time (this
-  module validates/resolves an existing envelope); cross-reference validation (an input naming a
-  missing feed/fixture). (`src/document/index.ts`.)
+  module validates/resolves an existing envelope). **Cross-reference validation shipped**
+  (`src/document/xref.ts`): a worksheet external naming a missing feed/fixture/static is an
+  **error** (a silent-null class killed); a param with no default and no widget is a
+  **warning**; fixture `sourceFeed` citations the document doesn't declare are **warnings**
+  (historical provenance — the frozen demo legitimately cites its capture source). Wired at
+  load (`validateFixtureProvenance`) and in `reportSession` (`xrefDiagnostics` over the
+  engine's `externalReferences()` + manifest params + template widget names + runtime feeds);
+  error-severity diagnostics render as a note above the report. (`src/document/index.ts`.)
 - **engine scheduler** — shell C shipped single-slot supersession + the watchdog circuit
   breaker (`src/engine/asyncEngine.ts` + `circuitBreaker.ts`). **Glitch-freedom (§4.2 C-R-B) is
   satisfied by construction + proven** (`asyncEngine.glitch.test.ts`, spec §11 E-2); the explicit
