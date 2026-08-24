@@ -6,9 +6,11 @@
 // snapshot. The engine and the flush cadence are injected ports: the engine is any async
 // `update`, and `scheduleFlush` is rAF in the browser / a microtask in tests.
 //
-// This increment delivers each feed as its **snapshot** (newest frame's rows) into `feeds.*`.
-// Windowed inputs (`{ feed, window }`) resolving over the buffer via `window()` + `params.now`
-// are the next increment (they need the engine's input resolver to apply the window).
+// This increment delivers each feed two ways: the **snapshot** (newest frame's rows) into
+// `feeds.<name>`, and the **retained rows** across the buffer into `feedBuffers.<name>` — the
+// external the engine's input resolver windows over for `{ feed, window }` inputs (it applies
+// `window()` with `now` from `params.now`, else the newest retained event time; see
+// `src/engine/resolve.ts`).
 
 import type { Row } from '../stdlib/types.ts';
 import type { ExternalValue } from '../engine/types.ts';
@@ -80,12 +82,13 @@ export class FeedRuntime {
     return this.#buffers.get(name);
   }
 
-  /** The `feeds.*` externals for the currently-buffered snapshots (for the cold `run`). */
+  /** The `feeds.*` snapshot + `feedBuffers.*` retained-rows externals (for the cold `run`). */
   initialExternals(): Record<string, ExternalValue> {
     const out: Record<string, ExternalValue> = {};
     for (const [name, buf] of this.#buffers) {
       const latest = buf.latest();
       if (latest !== undefined) out[`feeds.${name}`] = { value: latest.rows, tier: this.#tier.get(name)! };
+      out[`feedBuffers.${name}`] = { value: buf.rows(), tier: this.#tier.get(name)! };
     }
     return out;
   }
@@ -94,7 +97,9 @@ export class FeedRuntime {
     const buf = this.#buffers.get(name);
     if (buf === undefined) return;
     buf.append(rows, receivedAt);
-    this.#conflator.write(`feeds.${name}`, { value: buf.latest()!.rows, tier: this.#tier.get(name)! });
+    const tier = this.#tier.get(name)!;
+    this.#conflator.write(`feeds.${name}`, { value: buf.latest()!.rows, tier });
+    this.#conflator.write(`feedBuffers.${name}`, { value: buf.rows(), tier });
     this.#scheduleFlush();
   }
 

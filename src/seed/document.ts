@@ -112,6 +112,12 @@ export const live_by_region = cell({
   inputs: { rows: "feeds.live_regions" },
   formula: ({ rows }) => (Array.isArray(rows) ? rows : []),
 });
+
+export const live_recent_events = cell({
+  doc: "Feed events in the trailing 30s — the event-time window over the retained buffer",
+  inputs: { recent: { feed: "live_regions", window: "30s" } },
+  formula: ({ recent }) => recent.length,
+});
 `;
 
 // The report template — the MDX subset. Exercises the breadth of the catalog: KPIs (currency +
@@ -154,6 +160,12 @@ Net revenue retention and gross churn are the two levers behind the trend above 
 Active sessions per region, streaming from a live feed — this chart recomputes on every frame.
 
 <Chart source="review.live_by_region" kind="bar" x="region" y="sessions" />
+
+The trailing 30-second event-time window over the same feed is holding
+
+<Value source="review.live_recent_events" />
+
+events.
 
 ## Cohort retention.
 
