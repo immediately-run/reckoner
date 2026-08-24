@@ -136,3 +136,29 @@ function classifyInput(name: string, spec: InputSpec, ctx: ClassifyCtx): void {
   }
   ctx.resolvers.push({ name, kind: 'cell', nodeId });
 }
+
+/**
+ * Resolvers for a declared-inputs map held by a *non-graph* consumer — the test runner's
+ * fixture substitution (a test's declared inputs resolve against the same published state
+ * a cell's do). Unresolvable references come back as diagnostics for the caller to surface;
+ * they are the same errors `buildGraph` would emit for a cell.
+ */
+export function resolversFor(
+  inputs: Record<string, InputSpec>,
+  graph: DependencyGraph,
+): { resolvers: InputResolver[]; diagnostics: string[] } {
+  const diagnostics: GraphDiagnostic[] = [];
+  const resolvers: InputResolver[] = [];
+  for (const [name, spec] of Object.entries(inputs)) {
+    classifyInput(name, spec, {
+      id: '(test inputs)',
+      deps: new Set(),
+      externals: new Set(),
+      resolvers,
+      worksheets: graph.worksheets,
+      has: (id) => graph.nodes.has(id),
+      diagnostics,
+    });
+  }
+  return { resolvers, diagnostics: diagnostics.map((d) => d.message) };
+}
