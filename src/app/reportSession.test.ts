@@ -45,6 +45,26 @@ describe('buildReportSession + sessionBindings', () => {
     expect((stack.value as unknown[]).length).toBe(mrrMovements.length * 3); // 3 drivers per month
   });
 
+  it('the demo windowed-feed cell resolves and is bound by the template', async () => {
+    const session = await buildReportSession(inMemoryTransport());
+    const bindings = sessionBindings(session, () => {});
+    // No feed is running in this session → the buffer external is absent → the empty slice,
+    // resolved by the engine's windowed-input path (never an error).
+    const recent = bindings.resolve('review.live_recent_events');
+    expect(recent.status).toBe('ok');
+    expect(recent.value).toBe(0);
+    // and the report binds it (the "events in the trailing window" line).
+    expect(
+      session.nodes.some(
+        (n) =>
+          n.type === 'component' &&
+          n.name === 'Value' &&
+          n.attrs.source?.kind === 'literal' &&
+          n.attrs.source.value === 'review.live_recent_events',
+      ),
+    ).toBe(true);
+  });
+
   it('writing a param recomputes dependent cells (the interaction loop)', async () => {
     const session = await buildReportSession(inMemoryTransport());
     let changes = 0;

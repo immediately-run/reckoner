@@ -8,12 +8,21 @@
 // (any head that is not a reserved namespace). `<worksheet>.*` is the declared-namespace
 // indirection (the Shake/Bazel treatment) — never Excel's volatile `INDIRECT()`.
 
+import { parseDuration } from './window.ts';
+
 export type Namespace = 'feeds' | 'fixtures' | 'static' | 'params' | 'worksheet';
 
-/** The object form of an input: an event-time window over a feed's buffer. */
+/**
+ * The object form of an input: an event-time window over a feed's retained buffer
+ * (ARCHITECTURE_PLAN §3 "Feeds and time"). `by` names the row field carrying the event
+ * time (epoch-ms or ISO) and defaults to the feed convention `ts`.
+ */
 export interface WindowedFeed {
   feed: string;
-  window?: string;
+  /** Trailing window duration, e.g. "1h" — required in the object form. */
+  window: string;
+  /** The event-time row field. Default `"ts"`. */
+  by?: string;
 }
 
 export interface InputSpec {
@@ -31,6 +40,8 @@ export interface InputSpec {
   /** Set for the windowed-feed object form. */
   feed?: string;
   window?: string;
+  /** The event-time row field, for the windowed-feed object form. Always set when `feed` is. */
+  by?: string;
   /**
    * The coarse dependency key for the scheduler: the reserved `namespace.name`
    * (`feeds.orders`), a single cell (`revenue.by_month`), or the conservative
@@ -41,6 +52,9 @@ export interface InputSpec {
 
 const RESERVED: ReadonlySet<string> = new Set(['feeds', 'fixtures', 'static', 'params']);
 
+/** The event-time row field a windowed input slices on when `by` is not declared. */
+export const DEFAULT_EVENT_FIELD = 'ts';
+
 function isWindowedFeed(spec: unknown): spec is WindowedFeed {
   return typeof spec === 'object' && spec !== null && typeof (spec as WindowedFeed).feed === 'string';
 }
@@ -49,6 +63,15 @@ function isWindowedFeed(spec: unknown): spec is WindowedFeed {
 export function parseInput(spec: string | WindowedFeed): InputSpec {
   if (isWindowedFeed(spec)) {
     if (spec.feed.length === 0) throw new Error('Windowed input requires a non-empty `feed`.');
+    if (spec.window === undefined || spec.window.length === 0) {
+      throw new Error(`Windowed input over feed "${spec.feed}" requires a \`window\` duration.`);
+    }
+    // Fail closed at declaration time: an unparseable duration is an authoring error, and
+    // surfacing it here (not mid-recalc) is what makes the static coverage check honest.
+    parseDuration(spec.window);
+    if (spec.by !== undefined && spec.by.length === 0) {
+      throw new Error(`Windowed input over feed "${spec.feed}" has an empty \`by\` field.`);
+    }
     return {
       raw: spec,
       namespace: 'feeds',
@@ -56,6 +79,7 @@ export function parseInput(spec: string | WindowedFeed): InputSpec {
       wildcard: false,
       feed: spec.feed,
       window: spec.window,
+      by: spec.by ?? DEFAULT_EVENT_FIELD,
       dependency: `feeds.${spec.feed}`,
     };
   }

@@ -53,8 +53,13 @@ describe('parseInput — windowed feed object form', () => {
       namespace: 'feeds',
       feed: 'orders',
       window: '1h',
+      by: 'ts', // the event-time field convention
       dependency: 'feeds.orders',
     });
+  });
+
+  it('honors an explicit event-time field', () => {
+    expect(parseInput({ feed: 'orders', window: '30m', by: 'event_at' }).by).toBe('event_at');
   });
 });
 
@@ -64,6 +69,17 @@ describe('parseInput — errors', () => {
     expect(() => parseInput('feeds')).toThrow(); // no name
     expect(() => parseInput('feeds.')).toThrow();
     expect(() => parseInput('feeds.*')).toThrow(); // cannot wildcard a reserved namespace
+  });
+
+  it('rejects a windowed form without a usable window', () => {
+    // @ts-expect-error — exercising the runtime guard against a hand-written descriptor
+    expect(() => parseInput({ feed: 'orders' })).toThrow(/requires a .window. duration/);
+    expect(() => parseInput({ feed: 'orders', window: '1x' })).toThrow(/Invalid duration/);
+    expect(() => parseInput({ feed: 'orders', window: '' })).toThrow(/requires a .window. duration/);
+  });
+
+  it('rejects an empty event-time field', () => {
+    expect(() => parseInput({ feed: 'orders', window: '1h', by: '' })).toThrow(/empty .by./);
   });
 });
 

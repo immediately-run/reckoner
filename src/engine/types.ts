@@ -28,7 +28,14 @@ export interface GraphNode {
 export type InputResolver =
   | { name: string; kind: 'cell'; nodeId: string }
   | { name: string; kind: 'wildcard'; worksheet: string }
-  | { name: string; kind: 'external'; key: string };
+  | { name: string; kind: 'external'; key: string }
+  /**
+   * The windowed-feed object form (`{ feed, window }`): the event-time slice of the feed's
+   * retained buffer, computed at resolution time (never inside the formula). Reads the
+   * `feedBuffers.<feed>` external (retained rows) and windows it with `now` from
+   * `params.now`, falling back to the newest retained event time.
+   */
+  | { name: string; kind: 'windowed-feed'; feed: string; window: string; by: string };
 
 export interface GraphDiagnostic {
   severity: 'error';
