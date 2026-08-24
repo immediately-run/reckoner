@@ -29,10 +29,44 @@ export interface TestRunContext {
    * conservation/property relation and an `expect` test never call it.
    */
   reevaluate?: (inputs: Record<string, Value>) => Value;
+  /**
+   * Set when the test's own declaration is unrunnable (an input naming something the
+   * subject does not declare, an unresolvable reference, a subject error over the
+   * substituted inputs). The test fails with this message — never a silent null.
+   */
+  error?: string;
+}
+
+/**
+ * The test→subject input mapping (§6, pinned 2026-08-24): a test's declared inputs
+ * **substitute for the subject's same-named inputs** — `{ ...subjectLive, ...testDeclared }`.
+ * Partial substitution is the point: a holdout test swaps the data input for its fixture
+ * while params/static/cell inputs stay live. A test-local name the subject does not declare
+ * is an authoring error (the test cannot know what the formula should receive under that
+ * name), so it fails the test with a message rather than substituting a silent `null`.
+ */
+export function substituteInputs(
+  testInputs: Record<string, Value>,
+  subjectInputs: Record<string, Value>,
+): { ok: true; inputs: Record<string, Value> } | { ok: false; error: string } {
+  const unknown = Object.keys(testInputs).filter((n) => !(n in subjectInputs));
+  if (unknown.length > 0) {
+    const declared = Object.keys(subjectInputs);
+    return {
+      ok: false,
+      error:
+        `test input(s) ${unknown.map((n) => `"${n}"`).join(', ')} do not name a subject input ` +
+        `(subject declares: ${declared.length > 0 ? declared.join(', ') : 'none'}).`,
+    };
+  }
+  return { ok: true, inputs: { ...subjectInputs, ...testInputs } };
 }
 
 /** Run one test cell against its subject, returning a structured pass/fail record. */
 export function runTest(test: TestCellDef, ctx: TestRunContext): TestResult {
+  if (ctx.error !== undefined) {
+    return { pass: false, message: ctx.error };
+  }
   if (test.expect !== undefined) {
     return test.expect({ result: ctx.subject, inputs: ctx.inputs });
   }

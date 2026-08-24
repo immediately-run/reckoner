@@ -409,6 +409,17 @@ export const staleness = cell({
 });
 ```
 
+*Resolution convention (decided 2026-08-24, at implementation):* the windowed object form
+takes an optional `by` naming the event-time row field, **defaulting to `ts`** — feeds carry
+their event time in `ts` (epoch-ms or ISO) by convention. The window is applied by the
+engine's input resolver (never inside the formula): the feed runtime publishes the retained
+rows alongside the snapshot, and the resolver slices them with `now` taken from the
+`params.now` external when the app supplies one, **else the newest retained event time** — a
+pure function of published state, never an ambient clock (so a wall-clock-advancing window is
+the app writing `params.now`, which re-dirties every windowed input). Rows whose `by` value
+carries no usable event time drop out of the window (they cannot be placed in event time);
+resolution never throws.
+
 **Tests are cells with a mandatory `kind`** (RQ-D1 + workstream D preamble). A test's value
 is a structured pass/fail record carrying its kind; under infer-then-fortify a green suite
 means nothing without the label, because characterization tests pinned from the formula's
@@ -988,6 +999,16 @@ architecture, not test-infra niceties.
    is a useful regression signal) — never as the thing that certifies an inferred formula. The
    report's "the only example-based tests carrying genuine correctness weight" claim does *not*
    survive the oracle; the review surface must not show a holdout-only cell as validated.
+
+   *Test→subject input mapping (pinned 2026-08-24, at implementation):* a test that declares
+   its own `inputs` runs under **fixture substitution** — its declared inputs resolve against
+   the same published state a cell's do, then substitute **by local name** for the subject's
+   live inputs (`{ ...live, ...declared }`); the subject formula re-runs over the merged set
+   and `expect`/`relation` assert against that substituted run, never touching the published
+   value. Partial substitution is the point (swap the data input for its held-out fixture;
+   params/static stay live). A test-local name the subject does not declare, an unresolvable
+   reference, or a subject error over the substituted inputs **fails the test with a
+   message** — never a silent null.
 4. **Independent authoring — with an honest limit** (review-2 D9-3). The assistant can invoke
    a second agent that writes specification tests and synthetic fixtures from a cell's *stated
    intent* (its `doc`), with its read view narrowed to the intent (D9 redacted-mount-view), not

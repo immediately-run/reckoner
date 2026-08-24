@@ -8,7 +8,7 @@ import {
   conservation,
   expectClose,
 } from '../stdlib/index.ts';
-import { runTest, runSuite, classifyCell } from './testrunner.ts';
+import { runTest, runSuite, classifyCell, substituteInputs } from './testrunner.ts';
 import type { Row, Value } from '../stdlib/types.ts';
 
 describe('classifyCell — the review-surface verdict (§6)', () => {
@@ -151,5 +151,29 @@ describe('runSuite — verdict over a subject cell', () => {
     }));
     expect(suite.outcomes.every((o) => o.result.pass)).toBe(true);
     expect(suite.verdict).toBe('validated');
+  });
+});
+
+describe('substituteInputs — the test→subject mapping (§6)', () => {
+  it('merges by local name: test inputs override same-named subject inputs', () => {
+    const sub = substituteInputs({ orders: [1, 2] }, { orders: [9], region: 'emea' });
+    expect(sub).toEqual({ ok: true, inputs: { orders: [1, 2], region: 'emea' } });
+  });
+
+  it('a test-local name the subject does not declare is an authoring error', () => {
+    const sub = substituteInputs({ ghost: 1 }, { orders: [9] });
+    expect(sub.ok).toBe(false);
+    if (!sub.ok) expect(sub.error).toContain('"ghost"');
+  });
+
+  it('an empty substitution is the identity', () => {
+    expect(substituteInputs({}, { a: 1 })).toEqual({ ok: true, inputs: { a: 1 } });
+  });
+
+  it('runTest fails with the context error, never a silent null', () => {
+    const t = testCell({ kind: 'specification', subject: 'x.y', expect: () => ({ pass: true, message: 'unreached' }) });
+    const r = runTest(t, { subject: null, inputs: {}, error: 'test input(s) "ghost" do not name a subject input.' });
+    expect(r.pass).toBe(false);
+    expect(r.message).toContain('ghost');
   });
 });

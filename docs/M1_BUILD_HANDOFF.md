@@ -63,11 +63,17 @@ All three shells (A/B/C) are now merged to `main`. Each plugs into the existing 
   real browser over CDP (the chart populates and its values change over time).
 - **Glitch-freedom proven** (§4.2 C-R-B, PR #19) — see §5; the common-epoch barrier is resolved
   (satisfied by construction), not a pending item.
+- **Windowed-feed input resolution** — `{ feed, window }` at the input site now resolves through
+  the engine's shared input resolver: the `FeedRuntime` publishes each feed's **retained rows**
+  (`feedBuffers.<name>`) alongside the snapshot, the graph routes the object form to a
+  `windowed-feed` resolver (also keyed on `params.now`, so a clock-only update advances the
+  window), and `resolveInputs` applies `window()` with the decided conventions — `by` defaults to
+  `ts`; `now` = `params.now` when supplied, else the newest retained event time; unplaceable rows
+  drop out; resolution never throws (recorded in ARCHITECTURE_PLAN §3). The static
+  buffer-coverage check composes via `declaredWindows(graph)`, and the demo feed carries `ts` +
+  a 30s windowed cell live in the report. E2E-tested against the real `AsyncEngine`.
 
 **Genuinely-remaining feed increments:**
-- **Windowed-feed input resolution** — `{ feed, window }` applying `window()` over the buffer with
-  a `params.now` convention. Needs a small design decision (the event-time `by` field + the `now`
-  source), then an engine input-resolver change; the buffer already exposes the rows.
 - **The real host-proxied connector** (§5.1 — the SSRF-bounded fetch capability) + the **OPFS
   materialize-to-mount transport** (§5.2). *Platform-blocked:* both need host services not present
   in the standalone reckoner repo; the `Connector`/transport ports are the seams they slot into.
@@ -196,19 +202,22 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
   per-cell epoch-gate barrier is needed only if concurrent arm evaluation is added (deferred
   worker pool, §4.1) — see the `asyncEngine.ts` header.
 - **engine shell** — worker built + **wired into the app** (`AsyncEngine` now backs
-  `reportSession`, real `Worker`+`lockdown()` with an in-process fallback). Remaining: the
-  transpiled-module **linker** (the evaluator uses a source transform + `Compartment.evaluate`;
-  in-platform the sandbox transpiles and the Compartment module loader links); holdout-fixture
-  **substitution** test semantics — running a subject over a test's own fixture inputs (§6). (`src/engine/engine.ts`/`compartment.ts`.)
+  `reportSession`, real `Worker`+`lockdown()` with an in-process fallback). Holdout-fixture
+  **substitution** test semantics **shipped**: a test declaring its own `inputs` runs the
+  subject over `{ ...live, ...declared }` (same-local-name override, partial allowed;
+  name mismatch / unresolvable ref / subject error over the fixture fails the test with a
+  message) — the mapping is pinned in ARCHITECTURE_PLAN §6. Remaining: the transpiled-module
+  **linker** (the evaluator uses a source transform + `Compartment.evaluate`; in-platform the
+  sandbox transpiles and the Compartment module loader links). (`src/engine/engine.ts`/`compartment.ts`.)
 - **report** — shell A shipped the components + MDX parser. Remaining/deferred (in
   `src/report/render/index.ts`): the **host-rendered tier badge** (the slot is reserved, we
   supply the value); a real **polygon-geography Map** (v1 choropleth ships a region breakdown);
   **Kpi `spark`** (needs a series binding the v1 catalog doesn't carry); full CommonMark +
   **inline-component-in-prose** (the platform D3 renderer's remit — block-level is covered).
 - **feed (M2)** — the data-plane core + connector/`FeedRuntime` are built and wired into the app
-  (#16–#18). Remaining: **windowed-feed input resolution** (`{ feed, window }` over the buffer —
-  needs the `by`/`now` convention + an input-resolver change) and, **platform-blocked**, the real
-  host-proxied connector (§5.1 SSRF fetch) + OPFS materialize-to-mount transport (§5.2). (`src/feed/index.ts`.)
+  (#16–#18), and **windowed inputs resolve** (`{ feed, window }` over the buffer via the engine's
+  input resolver — see §2). Remaining, **platform-blocked**: the real host-proxied connector
+  (§5.1 SSRF fetch) + OPFS materialize-to-mount transport (§5.2). (`src/feed/index.ts`.)
 - **relations** — the M2 test runner supplies the metamorphic re-evaluation; the relation
   descriptors carry only their pure transform + comparison (`src/stdlib/relations.ts`).
 - **review surface (§6, brief surface 3) — first slice shipped**: the **workbook panel**

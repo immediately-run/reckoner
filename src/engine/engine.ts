@@ -8,8 +8,9 @@ import type { Value } from '../stdlib/types.ts';
 import type { CellDef, TestCellDef } from '../stdlib/cell.ts';
 import type { DependencyGraph, ExternalValue, PassResult, Workbook } from './types.ts';
 import { buildGraph } from './graph.ts';
+import { resolversFor } from './graph.ts';
 import { Scheduler } from './scheduler.ts';
-import { runSuite } from './testrunner.ts';
+import { runSuite, substituteInputs } from './testrunner.ts';
 import type { SuiteResult } from './testrunner.ts';
 import { evaluateWorksheet } from './compartment.ts';
 
@@ -75,23 +76,53 @@ export class Engine {
   }
 
   /**
-   * Run every test against its subject's settled value, returning the suite result +
-   * review-surface verdict per subject cell. Metamorphic invariance relations re-run the
-   * subject formula over a transformed input via the injected reevaluate port.
-   *
-   * (Example-based holdout tests currently assert over the subject's *live* value; running
-   * the subject over a test's own fixture inputs — the holdout-substitution semantics — is
-   * deferred until the test→subject input mapping is pinned, §6.)
+   * Run every test against its subject, returning the suite result + review-surface verdict
+   * per subject cell. A test that declares its own inputs runs under **fixture substitution**
+   * (§6): its declared inputs resolve against the same published state a cell's do and
+   * substitute, by local name, for the subject's live inputs — the subject formula re-runs
+   * over the merged set and `expect`/`relation` assert against that substituted run (the
+   * holdout shape: swap the data input for its fixture, keep params/static live). A test
+   * with no declared inputs asserts over the subject's live value, as before. Metamorphic
+   * invariance relations re-run the subject formula over a transformed input via the
+   * injected `reevaluate` port (the transformed re-run rides the same merged base).
    */
   runTests(): Map<string, SuiteResult> {
     const out = new Map<string, SuiteResult>();
     for (const [subject, tests] of this.testsBySubject) {
       const subjectDef = this.#cellDef.get(subject);
-      const suite = runSuite(tests, () => ({
-        subject: this.scheduler.result(subject)?.value ?? null,
-        inputs: this.scheduler.inputsFor(subject),
-        reevaluate: subjectDef === undefined ? undefined : (inputs) => subjectDef.formula(inputs),
-      }));
+      const liveInputs = this.scheduler.inputsFor(subject);
+      const suite = runSuite(tests, (test) => {
+        const reevaluate =
+          subjectDef === undefined
+            ? undefined
+            : (inputs: Record<string, Value>) => subjectDef.formula(inputs);
+        if (subjectDef === undefined || Object.keys(test.inputs).length === 0) {
+          return {
+            subject: this.scheduler.result(subject)?.value ?? null,
+            inputs: liveInputs,
+            reevaluate,
+          };
+        }
+
+        const { resolvers, diagnostics } = resolversFor(test.inputs, this.graph);
+        if (diagnostics.length > 0) {
+          return { subject: null, inputs: {}, error: diagnostics[0] };
+        }
+        const declared = this.scheduler.resolve(resolvers).values;
+        const sub = substituteInputs(declared, liveInputs);
+        if (!sub.ok) return { subject: null, inputs: {}, error: sub.error };
+        try {
+          return { subject: subjectDef.formula(sub.inputs), inputs: sub.inputs, reevaluate };
+        } catch (e) {
+          // The subject errored over the substituted inputs — a data-shape mismatch between
+          // the fixture and the formula, which is exactly what the test should report.
+          return {
+            subject: null,
+            inputs: sub.inputs,
+            error: `subject errored over substituted inputs: ${(e as Error).message}`,
+          };
+        }
+      });
       out.set(subject, suite);
     }
     return out;
