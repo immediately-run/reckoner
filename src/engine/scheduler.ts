@@ -71,6 +71,19 @@ export class Scheduler {
     return node === undefined ? {} : this.#resolveInputs(node).values;
   }
 
+  /**
+   * Resolve an arbitrary resolver list against current published state — for non-graph
+   * declared inputs (the test runner's fixture substitution). Same single resolution
+   * path as every cell input.
+   */
+  resolve(resolvers: Parameters<typeof resolveInputs>[0]): { values: Record<string, Value>; tiers: Tier[] } {
+    return resolveInputs(resolvers, {
+      results: this.#results,
+      externals: this.#externals,
+      worksheets: this.graph.worksheets,
+    });
+  }
+
   /** Cold build: set all externals and recompute every node in topo order. */
   initial(externals: Record<string, ExternalValue>, evaluate: Evaluator): PassResult {
     this.#assertAcyclic();

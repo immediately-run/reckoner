@@ -3,7 +3,7 @@
 **Purpose.** Pick up the Reckoner build in a fresh session. This records what is built (M1 — the
 pure spine + all three effectful shells; and M2 — the live-feed workstream, underway), how it is
 organized and verified, the working conventions, the environment quirks, and the concrete next
-steps. · **Updated:** 2026-07-13
+steps. · **Updated:** 2026-08-24
 
 > **Reads first, in order:** `product_definition.md` → `ARCHITECTURE_PLAN.md` §2 (the five
 > parts), §3 (document model + stdlib + templates), §4 (engine), §6 (testing), §10
@@ -18,7 +18,7 @@ steps. · **Updated:** 2026-07-13
 Reckoner went from the starter template to a tested formula-engine core, the report-view render
 surface, a runnable static report, the worker-backed async engine, and the live-feed data plane.
 **All of M1 (shells A/B/C) and four M2 feed increments are merged to `main`** (PRs #2–#19; #9 is
-the S5 spike doc). **286 vitest cases**; every merge is green on `tsc -b` + `npm test` +
+the S5 spike doc). **297 vitest cases**; every merge is green on `tsc -b` + `npm test` +
 `npm run lint` + `npm run build`, and the app is live-verified in a browser (the report renders
 and a live feed recomputes it — §2.B / §2 M2 note).
 
@@ -196,10 +196,13 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
   per-cell epoch-gate barrier is needed only if concurrent arm evaluation is added (deferred
   worker pool, §4.1) — see the `asyncEngine.ts` header.
 - **engine shell** — worker built + **wired into the app** (`AsyncEngine` now backs
-  `reportSession`, real `Worker`+`lockdown()` with an in-process fallback). Remaining: the
-  transpiled-module **linker** (the evaluator uses a source transform + `Compartment.evaluate`;
-  in-platform the sandbox transpiles and the Compartment module loader links); holdout-fixture
-  **substitution** test semantics — running a subject over a test's own fixture inputs (§6). (`src/engine/engine.ts`/`compartment.ts`.)
+  `reportSession`, real `Worker`+`lockdown()` with an in-process fallback). Holdout-fixture
+  **substitution** test semantics **shipped**: a test declaring its own `inputs` runs the
+  subject over `{ ...live, ...declared }` (same-local-name override, partial allowed;
+  name mismatch / unresolvable ref / subject error over the fixture fails the test with a
+  message) — the mapping is pinned in ARCHITECTURE_PLAN §6. Remaining: the transpiled-module
+  **linker** (the evaluator uses a source transform + `Compartment.evaluate`; in-platform the
+  sandbox transpiles and the Compartment module loader links). (`src/engine/engine.ts`/`compartment.ts`.)
 - **report** — shell A shipped the components + MDX parser. Remaining/deferred (in
   `src/report/render/index.ts`): the **host-rendered tier badge** (the slot is reserved, we
   supply the value); a real **polygon-geography Map** (v1 choropleth ships a region breakdown);
