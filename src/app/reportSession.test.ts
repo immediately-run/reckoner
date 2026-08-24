@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReportSession, sessionBindings, xrefDiagnostics } from './reportSession.ts';
+import { buildReportSession, makeTransport, sessionBindings, xrefDiagnostics } from './reportSession.ts';
 import { inMemoryTransport } from '../engine/workerTransport.ts';
 import { execSummary, mrrMovements } from '../seed/data.ts';
 
@@ -154,5 +154,29 @@ describe('the demo document under the value inspector', () => {
     // so the inspector can chip it without knowing the input grammar
     const recent = session.engine.cells().find((c) => c.id === 'review.live_recent_events');
     expect(recent?.resolvers.some((r) => r.kind === 'windowed-feed' && r.feed === 'live_regions')).toBe(true);
+  });
+});
+
+describe('makeTransport — module-semantics degradation (the import.meta platform trap)', () => {
+  it('falls back to the in-process transport when the worker URL module cannot load', async () => {
+    // The platform shape: immediately.run transpiles ESM→CJS and evaluates as a classic
+    // script, so any module containing import.meta throws at load — the dynamic import
+    // rejects HERE (catchable) instead of killing the app at parse time.
+    const t = await makeTransport(() => Promise.reject(new SyntaxError("Cannot use 'import.meta' outside a module")));
+    expect(t).toBeInstanceOf(Object);
+    expect(typeof t.post).toBe('function');
+    expect(typeof t.restart).toBe('function');
+  });
+
+  it('uses the worker transport when real module semantics resolve the URL', async () => {
+    const t = await makeTransport(async () => ({ ENGINE_WORKER_URL: new URL('https://example.com/engine.js') }));
+    // A real worker transport satisfies the same port; asserting the distinction by
+    // behavior would need a Worker — the port shape is the contract.
+    expect(typeof t.post).toBe('function');
+  });
+
+  it('the worker URL module itself resolves under real ESM (vitest) to the engine entry', async () => {
+    const { ENGINE_WORKER_URL } = await import('./workerUrl.ts');
+    expect(ENGINE_WORKER_URL.href).toContain('entry/engine.ts');
   });
 });

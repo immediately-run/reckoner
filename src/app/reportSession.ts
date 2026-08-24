@@ -61,15 +61,25 @@ function assembleExternals(loaded: LoadedDocument): Record<string, ExternalValue
 
 /**
  * The engine's worker transport: a real module Web Worker (off-main-thread, `lockdown()`-ed)
- * when available, else the in-process fallback. The `new URL(..., import.meta.url)` Worker form
- * is a web standard (not a bundler macro), so it works on `vite` and immediately.run alike.
+ * under real module semantics (`vite` dev + build), else the in-process fallback.
+ *
+ * The worker's URL lives in `./workerUrl.ts` behind `import.meta.url` — a web standard, but
+ * one immediately.run cannot yet evaluate: the platform transpiles app source ESM→CommonJS
+ * and runs it as a classic script, where `import.meta` is a **parse-time** SyntaxError. That
+ * module is therefore reached only via a dynamic `import()` inside this try/catch, so on the
+ * platform the failure is *catchable* and the in-process transport takes over (same engine,
+ * main-thread) instead of the whole app dying at module load. When the platform learns
+ * `import.meta.url` (roadmap: the sandbox transpiler shim), nothing here needs to change.
  */
-export function makeTransport(): WorkerTransport {
+export async function makeTransport(
+  loadWorkerUrl: () => Promise<{ ENGINE_WORKER_URL: URL }> = () => import('./workerUrl.ts'),
+): Promise<WorkerTransport> {
   if (typeof Worker !== 'undefined') {
     try {
-      return workerTransport(() => new Worker(new URL('../entry/engine.ts', import.meta.url), { type: 'module' }));
+      const { ENGINE_WORKER_URL } = await loadWorkerUrl();
+      return workerTransport(() => new Worker(ENGINE_WORKER_URL, { type: 'module' }));
     } catch {
-      /* fall through to the in-process transport */
+      /* classic-script semantics (immediately.run) — fall through to the in-process transport */
     }
   }
   return inMemoryTransport();
@@ -112,13 +122,14 @@ export function xrefDiagnostics(
 }
 
 /** Load the bundled demo document and run the full cold pipeline through the worker engine. */
-export async function buildReportSession(transport: WorkerTransport = makeTransport()): Promise<ReportSession> {
+export async function buildReportSession(transport?: WorkerTransport): Promise<ReportSession> {
+  const t = transport ?? (await makeTransport());
   const loaded = await loadDocument(memoryReader(SEED_FILES), SEED_ROOT);
 
   const worksheetSources: Record<string, string> = {};
   for (const w of loaded.worksheets) worksheetSources[w.name] = w.source;
 
-  const engine = await AsyncEngine.fromSources(worksheetSources, { transport });
+  const engine = await AsyncEngine.fromSources(worksheetSources, { transport: t });
   const externals = assembleExternals(loaded);
   await engine.run(externals);
 
