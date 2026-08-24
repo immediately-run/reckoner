@@ -18,7 +18,7 @@ steps. · **Updated:** 2026-08-24
 Reckoner went from the starter template to a tested formula-engine core, the report-view render
 surface, a runnable static report, the worker-backed async engine, and the live-feed data plane.
 **All of M1 (shells A/B/C) and four M2 feed increments are merged to `main`** (PRs #2–#19; #9 is
-the S5 spike doc). **355 vitest cases**; every merge is green on `tsc -b` + `npm test` +
+the S5 spike doc). **359 vitest cases**; every merge is green on `tsc -b` + `npm test` +
 `npm run lint` + `npm run build`, and the app is live-verified in a browser (the report renders
 and a live feed recomputes it — §2.B / §2 M2 note).
 
@@ -173,6 +173,19 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
 ---
 
 ## 4. Environment
+
+- **The platform live-check is a gate, not an expectation (learned 2026-08-24, the hard
+  way):** the demo first ran on production immediately.run only after M2 — and died with
+  `Cannot use 'import.meta' outside a module`. The platform transpiles app source ESM→CJS
+  and evaluates it as a classic script, where `import.meta` is a parse-time SyntaxError
+  that kills the whole module (a claim that the `new URL(..., import.meta.url)` Worker form
+  "works on vite and immediately.run alike" had asserted, never verified). Fixes: the
+  worker URL lives in `src/app/workerUrl.ts`, reached only via dynamic import inside
+  `makeTransport`'s try/catch — on the platform the failure is catchable and the in-process
+  engine transport takes over; `src/app/platformGuards.test.ts` greeps the source for the
+  class (comment-aware, two exempt files) so it cannot silently return. **Verify on
+  https://immediately.run/present/github/immediately-run/reckoner/main before calling any
+  shell "done"** — vite-only verification is exactly the trap the app CLAUDE.md warns about.
 
 - **Bring the local stack up when `local.immediately.run` 502s** — see the `local-stack-bringup`
   memory (`docs/.claude/memory/` in the `docs` repo) and the S5 spike's reproduce section:
