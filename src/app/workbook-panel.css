@@ -329,3 +329,62 @@
 .rk-wb-name--link:hover {
   color: var(--accent);
 }
+
+/* The precedent neighborhood (review-1 UX-4) — the whole subgraph, nested spatially. */
+
+.rk-prec {
+  flex: 1;
+  min-width: 0;
+}
+
+.rk-prec-meta {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+
+.rk-prec-truncated {
+  color: var(--accent-hot);
+}
+
+.rk-prec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 14px;
+  border-left: 1px dashed var(--line);
+}
+
+.rk-prec-node {
+  margin: 3px 0;
+}
+
+.rk-prec-cell {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+  text-decoration: underline dotted var(--line-2);
+  text-underline-offset: 3px;
+}
+
+.rk-prec-cell:hover {
+  color: var(--accent);
+}
+
+.rk-prec-leaf {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+.rk-prec-via {
+  color: var(--ink-3);
+}
+
+.rk-prec-detail {
+  color: var(--ink-3);
+}

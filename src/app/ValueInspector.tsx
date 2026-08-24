@@ -13,7 +13,9 @@
 import type { CellDescriptor, SubjectResult, TestDescriptor } from '../engine/worker/protocol.ts';
 import type { CellVerdict } from '../engine/testrunner.ts';
 import type { PublishedResult } from '../engine/types.ts';
+import { precedentTree } from '../engine/precedents.ts';
 import type { Value } from '../stdlib/types.ts';
+import PrecedentView from './PrecedentView.tsx';
 import './workbook-panel.css';
 
 const VERDICT_CLASS: Record<CellVerdict, string> = {
@@ -33,6 +35,8 @@ function preview(value: Value | undefined): string {
 
 interface ValueInspectorProps {
   cell: CellDescriptor;
+  /** Every cell of the workbook (the precedent neighborhood's substrate). */
+  cells: readonly CellDescriptor[];
   /** Every test targeting this cell (filtered by subject by the caller). */
   tests: readonly TestDescriptor[];
   /** This cell's suite result, if any — absent renders `untested`. */
@@ -44,7 +48,7 @@ interface ValueInspectorProps {
   onClose: () => void;
 }
 
-function ValueInspector({ cell, tests, outcome, result, onNavigate, onClose }: ValueInspectorProps) {
+function ValueInspector({ cell, cells, tests, outcome, result, onNavigate, onClose }: ValueInspectorProps) {
   const verdict: CellVerdict = outcome?.verdict ?? 'untested';
   return (
     <div className="rk-ins" aria-label={`Inspector for ${cell.id}`}>
@@ -107,6 +111,13 @@ function ValueInspector({ cell, tests, outcome, result, onNavigate, onClose }: V
         <span className="rk-ins-label">formula</span>
         <pre className="rk-ins-formula">{cell.formulaSource}</pre>
       </div>
+
+      {cell.resolvers.some((r) => r.kind === 'cell' || r.kind === 'wildcard') && (
+        <div className="rk-ins-row">
+          <span className="rk-ins-label">precedents</span>
+          <PrecedentView tree={precedentTree(cell.id, cells)} onNavigate={onNavigate} />
+        </div>
+      )}
 
       {tests.length > 0 && (
         <div className="rk-ins-row">

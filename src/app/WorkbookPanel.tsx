@@ -57,6 +57,7 @@ function WorkbookPanel({ engine, tick, onClose }: WorkbookPanelProps) {
       {inspectedCell !== null && (
         <ValueInspector
           cell={inspectedCell}
+          cells={engine.cells()}
           tests={engine.tests().filter((t) => t.subject === inspectedCell.id)}
           outcome={results?.get(inspectedCell.id)}
           result={engine.result(inspectedCell.id)}
