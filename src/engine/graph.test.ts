@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { cell, testCell } from '../stdlib/index.ts';
-import { buildGraph, SUBJECT_INPUT } from './graph.ts';
+import { buildGraph, declaredWindows, SUBJECT_INPUT } from './graph.ts';
+import { checkBufferCoversWindows } from '../feed/constraints.ts';
 import type { Workbook } from './types.ts';
 
 const noop = () => null;
@@ -79,5 +80,46 @@ describe('buildGraph', () => {
     expect(t.deps).toContain('revenue.by_month');
     expect(t.resolvers.some((r) => r.name === SUBJECT_INPUT)).toBe(true);
     expect(t.externals).toContain('fixtures.orders');
+  });
+});
+
+describe('buildGraph — windowed feed inputs', () => {
+  const wb: Workbook = {
+    live: {
+      recent: cell({
+        doc: 'windowed',
+        inputs: { tail: { feed: 'orders', window: '1h' }, also: { feed: 'orders', window: '5m', by: 'at' } },
+        formula: noop,
+      }),
+      snapshot: cell({ doc: 'snap', inputs: { rows: 'feeds.orders' }, formula: noop }),
+    },
+  };
+
+  it('routes the object form to windowed-feed resolvers keyed on the buffer external', () => {
+    const g = buildGraph(wb);
+    const node = g.nodes.get('live.recent')!;
+    const resolvers = node.resolvers.filter((r) => r.kind === 'windowed-feed');
+    expect(resolvers).toEqual([
+      { name: 'tail', kind: 'windowed-feed', feed: 'orders', window: '1h', by: 'ts' },
+      { name: 'also', kind: 'windowed-feed', feed: 'orders', window: '5m', by: 'at' },
+    ]);
+    // the retained-rows external + the clock dirty the cell — not the snapshot external
+    expect(node.externals).toEqual(['feedBuffers.orders', 'params.now']);
+    expect(g.externalInputs.has('feedBuffers.orders')).toBe(true);
+    // the plain string form still reads the snapshot
+    expect(g.nodes.get('live.snapshot')!.externals).toEqual(['feeds.orders']);
+  });
+
+  it('declaredWindows enumerates every windowed site for the coverage diagnostic', () => {
+    const g = buildGraph(wb);
+    expect(declaredWindows(g)).toEqual([
+      { feed: 'orders', window: '1h', site: 'live.recent' },
+      { feed: 'orders', window: '5m', site: 'live.recent' },
+    ]);
+    // and it composes with the static buffer-coverage check
+    expect(checkBufferCoversWindows({ orders: { keepFor: '2h' } }, declaredWindows(g))).toEqual([]);
+    const bad = checkBufferCoversWindows({ orders: { keepFor: '30m' } }, declaredWindows(g));
+    expect(bad).toHaveLength(1);
+    expect(bad[0].severity).toBe('error');
   });
 });

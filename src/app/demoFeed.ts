@@ -15,12 +15,14 @@ const REGIONS = ['amer', 'emea', 'apac', 'latam'];
 /** A poll connector emitting a full active-sessions-by-region snapshot each tick (random walk). */
 export function demoLiveConnector(intervalMs = 1500): Connector {
   const sessions = new Map(REGIONS.map((r) => [r, 180 + Math.floor(Math.random() * 220)]));
-  const fetchFrame = async (): Promise<Row[]> =>
-    REGIONS.map((r) => {
+  const fetchFrame = async (): Promise<Row[]> => {
+    const ts = Date.now(); // event time stamped at the connector, per the `ts` feed convention
+    return REGIONS.map((r) => {
       const next = Math.max(20, Math.min(640, (sessions.get(r) ?? 200) + Math.round((Math.random() - 0.5) * 90)));
       sessions.set(r, next);
-      return { region: r, sessions: next };
+      return { region: r, sessions: next, ts };
     });
+  };
 
   return pollingConnector({
     fetchFrame,

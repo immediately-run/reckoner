@@ -26,13 +26,25 @@ export function parseDuration(spec: string): number {
 }
 
 function toEpoch(v: Value): number {
+  const t = eventTimeOf(v);
+  if (t === undefined) throw new Error(`Invalid event time: ${JSON.stringify(v)}`);
+  return t;
+}
+
+/**
+ * The event time of a row value as epoch-ms, or `undefined` when it carries none usable
+ * (absent, or not an epoch-ms number / parseable date string). The non-throwing half of
+ * `toEpoch`, for machinery that must degrade instead of erroring — the engine's windowed
+ * input resolution (a malformed feed row drops out of the window rather than wedging the
+ * pass). Not re-exported through the barrel: internal, not formula-facing.
+ */
+export function eventTimeOf(v: Value): number | undefined {
   if (typeof v === 'number') return v;
   if (typeof v === 'string') {
     const t = Date.parse(v);
-    if (Number.isNaN(t)) throw new Error(`Invalid event time: ${JSON.stringify(v)}`);
-    return t;
+    return Number.isNaN(t) ? undefined : t;
   }
-  throw new Error(`Invalid event time: ${JSON.stringify(v)}`);
+  return undefined;
 }
 
 /**
