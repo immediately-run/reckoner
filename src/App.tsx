@@ -17,6 +17,11 @@ function App() {
   useEffect(() => {
     if (title !== undefined) document.title = title;
   }, [title]);
+  // Error-severity document diagnostics (a dangling feed/fixture reference, a malformed
+  // file) render as a note above the report — the report still renders what it can, since
+  // every affected cell degrades to its own missing-value state rather than failing the page.
+  const errors =
+    report.status === 'ready' ? report.session.diagnostics.filter((d) => d.severity === 'error') : [];
   return (
     <main className="rk-page">
       {report.status === 'loading' && <div className="rk-page-note">Loading report…</div>}
@@ -31,6 +36,13 @@ function App() {
               {reviewOpen ? 'Close review' : 'Review'}
             </button>
           </header>
+          {errors.length > 0 && (
+            <div className="rk-page-note rk-page-error" role="alert">
+              {errors.map((d, i) => (
+                <div key={i}>{d.message}</div>
+              ))}
+            </div>
+          )}
           <ReportView nodes={report.session.nodes} bindings={report.bindings} />
           {reviewOpen && (
             <WorkbookPanel
