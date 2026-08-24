@@ -68,3 +68,19 @@ describe('buildReportSession + sessionBindings', () => {
     expect(windowed.length).toBe(6); // span=6m → last 6 months
   });
 });
+
+describe('the demo document under the review surface', () => {
+  it('cells() carries docs; tests() carries the demo test cards; runTests() yields honest verdicts', async () => {
+    const session = await buildReportSession(inMemoryTransport());
+    expect(session.engine.cells().find((c) => c.id === 'review.total')?.doc).toContain('Latest monthly');
+    expect(session.engine.tests().map((t) => [t.name, t.kind])).toEqual([
+      ['total_check', 'specification'],
+      ['nrr_sane', 'property'],
+    ]);
+
+    const verdicts = await session.engine.runTests();
+    expect(verdicts.get('review.total')?.verdict).toBe('pinned'); // example-based only
+    expect(verdicts.get('review.nrr')?.verdict).toBe('validated'); // a property leg
+    expect(verdicts.has('review.by_month')).toBe(false); // honestly untested
+  });
+});

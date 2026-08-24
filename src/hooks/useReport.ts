@@ -14,7 +14,7 @@ import type { Bindings } from '../report/render/bindings.ts';
 export type ReportState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; session: ReportSession; bindings: Bindings };
+  | { status: 'ready'; session: ReportSession; bindings: Bindings; tick: number };
 
 const scheduleFlush = (fn: () => void): void => {
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fn);
@@ -24,7 +24,7 @@ const scheduleFlush = (fn: () => void): void => {
 export function useReport(): ReportState {
   const [session, setSession] = useState<ReportSession | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -59,5 +59,5 @@ export function useReport(): ReportState {
 
   if (error !== null) return { status: 'error', message: error };
   if (session === null || bindings === null) return { status: 'loading' };
-  return { status: 'ready', session, bindings };
+  return { status: 'ready', session, bindings, tick };
 }

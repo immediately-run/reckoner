@@ -34,7 +34,14 @@ import { resolveInputs } from './resolve.ts';
 import { CircuitBreaker, DEFAULT_BREAKER } from './circuitBreaker.ts';
 import type { BreakerConfig } from './circuitBreaker.ts';
 import type { WorkerTransport } from './workerTransport.ts';
-import type { CellDescriptor, WorkbookDescriptor, WorkerResponse } from './worker/protocol.ts';
+import type {
+  CellDescriptor,
+  SubjectResult,
+  SuiteContext,
+  TestDescriptor,
+  WorkbookDescriptor,
+  WorkerResponse,
+} from './worker/protocol.ts';
 
 export class TimeoutError extends Error {
   constructor(id: string) {
@@ -94,11 +101,13 @@ export class AsyncEngine {
   #results = new Map<string, PublishedResult>();
   #errors = new Map<string, string>();
   #externals = new Map<string, { value: Value; tier: ExternalValue['tier'] }>();
+  #tests: WorkbookDescriptor['tests'] = [];
 
   #pending = new Map<number, PendingEval>();
   #token = 0;
   #buildResolve: ((d: WorkbookDescriptor) => void) | null = null;
   #buildReject: ((e: Error) => void) | null = null;
+  #testsPending = new Map<number, { resolve: (r: SubjectResult[]) => void; reject: (e: Error) => void }>();
 
   // supersession
   #running = false;
@@ -162,6 +171,70 @@ export class AsyncEngine {
     this.#breaker.rearm(id);
   }
 
+  /** The workbook's cells (id, worksheet, cell, doc) — the review surface's card data. */
+  cells(): readonly CellDescriptor[] {
+    return [...this.#nodesById.values()];
+  }
+
+  /** The workbook's test cells (kind + subject), sans closures — `runTests` executes them. */
+  tests(): readonly TestDescriptor[] {
+    return this.#tests;
+  }
+
+  /**
+   * Run every test suite against the current published state, worker-side (that is where the
+   * `expect`/`relation` closures live), and return the review-surface verdict per subject.
+   * Subjects without tests are absent from the map (their cells render `untested`).
+   *
+   * A divergent test wedges the worker the same way a divergent formula does, so this rides
+   * a wall-clock budget like `eval`: on timeout the worker is restarted (abandoning the
+   * pending suites) and the call rejects — the render pipeline's own watchdog recovery
+   * pattern, applied to the review path. The per-cell circuit breaker does not yet count
+   * test-run terminations (a booked residual; tests are author code with the same runaway
+   * risk, but the failure is contained to the panel).
+   */
+  runTests(): Promise<Map<string, SubjectResult>> {
+    const subjects = [...new Set(this.#tests.map((t) => t.subject))];
+    const suites: SuiteContext[] = subjects.map((subject) => ({
+      subject,
+      subjectValue: this.#results.get(subject)?.value ?? null,
+      inputs: this.#inputsFor(subject),
+    }));
+    const token = ++this.#token;
+    return new Promise<Map<string, SubjectResult>>((resolve, reject) => {
+      const cancel = this.#setTimer(() => {
+        this.#testsPending.delete(token);
+        this.#transport.restart();
+        void this.#sendBuild(this.#sources).catch(() => {
+          /* rebuild failure surfaces on the next pass */
+        });
+        reject(new Error('test run timed out (worker restarted)'));
+      }, this.#budget * Math.max(1, suites.length));
+      this.#testsPending.set(token, {
+        resolve: (r) => {
+          cancel();
+          resolve(new Map(r.map((s) => [s.subject, s])));
+        },
+        reject: (e) => {
+          cancel();
+          reject(e);
+        },
+      });
+      this.#transport.post({ type: 'run-tests', token, suites });
+    });
+  }
+
+  /** Resolve one cell's inputs from current published state (the run-tests context). */
+  #inputsFor(id: string): Record<string, Value> {
+    const node = this.#nodesById.get(id);
+    if (node === undefined) return {};
+    return resolveInputs(node.resolvers, {
+      results: this.#results,
+      externals: this.#externals,
+      worksheets: this.#worksheets,
+    }).values;
+  }
+
   snapshot(): AsyncPass {
     return { results: new Map(this.#results), errors: new Map(this.#errors), quarantined: this.#breaker.quarantined() };
   }
@@ -177,6 +250,7 @@ export class AsyncEngine {
     this.#cycles = d.cycles;
     this.#nodesById = new Map(d.cells.map((c) => [c.id, c]));
     this.#worksheets = new Map(d.worksheets);
+    this.#tests = d.tests;
   }
 
   #onMessage(msg: WorkerResponse): void {
@@ -186,11 +260,25 @@ export class AsyncEngine {
     } else if (msg.type === 'build-error') {
       this.#buildReject?.(new Error(msg.message));
       this.#buildResolve = this.#buildReject = null;
+    } else if (msg.type === 'test-results') {
+      const p = this.#testsPending.get(msg.token);
+      if (p === undefined) return;
+      this.#testsPending.delete(msg.token);
+      p.resolve(msg.suites);
+    } else if (msg.type === 'eval-error') {
+      // An eval-error can carry a run-tests token (suite machinery threw worker-side).
+      const t = this.#testsPending.get(msg.token);
+      if (t !== undefined) {
+        this.#testsPending.delete(msg.token);
+        t.reject(new Error(msg.message));
+        return;
+      }
+      const p = this.#pending.get(msg.token);
+      if (p !== undefined) p.reject(new Error(msg.message));
     } else {
       const p = this.#pending.get(msg.token);
       if (p === undefined) return; // superseded / abandoned after a restart
-      if (msg.type === 'result') p.resolve(msg.value);
-      else p.reject(new Error(msg.message));
+      p.resolve(msg.value);
     }
   }
 
