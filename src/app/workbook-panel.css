@@ -1,0 +1,198 @@
+/* The workbook panel (review surface, brief surface 3). Desktop: a fixed side sheet;
+   phone-width: a full-width sheet under the header. Tokens from index.css — no literals. */
+
+.rk-wb-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 100vw);
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 20px 20px 32px;
+  z-index: 20;
+}
+
+.rk-wb-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.rk-wb-head h2 {
+  font-family: var(--disp);
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.rk-wb-close {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.rk-wb-close:hover {
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+
+.rk-wb-note,
+.rk-wb-error {
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  margin-bottom: 12px;
+}
+
+.rk-wb-error {
+  color: var(--accent-hot);
+}
+
+.rk-wb-sheet {
+  margin-bottom: 20px;
+}
+
+.rk-wb-sheet h3 {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 8px;
+}
+
+.rk-wb-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.rk-wb-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rk-wb-name {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.rk-wb-doc {
+  font-size: 0.8rem;
+  color: var(--ink-2);
+  margin-top: 4px;
+}
+
+.rk-wb-value {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-3);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+/* The four coverage states — visually distinct by construction (§6: pinned must not read
+   as tested). Validated carries the accent; pinned is a deliberate neutral-yellow; failing
+   is the only red; untested is quiet. */
+
+.rk-verdict {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 2px 9px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.rk-verdict--validated {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.rk-verdict--pinned {
+  color: var(--accent-3);
+  border-color: var(--accent-3);
+}
+
+.rk-verdict--untested {
+  color: var(--ink-3);
+  border-color: var(--line);
+}
+
+.rk-verdict--failing {
+  color: var(--accent-hot);
+  border-color: var(--accent-hot);
+}
+
+/* Test cards — visually distinct from cell cards (smaller, indented, kind-labeled). */
+
+.rk-wb-test {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  font-size: 0.78rem;
+  flex-wrap: wrap;
+}
+
+.rk-wb-kind {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  padding: 1px 6px;
+}
+
+.rk-wb-test-name {
+  color: var(--ink-2);
+}
+
+.rk-wb-outcome {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  margin-left: auto;
+}
+
+.rk-wb-test--pass .rk-wb-outcome {
+  color: var(--accent);
+}
+
+.rk-wb-test--fail .rk-wb-outcome {
+  color: var(--accent-hot);
+}
+
+.rk-wb-test-msg {
+  flex-basis: 100%;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--accent-hot);
+  overflow-wrap: anywhere;
+}
+
+/* Phone: the panel takes the full width — the report scrolls behind it. */
+@media (max-width: 560px) {
+  .rk-wb-panel {
+    width: 100vw;
+    border-left: none;
+  }
+}

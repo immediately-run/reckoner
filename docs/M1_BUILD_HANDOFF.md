@@ -18,7 +18,8 @@ steps. · **Updated:** 2026-08-24
 Reckoner went from the starter template to a tested formula-engine core, the report-view render
 surface, a runnable static report, the worker-backed async engine, and the live-feed data plane.
 **All of M1 (shells A/B/C) and four M2 feed increments are merged to `main`** (PRs #2–#19; #9 is
-the S5 spike doc). **325 vitest cases**; every merge is green on `tsc -b` + `npm test` +
+the S5 spike doc). **337 vitest cases**; every merge is green on `tsc -b` + `npm test` +
+
 `npm run lint` + `npm run build`, and the app is live-verified in a browser (the report renders
 and a live feed recomputes it — §2.B / §2 M2 note).
 
@@ -226,6 +227,21 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
   (§5.1 SSRF fetch) + OPFS materialize-to-mount transport (§5.2). (`src/feed/index.ts`.)
 - **relations** — the M2 test runner supplies the metamorphic re-evaluation; the relation
   descriptors carry only their pure transform + comparison (`src/stdlib/relations.ts`).
+- **review surface (§6, brief surface 3) — first slice shipped**: the **workbook panel**
+  (`src/app/WorkbookPanel.tsx` + `WorkbookPanelBody.tsx`). One card per cell (name, `doc`,
+  value preview, **coverage-state chip**) with test cards beneath their subject (kind label +
+  pass/fail + message); the four states — validated / pinned / untested / failing — are
+  visually distinct by CSS class (§6: pinned must not read as tested). Engine plumbing: the
+  worker keeps test defs (their closures never cross the wire — a `run-tests` op executes
+  them in the SES realm over host-computed contexts and returns serializable verdicts);
+  `AsyncEngine.runTests()` rides a wall-clock budget like `eval` (a wedged suite restarts the
+  worker and rejects; the per-cell breaker does not yet count test-run terminations — a
+  booked residual). Opened from the report header (author surface — viewers never see
+  worksheets, brief A3). The demo worksheet carries an honest mix (a specification test →
+  `pinned`; a property relation → `validated`; the rest genuinely untested). Remaining
+  review-surface work: the **value inspector** (brief surface 2 — binding name, formula
+  source, input chips, precedent-neighborhood view), and per-cell verdict marks inside the
+  report itself.
 
 ## 6. Dogfooding note (Axis-2)
 

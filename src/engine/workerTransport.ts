@@ -36,6 +36,14 @@ export function inMemoryTransport(): WorkerTransport {
         }
         return;
       }
+      if (msg.type === 'run-tests') {
+        try {
+          deliver({ type: 'test-results', token: msg.token, suites: worker.runSuites(msg.suites) });
+        } catch (e) {
+          deliver({ type: 'eval-error', token: msg.token, id: '(run-tests)', message: (e as Error).message });
+        }
+        return;
+      }
       // A formula may be async — await it before delivering (§4.1).
       Promise.resolve()
         .then(() => worker.eval(msg.id, msg.inputs))

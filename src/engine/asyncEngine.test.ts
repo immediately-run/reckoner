@@ -42,6 +42,14 @@ function makeTransport(opts: { stuck?: Set<string>; evalDelayMs?: number } = {})
           }
           return;
         }
+        if (msg.type === 'run-tests') {
+          try {
+            handler({ type: 'test-results', token: msg.token, suites: worker.runSuites(msg.suites) });
+          } catch (e) {
+            handler({ type: 'eval-error', token: msg.token, id: '(run-tests)', message: (e as Error).message });
+          }
+          return;
+        }
         evalPosts++;
         if (opts.stuck?.has(msg.id)) return; // withhold → the host watchdog must fire
         const run = (): void => {
@@ -154,5 +162,63 @@ export const a = cell({ doc: "async", inputs: { x: "params.x" }, formula: async 
     const engine = await AsyncEngine.fromSources(sources, { transport: inMemoryTransport() });
     await engine.run({ 'params.x': { value: 5, tier: 'static' } });
     expect(engine.value('sheet.a')).toBe(105); // awaited, not a Promise
+  });
+});
+
+describe('AsyncEngine.runTests — the review surface over the real transport', () => {
+  const SOURCES = {
+    live: `import { cell, testCell, expectEqual, property } from "@reckoner/stdlib";
+export const total = cell({ doc: "sum", inputs: { rows: "feeds.orders" }, formula: ({ rows }) => rows.reduce((a, r) => a + r.eur, 0) });
+export const total_check = testCell({ kind: "specification", subject: "live.total", expect: ({ result }) => expectEqual(result, 30) });
+export const total_sane = testCell({ kind: "property", subject: "live.total", relation: property("non-negative", (r) => r >= 0) });
+export const untouched = cell({ doc: "no tests", inputs: { t: "live.total" }, formula: ({ t }) => t + 1 });
+`,
+  };
+
+  it('runs suites worker-side and returns per-subject verdicts (example+property → validated)', async () => {
+    const engine = await AsyncEngine.fromSources(SOURCES, { transport: inMemoryTransport() });
+    await engine.run({ 'feeds.orders': { value: [{ eur: 10 }, { eur: 20 }], tier: 'live' } });
+    const verdicts = await engine.runTests();
+    expect(verdicts.get('live.total')?.verdict).toBe('validated');
+    // cells without tests are absent — the panel renders them `untested`
+    expect(verdicts.has('live.untouched')).toBe(false);
+    const check = verdicts.get('live.total')!.outcomes.find((o) => o.id === 'live.total_check')!;
+    expect(check.kind).toBe('specification');
+    expect(check.pass).toBe(true);
+  });
+
+  it('a broken expectation fails the suite and the verdict reads failing', async () => {
+    const engine = await AsyncEngine.fromSources(SOURCES, { transport: inMemoryTransport() });
+    await engine.run({ 'feeds.orders': { value: [{ eur: 1 }], tier: 'live' } });
+    const verdicts = await engine.runTests();
+    expect(verdicts.get('live.total')?.verdict).toBe('failing');
+  });
+
+  it('a wedged suite times out, restarts the worker, and rejects — the render path recovers', async () => {
+    const base = inMemoryTransport();
+    let withholdTests = false;
+    const withholding: typeof base = {
+      post(msg) {
+        if (msg.type === 'run-tests' && withholdTests) return; // the wedged-worker shape
+        base.post(msg);
+      },
+      onMessage(h) {
+        base.onMessage(h);
+      },
+      restart() {
+        withholdTests = false;
+        base.restart();
+      },
+    };
+    const engine = await AsyncEngine.fromSources(SOURCES, {
+      transport: withholding,
+      evalBudgetMs: 20,
+    });
+    await engine.run({ 'feeds.orders': { value: [{ eur: 10 }], tier: 'live' } });
+    withholdTests = true;
+    await expect(engine.runTests()).rejects.toThrow(/timed out/);
+    // the worker was restarted and rebuilt — the render pipeline still evaluates
+    await engine.run({ 'feeds.orders': { value: [{ eur: 5 }], tier: 'live' } });
+    expect(engine.value('live.total')).toBe(5);
   });
 });

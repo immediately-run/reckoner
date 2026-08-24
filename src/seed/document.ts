@@ -25,7 +25,7 @@ const manifest = {
 // The formula worksheet: plain JS registering cells; imports resolve only to the stdlib, which
 // the engine's compartment endows. Light shaping over the frozen fixtures — the real port of
 // the Meridian MRR waterfall/cohort pivot is M2 work; here we prove the runnable pipeline.
-const reviewSheet = `import { cell, table } from "@reckoner/stdlib";
+const reviewSheet = `import { cell, table, testCell, expectClose, property } from "@reckoner/stdlib";
 
 export const total = cell({
   doc: "Latest monthly recurring revenue, EUR",
@@ -117,6 +117,25 @@ export const live_recent_events = cell({
   doc: "Feed events in the trailing 30s — the event-time window over the retained buffer",
   inputs: { recent: { feed: "live_regions", window: "30s" } },
   formula: ({ recent }) => recent.length,
+});
+
+// The demo's tests — an honest mix for the review surface: this specification test pins
+// \`total\` to a plain-JS recomputation of the same fixture (regression evidence: "pinned",
+// not "validated", because an example-based test cannot validate the formula it was fitted
+// to); the property relation on \`nrr\` is a non-example-based leg (a sane NRR is a ratio in
+// (0, 2]), so \`nrr\` reads "validated". Every other cell is genuinely untested — the panel
+// shows that honestly rather than decorating the demo.
+export const total_check = testCell({
+  kind: "specification",
+  subject: "review.total",
+  expect: ({ result, inputs }) =>
+    expectClose(result, inputs.rows[inputs.rows.length - 1].mrr, { abs: 0.01 }),
+});
+
+export const nrr_sane = testCell({
+  kind: "property",
+  subject: "review.nrr",
+  relation: property("nrr is a ratio in (0, 2]", (result) => result > 0 && result <= 2),
 });
 `;
 

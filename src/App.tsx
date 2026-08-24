@@ -5,12 +5,14 @@
 // immediately.run's runtime ignores.
 import './index.css';
 import './app/report-page.css';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useReport } from './hooks/useReport.ts';
 import { ReportView } from './report/index.ts';
+import WorkbookPanel from './app/WorkbookPanel.tsx';
 
 function App() {
   const report = useReport();
+  const [reviewOpen, setReviewOpen] = useState(false);
   const title = report.status === 'ready' ? report.session.title : undefined;
   useEffect(() => {
     if (title !== undefined) document.title = title;
@@ -30,6 +32,9 @@ function App() {
         <>
           <header className="rk-page-head">
             <h1 className="grad-text">{report.session.title}</h1>
+            <button type="button" className="rk-review-toggle" onClick={() => setReviewOpen((v) => !v)}>
+              {reviewOpen ? 'Close review' : 'Review'}
+            </button>
           </header>
           {errors.length > 0 && (
             <div className="rk-page-note rk-page-error" role="alert">
@@ -39,6 +44,13 @@ function App() {
             </div>
           )}
           <ReportView nodes={report.session.nodes} bindings={report.bindings} />
+          {reviewOpen && (
+            <WorkbookPanel
+              engine={report.session.engine}
+              tick={report.tick}
+              onClose={() => setReviewOpen(false)}
+            />
+          )}
         </>
       )}
     </main>

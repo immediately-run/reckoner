@@ -33,6 +33,14 @@ scope.onmessage = (e) => {
     }
     return;
   }
+  if (msg.type === 'run-tests') {
+    try {
+      scope.postMessage({ type: 'test-results', token: msg.token, suites: worker.runSuites(msg.suites) });
+    } catch (err) {
+      scope.postMessage({ type: 'eval-error', token: msg.token, id: '(run-tests)', message: (err as Error).message });
+    }
+    return;
+  }
   // A formula may be async (§4.1) — await it before posting the result.
   Promise.resolve()
     .then(() => worker.eval(msg.id, msg.inputs))

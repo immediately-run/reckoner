@@ -30,6 +30,14 @@ function delayingTransport(delays: Record<string, number>): WorkerTransport {
         }
         return;
       }
+      if (msg.type === 'run-tests') {
+        try {
+          handler({ type: 'test-results', token: msg.token, suites: worker.runSuites(msg.suites) });
+        } catch (e) {
+          handler({ type: 'eval-error', token: msg.token, id: '(run-tests)', message: (e as Error).message });
+        }
+        return;
+      }
       const run = (): void =>
         void Promise.resolve()
           .then(() => worker.eval(msg.id, msg.inputs))

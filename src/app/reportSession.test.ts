@@ -89,6 +89,22 @@ describe('buildReportSession + sessionBindings', () => {
   });
 });
 
+describe('the demo document under the review surface', () => {
+  it('cells() carries docs; tests() carries the demo test cards; runTests() yields honest verdicts', async () => {
+    const session = await buildReportSession(inMemoryTransport());
+    expect(session.engine.cells().find((c) => c.id === 'review.total')?.doc).toContain('Latest monthly');
+    expect(session.engine.tests().map((t) => [t.name, t.kind])).toEqual([
+      ['total_check', 'specification'],
+      ['nrr_sane', 'property'],
+    ]);
+
+    const verdicts = await session.engine.runTests();
+    expect(verdicts.get('review.total')?.verdict).toBe('pinned'); // example-based only
+    expect(verdicts.get('review.nrr')?.verdict).toBe('validated'); // a property leg
+    expect(verdicts.has('review.by_month')).toBe(false); // honestly untested
+  });
+});
+
 describe('cross-reference validation (worksheet externals vs. what can be supplied)', () => {
   it('the demo document is clean — no error diagnostics, only the frozen-provenance warnings', async () => {
     const session = await buildReportSession(inMemoryTransport());
