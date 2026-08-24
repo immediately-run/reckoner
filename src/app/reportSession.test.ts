@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReportSession, sessionBindings } from './reportSession.ts';
+import { buildReportSession, sessionBindings, xrefDiagnostics } from './reportSession.ts';
 import { inMemoryTransport } from '../engine/workerTransport.ts';
 import { execSummary, mrrMovements } from '../seed/data.ts';
 
@@ -86,5 +86,45 @@ describe('buildReportSession + sessionBindings', () => {
     expect(bindings.resolve('params.span').value).toBe('6m');
     const windowed = bindings.resolve('review.by_month').value as unknown[];
     expect(windowed.length).toBe(6); // span=6m → last 6 months
+  });
+});
+
+describe('cross-reference validation (worksheet externals vs. what can be supplied)', () => {
+  it('the demo document is clean — no error diagnostics, only the frozen-provenance warnings', async () => {
+    const session = await buildReportSession(inMemoryTransport());
+    expect(session.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    // The demo fixtures cite the "meridian" feed the frozen document doesn't declare —
+    // historical provenance, warning-class by design.
+    expect(session.diagnostics.some((d) => d.severity === 'warning' && /sourceFeed/.test(d.message))).toBe(true);
+  });
+
+  it('a dangling worksheet reference is an error anchored at the declaring worksheet', () => {
+    const loaded = {
+      root: 'doc',
+      manifest: { params: { region: 'all' } },
+      worksheets: [{ name: 'revenue', path: 'worksheets/revenue.sheet.js', source: '' }],
+      templates: [],
+      feeds: [{ name: 'orders', path: 'feeds/orders.feed.json', config: {} }],
+      fixtures: [],
+      diagnostics: [],
+    };
+    const nodes = [
+      { type: 'component', name: 'Select', attrs: { name: { kind: 'literal', value: 'span' } }, children: [] },
+    ] as never;
+    const diags = xrefDiagnostics(
+      loaded as never,
+      [
+        { key: 'feeds.orders', site: 'revenue.by_month' }, // declared → silent
+        { key: 'feeds.ghost', site: 'revenue.by_month' }, // dangling → error
+        { key: 'params.span', site: 'revenue.total' }, // widget param → silent
+        { key: 'params.typo', site: 'revenue.total' }, // no default, no widget → warning
+      ],
+      nodes,
+    );
+    expect(diags).toHaveLength(2);
+    const error = diags.find((d) => d.severity === 'error')!;
+    expect(error.message).toContain('feeds.ghost');
+    expect(error.file).toBe('worksheets/revenue.sheet.js'); // anchored at the declaring file
+    expect(diags.find((d) => d.severity === 'warning')?.message).toContain('typo');
   });
 });

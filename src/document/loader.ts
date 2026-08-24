@@ -18,6 +18,7 @@ import { parseJson } from './internal.ts';
 import { parseManifest } from './manifest.ts';
 import { parseFeedConfig } from './feeds.ts';
 import { parseFixtureFrame } from './fixtures.ts';
+import { validateFixtureProvenance } from './xref.ts';
 
 const WORKSHEET_SUFFIX = '.sheet.js';
 const TEMPLATE_SUFFIX = '.mdx';
@@ -40,6 +41,11 @@ export async function loadDocument(reader: DocumentReader, root: string): Promis
   if (manifest.worksheets.length === 0) {
     diagnostics.push({ severity: 'warning', file: 'reckoner.json', message: 'document declares no worksheets.' });
   }
+
+  // Cross-reference validation (document-internal half): a fixture's capture provenance
+  // naming a feed the document does not declare. The worksheet-input half needs the
+  // evaluated workbook, so it composes app-side (`validateExternalReferences`).
+  diagnostics.push(...validateFixtureProvenance(fixtures, new Set(feeds.map((f) => f.name))));
 
   return { root, manifest, worksheets, templates, feeds, fixtures, diagnostics };
 }

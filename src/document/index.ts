@@ -9,8 +9,9 @@
 // Deferred (tracked, follow-up): host-side `compat` derivation by static analysis of
 // worksheet imports / template component uses at save time (DOCUMENT_VERSIONING §1 — this
 // module validates and resolves an *existing* envelope; deriving it is a save-time host
-// feature), and cross-reference validation (a worksheet input naming a missing feed/fixture,
-// a fixture's `sourceFeed` naming a missing feed).
+// feature). Cross-reference validation is shipped (`xref.ts`): fixture `sourceFeed`
+// references are checked at load; worksheet external references are validated where the
+// evaluated workbook meets the loaded document (`validateExternalReferences`).
 
 export type {
   AuthoredWith,
@@ -34,6 +35,8 @@ export { parseManifest } from './manifest.ts';
 export { parseFeedConfig } from './feeds.ts';
 export { parseFixtureFrame } from './fixtures.ts';
 export { loadDocument } from './loader.ts';
+export { validateExternalReferences, validateFixtureProvenance } from './xref.ts';
+export type { ExternalReference, XRefAvailability } from './xref.ts';
 export { resolveCompat } from './compat.ts';
 export type { AppVersions, CompatVerdict } from './compat.ts';
 export { compareVersions, parseVersion, satisfies } from './semver.ts';

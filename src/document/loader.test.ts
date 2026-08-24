@@ -106,3 +106,19 @@ describe('loadDocument — degradation', () => {
     expect(doc.diagnostics.some((d) => d.severity === 'warning' && /no worksheets/.test(d.message))).toBe(true);
   });
 });
+
+describe('loadDocument — cross-reference validation (fixture provenance)', () => {
+  it('warns when a fixture cites a sourceFeed the document does not declare', async () => {
+    const files = {
+      ...base,
+      '/doc/fixtures/stray.frame.json': JSON.stringify({
+        rows: [],
+        provenance: { sourceFeed: 'ghost', capturedAt: '2026-07-01T00:00:00Z' },
+      }),
+    };
+    const doc = await loadDocument(memReader(files), '/doc');
+    const warn = doc.diagnostics.find((d) => d.file === 'fixtures/stray.frame.json');
+    expect(warn?.severity).toBe('warning');
+    expect(warn?.message).toContain('"ghost"');
+  });
+});
