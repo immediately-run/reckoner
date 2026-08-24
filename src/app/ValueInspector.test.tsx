@@ -39,6 +39,7 @@ const outcome: SubjectResult = {
 function render(over: Partial<Parameters<typeof ValueInspector>[0]> = {}): string {
   const props = {
     cell,
+    cells: [cell, ...extraCells],
     tests,
     outcome,
     result: { id: 'revenue.total', value: 48_120, tier: 'live' as const, key: 'k' },
@@ -48,6 +49,30 @@ function render(over: Partial<Parameters<typeof ValueInspector>[0]> = {}): strin
   };
   return renderToStaticMarkup(createElement(ValueInspector, props));
 }
+
+/** Upstream cells the precedent neighborhood can walk into. */
+const extraCells = [
+  {
+    id: 'revenue.raw',
+    worksheet: 'revenue',
+    cell: 'raw',
+    doc: 'raw rows',
+    formulaSource: '({ rows }) => rows',
+    deps: [],
+    externals: ['feeds.orders'],
+    resolvers: [{ name: 'rows', kind: 'external', key: 'feeds.orders' }] as never,
+  },
+  {
+    id: 'revenue.base',
+    worksheet: 'revenue',
+    cell: 'base',
+    doc: 'base',
+    formulaSource: '({ r }) => r.length',
+    deps: ['revenue.raw'],
+    externals: [],
+    resolvers: [{ name: 'r', kind: 'cell', nodeId: 'revenue.raw' }] as never,
+  },
+];
 
 describe('ValueInspector', () => {
   const html = render();
@@ -96,5 +121,27 @@ describe('ValueInspector', () => {
     });
     expect(failing).toContain('rk-verdict--failing');
     expect(failing).toContain('expected 30, got 29');
+  });
+});
+
+describe('ValueInspector — the precedent neighborhood (UX-4)', () => {
+  it('renders the whole subgraph beneath the cell inputs, nested', () => {
+    const html = render();
+    // total → raw → feeds.orders: the two-level walk is visible at once
+    expect(html).toContain('rk-prec');
+    expect(html).toContain('raw:');
+    expect(html).toContain('revenue.raw');
+    expect(html).toContain('feeds.orders');
+    // the meta line states the shape
+    expect(html).toMatch(/nodes · depth 1/);
+  });
+
+  it('a cell with only external inputs shows no neighborhood (nothing to walk)', () => {
+    const onlyExternal = {
+      ...cell,
+      resolvers: [{ name: 'rows', kind: 'external', key: 'feeds.orders' }] as never,
+    };
+    const html = render({ cell: onlyExternal });
+    expect(html).not.toContain('rk-prec');
   });
 });

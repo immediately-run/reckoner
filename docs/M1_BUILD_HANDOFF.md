@@ -18,7 +18,7 @@ steps. · **Updated:** 2026-08-24
 Reckoner went from the starter template to a tested formula-engine core, the report-view render
 surface, a runnable static report, the worker-backed async engine, and the live-feed data plane.
 **All of M1 (shells A/B/C) and four M2 feed increments are merged to `main`** (PRs #2–#19; #9 is
-the S5 spike doc). **331 vitest cases**; every merge is green on `tsc -b` + `npm test` +
+the S5 spike doc). **339 vitest cases**; every merge is green on `tsc -b` + `npm test` +
 `npm run lint` + `npm run build`, and the app is live-verified in a browser (the report renders
 and a live feed recomputes it — §2.B / §2 M2 note).
 
@@ -238,10 +238,14 @@ S5 already proved SES resolves + runs in-platform). Verified by the engine test 
   source (`formulaSource` crosses the wire as `Function.prototype.toString` at worker
   build), declared-input chips (cell refs navigable hop-by-hop — the V3 walk; windowed-feed
   and wildcard chips inert), and the coverage state + this cell's test outcomes. Opens from
-  workbook-panel card clicks (master-detail in the panel). Remaining review-surface work:
-  the **precedent-neighborhood view** (review-1 UX-4), the **on-pixel affordance** (V3's
-  hover-reveal / long-press on bound elements), edit/ask-assistant affordances (need a
-  writable mount), and per-cell verdict marks inside the report itself.
+  workbook-panel card clicks (master-detail in the panel). The **precedent-neighborhood
+  view** (review-1 UX-4) shipped with it (`src/engine/precedents.ts` + `PrecedentView`):
+  the whole precedent subgraph at once — the DAG unrolled as a tree, externals as leaves,
+  wildcards expanded, node-capped with an honest truncation flag — nested beneath the
+  inspector's chips, every cell node navigable. Remaining review-surface work: the
+  **on-pixel affordance** (V3's hover-reveal / long-press on bound elements),
+  edit/ask-assistant affordances (need a writable mount), and per-cell verdict marks
+  inside the report itself.
 
 ## 6. Dogfooding note (Axis-2)
 
