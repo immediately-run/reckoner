@@ -45,6 +45,12 @@ export const nrr = cell({
   formula: ({ rows }) => (rows.length ? rows[rows.length - 1].nrrPct / 100 : null),
 });
 
+export const mrr_delta = cell({
+  doc: "Month-over-month MRR change, EUR — the one cell-to-cell edge in the demo (the value inspector's navigable chip)",
+  inputs: { latest: "review.total", prior: "review.total_prev" },
+  formula: ({ latest, prior }) => (latest === null || prior === null ? null : latest - prior),
+});
+
 export const churn = cell({
   doc: "Latest gross revenue churn, as a ratio",
   inputs: { rows: "fixtures.exec_summary" },

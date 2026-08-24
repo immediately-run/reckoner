@@ -104,3 +104,15 @@ describe('the demo document under the review surface', () => {
     expect(verdicts.has('review.by_month')).toBe(false); // honestly untested
   });
 });
+
+describe('the demo document under the value inspector', () => {
+  it('cells carry their formula source for read-only display', async () => {
+    const session = await buildReportSession(inMemoryTransport());
+    const total = session.engine.cells().find((c) => c.id === 'review.total')!;
+    expect(total.formulaSource).toContain('rows[rows.length - 1].mrr');
+    // the windowed cell (from the windowed-feed PR) describes its window in the resolver,
+    // so the inspector can chip it without knowing the input grammar
+    const recent = session.engine.cells().find((c) => c.id === 'review.live_recent_events');
+    expect(recent?.resolvers.some((r) => r.kind === 'windowed-feed' && r.feed === 'live_regions')).toBe(true);
+  });
+});
