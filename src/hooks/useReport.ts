@@ -40,14 +40,18 @@ export function useReport(): ReportState {
     };
   }, []);
 
-  // Start the demo live feed once the session is ready; stop it on unmount.
+  // Start the demo live feed once the session is ready; stop it on unmount. Retention covers
+  // the demo's 30s windowed input with margin (buffer ≥ longest dependent window, §5.3).
   useEffect(() => {
     if (session === null) return;
-    const runtime = new FeedRuntime([{ name: DEMO_FEED_NAME, connector: demoLiveConnector(), tier: 'live' }], {
-      engine: session.engine,
-      scheduleFlush,
-      onSettled: () => setTick((t) => t + 1),
-    });
+    const runtime = new FeedRuntime(
+      [{ name: DEMO_FEED_NAME, connector: demoLiveConnector(), tier: 'live', retention: { keepFor: '2m' } }],
+      {
+        engine: session.engine,
+        scheduleFlush,
+        onSettled: () => setTick((t) => t + 1),
+      },
+    );
     runtime.start();
     return () => runtime.stop();
   }, [session]);

@@ -409,6 +409,17 @@ export const staleness = cell({
 });
 ```
 
+*Resolution convention (decided 2026-08-24, at implementation):* the windowed object form
+takes an optional `by` naming the event-time row field, **defaulting to `ts`** — feeds carry
+their event time in `ts` (epoch-ms or ISO) by convention. The window is applied by the
+engine's input resolver (never inside the formula): the feed runtime publishes the retained
+rows alongside the snapshot, and the resolver slices them with `now` taken from the
+`params.now` external when the app supplies one, **else the newest retained event time** — a
+pure function of published state, never an ambient clock (so a wall-clock-advancing window is
+the app writing `params.now`, which re-dirties every windowed input). Rows whose `by` value
+carries no usable event time drop out of the window (they cannot be placed in event time);
+resolution never throws.
+
 **Tests are cells with a mandatory `kind`** (RQ-D1 + workstream D preamble). A test's value
 is a structured pass/fail record carrying its kind; under infer-then-fortify a green suite
 means nothing without the label, because characterization tests pinned from the formula's

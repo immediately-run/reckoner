@@ -20,6 +20,7 @@ import type {
   Workbook,
 } from './types.ts';
 import type { InputSpec } from '../stdlib/inputs.ts';
+import { FEED_BUFFER_PREFIX } from './resolve.ts';
 
 const RESERVED = new Set(['feeds', 'fixtures', 'static', 'params']);
 
@@ -90,6 +91,21 @@ export function buildGraph(workbook: Workbook): DependencyGraph {
   return { nodes, worksheets, externalInputs, diagnostics };
 }
 
+/**
+ * Every windowed input declared in the workbook (`{ feed, window }` sites), for the
+ * edit-time buffer-coverage diagnostic (`checkBufferCoversWindows`). Structurally the
+ * feed layer's `WindowDecl` — declared here so the engine never imports the feed layer.
+ */
+export function declaredWindows(graph: DependencyGraph): { feed: string; window: string; site: string }[] {
+  const out: { feed: string; window: string; site: string }[] = [];
+  for (const node of graph.nodes.values()) {
+    for (const r of node.resolvers) {
+      if (r.kind === 'windowed-feed') out.push({ feed: r.feed, window: r.window, site: node.id });
+    }
+  }
+  return out;
+}
+
 interface ClassifyCtx {
   id: string;
   deps: Set<string>;
@@ -101,6 +117,19 @@ interface ClassifyCtx {
 }
 
 function classifyInput(name: string, spec: InputSpec, ctx: ClassifyCtx): void {
+  if (spec.feed !== undefined) {
+    // The windowed-feed object form: the cell reads the feed's *retained rows* (not the
+    // snapshot), so its external key is the buffer external the feed runtime publishes
+    // alongside `feeds.<name>` — that key changing is what dirties the cell. The resolver
+    // also reads the clock (`params.now`, falling back to the newest retained event time),
+    // so a windowed input structurally depends on `params.now` too: a clock-only update must
+    // advance the window. (Unconditional — whether the app supplies `params.now` is a
+    // runtime fact the graph cannot know; an external that never changes never dirties.)
+    ctx.externals.add(`${FEED_BUFFER_PREFIX}${spec.feed}`);
+    ctx.externals.add('params.now');
+    ctx.resolvers.push({ name, kind: 'windowed-feed', feed: spec.feed, window: spec.window!, by: spec.by! });
+    return;
+  }
   if (spec.namespace !== 'worksheet') {
     ctx.externals.add(spec.dependency);
     ctx.resolvers.push({ name, kind: 'external', key: spec.dependency });
