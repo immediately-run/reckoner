@@ -124,6 +124,22 @@ describe('Caldera LBO case study', () => {
     // the grid's center must reproduce the interactive base case exactly
     const center = grid.find((r) => r.exit_multiple === 8.0 && r.tlb_turns === 5.0);
     expect(center?.irr).toBe(retv.irr);
+
+    // R3-376 parity: the stdlib irr matches the hand-rolled bisection it replaced,
+    // over all 25 grid flows, to 1e-15 (the refactor-safety-net receipt).
+    for (const g of truth) {
+      const flows = [-g.sponsor_equity, 0, 0, 0, 0, g.exit_equity];
+      const npvAt = (r: number): number => flows.reduce((acc, cf, t) => acc + cf / (1 + r) ** t, 0);
+      let lo = -0.99;
+      let hi = 10;
+      for (let i = 0; i < 200; i += 1) {
+        const mid = (lo + hi) / 2;
+        if (npvAt(mid) > 0) lo = mid;
+        else hi = mid;
+      }
+      const { irr } = await import('../stdlib/financial.ts');
+      expect(Math.abs(irr(flows) - (lo + hi) / 2)).toBeLessThanOrEqual(1e-15);
+    }
   });
 
   it('every workbook test cell passes and the key cells are validated, not merely pinned', async () => {

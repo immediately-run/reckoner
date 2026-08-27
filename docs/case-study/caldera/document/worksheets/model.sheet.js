@@ -1,4 +1,4 @@
-import { cell, table, rollforward, cumprod, sum } from "@reckoner/stdlib";
+import { cell, table, rollforward, cumprod, irr, sum } from "@reckoner/stdlib";
 
 // Caldera Components LBO — the model worksheet.
 //
@@ -11,7 +11,11 @@ import { cell, table, rollforward, cumprod, sum } from "@reckoner/stdlib";
 //                        iterative-calc circular reference, here an explicit,
 //                        per-year converged fixed point inside one cell)
 //   Sens_Models/grid   → `sensitivity` (25 full model re-runs)
-//   Returns            → `returns`, `irr`, `moic`, `breakeven_exit_multiple`
+//   Returns            → `returns`, `sponsor_irr`, `moic`, `breakeven_exit_multiple`
+//
+// Naming note: a worksheet export shadows any same-named stdlib callable in module
+// scope (the import is stripped; stdlib functions arrive as compartment globals) —
+// hence `sponsor_irr`, not `irr`, for the scalar tile.
 //
 // Everything below is pure: plain values in, plain values out, no ambient
 // anything. The module-scope helpers are the "model as a function" the
@@ -22,25 +26,8 @@ import { cell, table, rollforward, cumprod, sum } from "@reckoner/stdlib";
 const YEARS_ORDER = "year";
 
 // ── module-scope model helpers (shared by cells and the grid) ────────────────
-
-function npv(rate, flows) {
-  let total = 0;
-  for (let t = 0; t < flows.length; t += 1) total += flows[t] / Math.pow(1 + rate, t);
-  return total;
-}
-
-// Bisection IRR — the flows have one sign change, so NPV(r) is monotone.
-// Excel ships IRR(); the stdlib does not (a gap this case study records).
-function irrBisect(flows) {
-  let lo = -0.99;
-  let hi = 10.0;
-  for (let i = 0; i < 200; i += 1) {
-    const mid = (lo + hi) / 2;
-    if (npv(mid, flows) > 0) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
-}
+// (The hand-rolled npv/irrBisect that lived here is R3-376's receipt: the stdlib's
+// irr() replaced it, deleted rather than kept.)
 
 // The operating build: segment revenue paths (base × the compounded growth factors via
 // cumprod), margin-weighted EBITDA, D&A / capex / ΔNWC per year. Fluent stdlib throughout.
@@ -195,7 +182,7 @@ function runModel(a, hist, plan, yearPlan, o) {
   const flows = [-su.sponsor_equity].concat(Array(a.hold_years - 1).fill(0)).concat([exit_equity]);
   return {
     su, exit_ev, net_debt: lastS.net_debt, exit_equity,
-    moic: exit_equity / su.sponsor_equity, irr: irrBisect(flows),
+    moic: exit_equity / su.sponsor_equity, irr: irr(flows),
   };
 }
 
@@ -275,7 +262,7 @@ export const returns = cell({
     const flows = [-su.sponsor_equity].concat(Array(a[0].hold_years - 1).fill(0)).concat([exit_equity]);
     return {
       exit_ev, net_debt: lastS.net_debt, exit_equity, sponsor_equity: su.sponsor_equity,
-      moic: exit_equity / su.sponsor_equity, irr: irrBisect(flows),
+      moic: exit_equity / su.sponsor_equity, irr: irr(flows),
     };
   },
 });
@@ -292,12 +279,12 @@ export const returns_avg = cell({
     const exit_ev = exit * last.ebitda;
     const exit_equity = exit_ev - lastS.net_debt;
     const flows = [-su.sponsor_equity].concat(Array(a[0].hold_years - 1).fill(0)).concat([exit_equity]);
-    return { exit_ev, exit_equity, irr: irrBisect(flows), moic: exit_equity / su.sponsor_equity };
+    return { exit_ev, exit_equity, irr: irr(flows), moic: exit_equity / su.sponsor_equity };
   },
 });
 
 // Thin named scalars the template and tests bind to.
-export const irr = cell({
+export const sponsor_irr = cell({
   doc: "Base-case sponsor IRR as a scalar, for the Kpi tile",
   inputs: { r: "model.returns" },
   formula: ({ r }) => r.irr,
