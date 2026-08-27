@@ -1,0 +1,41 @@
+# Caldera Components — LBO.
+
+The Harrow Capital take-private of Caldera Components (fictional): entry at
+<Value source="params.entry_multiple" />x LTM EBITDA, exit at
+<Value source="params.exit_multiple" />x, funded with
+<Value source="params.tlb_turns" />x Term Loan B plus a 1.0x mezzanine tranche.
+Debt schedule charges interest on beginning balances; the converged
+average-balance variant lives in the workbook cells.
+
+<Params>
+  <Range name="entry_multiple" min={6} max={10} step={0.5} default={8} />
+  <Range name="exit_multiple" min={6} max={10} step={0.5} default={8} />
+  <Range name="tlb_turns" min={3.5} max={6.5} step={0.5} default={5} />
+</Params>
+
+<Row>
+  <Kpi source="model.irr" format="percent" />
+  <Kpi source="model.moic" format="number" />
+  <Kpi source="model.sponsor_equity" format="currency" />
+</Row>
+
+## The deleveraging story.
+
+<Chart source="model.debt_schedule" kind="bar" x="year" y="tlb_end" />
+<Chart source="model.operating" kind="line" x="year" y="ebitda" />
+
+<Table source="model.debt_schedule" columns={["year", "ebitda", "interest", "cfadr", "mand", "sweep", "tlb_end", "mezz_end", "cash_end", "net_debt", "leverage", "coverage"]} sortable />
+
+## Sensitivity — sponsor IRR by exit multiple and leverage.
+
+Twenty-five full model re-runs over the base fixtures; the live deal knobs above
+do not bend this grid (it sweeps the model as a function, not the params).
+
+<Table source="model.sensitivity" columns={["exit_multiple", "tlb_turns", "sponsor_equity", "exit_equity", "moic", "irr"]} sortable />
+
+<Callout tone="info">
+  Breakeven exit multiple for the 20 percent hurdle:
+  <Value source="model.breakeven_exit_multiple" />x — a goal seek recomputed
+  by the model, not a pasted number. The converged average-balance interest
+  variant lives in the model.debt_schedule_avg and model.returns_avg cells.
+</Callout>

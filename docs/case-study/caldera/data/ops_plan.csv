@@ -1,0 +1,16 @@
+segment,year,growth,margin
+seals,2027,0.08,0.264
+seals,2028,0.08,0.268
+seals,2029,0.07,0.272
+seals,2030,0.07,0.276
+seals,2031,0.06,0.28
+bearings,2027,0.04,0.192
+bearings,2028,0.04,0.194
+bearings,2029,0.04,0.196
+bearings,2030,0.035,0.198
+bearings,2031,0.035,0.2
+fabrication,2027,0.025,0.127
+fabrication,2028,0.025,0.129
+fabrication,2029,0.02,0.131
+fabrication,2030,0.02,0.133
+fabrication,2031,0.02,0.135

@@ -1,0 +1,166 @@
+// The Caldera LBO case study (docs/case-study/caldera) — the financial-domain
+// sibling of the Meridian study. This harness is the *proof* half of the study:
+// it loads the document from disk through the real `loadDocument` loader, runs
+// it through the real SES-compartment engine (in-process transport, same worker
+// body), asserts the port against the Python-generated truth (expected.json —
+// an independent implementation of the model), and runs the workbook's own test
+// cells through `runTests`, asserting verdicts.
+import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadDocument } from './loader.ts';
+import { memoryReader } from '../app/memoryReader.ts';
+import { AsyncEngine } from '../engine/asyncEngine.ts';
+import { inMemoryTransport } from '../engine/workerTransport.ts';
+import type { ExternalValue } from '../engine/types.ts';
+import type { LoadedDocument } from './types.ts';
+import { parseTemplate } from '../report/parse/mdx.ts';
+import { validateTemplate } from '../report/validate.ts';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const CASE = join(HERE, '..', '..', 'docs', 'case-study', 'caldera');
+
+async function caseReader(root: string) {
+  const files: Record<string, string> = {};
+  async function walk(dir: string, prefix = ''): Promise<void> {
+    const { readdir } = await import('node:fs/promises');
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const rel = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
+      if (entry.isDirectory()) await walk(join(dir, entry.name), rel);
+      else files[join(root, rel)] = await readFile(join(dir, entry.name), 'utf8');
+    }
+  }
+  await walk(join(CASE, 'document'));
+  return memoryReader(files);
+}
+
+async function loadCase(): Promise<{ loaded: LoadedDocument; expected: Record<string, unknown> }> {
+  const loaded = await loadDocument(await caseReader('caldera'), 'caldera');
+  const expected = JSON.parse(await readFile(join(CASE, 'expected.json'), 'utf8'));
+  return { loaded, expected };
+}
+
+function externalsFor(loaded: LoadedDocument): Record<string, ExternalValue> {
+  const externals: Record<string, ExternalValue> = {};
+  for (const fx of loaded.fixtures) {
+    externals[`fixtures.${fx.name}`] = { value: fx.frame.rows, tier: 'static' };
+  }
+  for (const [name, value] of Object.entries(loaded.manifest.params)) {
+    externals[`params.${name}`] = { value, tier: 'static' };
+  }
+  return externals;
+}
+
+describe('Caldera LBO case study', () => {
+  it('loads the document with no error diagnostics', async () => {
+    const { loaded } = await loadCase();
+    expect(loaded.worksheets.map((w) => w.name)).toEqual(['model', 'checks']);
+    expect(loaded.fixtures.map((f) => f.name).sort()).toEqual([
+      'assumptions', 'expected_values', 'historical_segments', 'ops_plan', 'year_plan',
+    ]);
+    expect(loaded.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+  });
+
+  it('computes the model against the Python truth', async () => {
+    const { loaded, expected } = await loadCase();
+    const engine = await AsyncEngine.fromSources(
+      Object.fromEntries(loaded.worksheets.map((w) => [w.name, w.source])),
+      { transport: inMemoryTransport() },
+    );
+    const pass = await engine.run(externalsFor(loaded));
+    expect([...pass.errors.entries()]).toEqual([]);
+
+    const su = expected.sources_uses as Record<string, number>;
+    const exit = expected.exit as Record<string, number>;
+    const sched = expected.schedule as Record<string, number>[];
+    const ops = expected.operating as Record<string, number>[];
+
+    expect(engine.value('model.ltm_ebitda')).toBeCloseTo(expected.ltm_ebitda as number, 8);
+
+    const suv = engine.value('model.sources_uses') as Record<string, number>;
+    expect(suv.entry_ev).toBeCloseTo(su.entry_ev, 6);
+    expect(suv.sponsor_equity).toBeCloseTo(su.sponsor_equity, 6);
+    expect(suv.uses).toBeCloseTo(su.uses, 6);
+    expect(suv.sources - suv.uses).toBeCloseTo(0, 9);
+
+    const opv = engine.value('model.operating') as Record<string, number>[];
+    expect(opv.length).toBe(5);
+    for (let i = 0; i < 5; i += 1) {
+      expect(opv[i].revenue).toBeCloseTo(ops[i].revenue, 6);
+      expect(opv[i].ebitda).toBeCloseTo(ops[i].ebitda, 6);
+      expect(opv[i].delta_nwc).toBeCloseTo(ops[i].delta_nwc, 6);
+    }
+
+    const schedv = engine.value('model.debt_schedule') as Record<string, number>[];
+    for (let i = 0; i < 5; i += 1) {
+      expect(schedv[i].tlb_end).toBeCloseTo(sched[i].tlb_end, 6);
+      expect(schedv[i].mezz_end).toBeCloseTo(sched[i].mezz_end, 6);
+      expect(schedv[i].cash_end).toBeCloseTo(sched[i].cash_end, 6);
+      expect(schedv[i].leverage).toBeCloseTo(sched[i].leverage, 9);
+      expect(schedv[i].coverage).toBeCloseTo(sched[i].coverage, 9);
+    }
+
+    const retv = engine.value('model.returns') as Record<string, number>;
+    expect(retv.exit_equity).toBeCloseTo(exit.exit_equity, 6);
+    expect(retv.irr).toBeCloseTo(exit.irr, 10);
+    expect(retv.moic).toBeCloseTo(exit.moic, 9);
+
+    const avg = engine.value('model.returns_avg') as Record<string, number>;
+    expect(avg.irr).toBeCloseTo((expected.exit_avg as Record<string, number>).irr, 10);
+
+    expect(engine.value('model.breakeven_exit_multiple')).toBeCloseTo(
+      expected.breakeven_exit_multiple as number, 8,
+    );
+
+    const grid = engine.value('model.sensitivity') as Record<string, number>[];
+    const truth = expected.sensitivity_grid as Record<string, number>[];
+    expect(grid.length).toBe(25);
+    for (let i = 0; i < 25; i += 1) {
+      expect(grid[i].irr).toBeCloseTo(truth[i].irr, 10);
+      expect(grid[i].sponsor_equity).toBeCloseTo(truth[i].sponsor_equity, 6);
+    }
+    // the grid's center must reproduce the interactive base case exactly
+    const center = grid.find((r) => r.exit_multiple === 8.0 && r.tlb_turns === 5.0);
+    expect(center?.irr).toBe(retv.irr);
+  });
+
+  it('every workbook test cell passes and the key cells are validated, not merely pinned', async () => {
+    const { loaded } = await loadCase();
+    const engine = await AsyncEngine.fromSources(
+      Object.fromEntries(loaded.worksheets.map((w) => [w.name, w.source])),
+      { transport: inMemoryTransport() },
+    );
+    await engine.run(externalsFor(loaded));
+    const results = await engine.runTests();
+
+    expect(results.size).toBeGreaterThan(0);
+    const failing: string[] = [];
+    for (const [subject, r] of results) {
+      for (const o of r.outcomes) {
+        if (!o.pass) failing.push(`${subject} / ${o.id}: ${o.message}`);
+      }
+    }
+    expect(failing).toEqual([]);
+
+    // the review-surface verdict taxonomy in action: the load-bearing cells
+    // carry a metamorphic/property leg, so they read "validated"
+    for (const subject of [
+      'model.ltm_ebitda', 'model.sources_uses', 'model.sources_uses_row', 'model.operating',
+      'model.debt_schedule', 'model.debt_schedule_avg', 'model.returns', 'model.returns_avg',
+      'model.sensitivity', 'model.breakeven_exit_multiple',
+    ]) {
+      expect(results.get(subject)?.verdict, `verdict for ${subject}`).toBe('validated');
+    }
+  });
+
+  it('the template parses and validates against the component catalog', async () => {
+    const { loaded } = await loadCase();
+    const template = loaded.templates.find((t) => t.name === 'deal_summary');
+    expect(template).toBeDefined();
+    const nodes = parseTemplate(template!.source);
+    const validation = validateTemplate(nodes);
+    expect(validation.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    expect(validation.placeholders).toEqual([]);
+  });
+});

@@ -1,0 +1,25 @@
+{
+  "rows": [
+    {
+      "ltm_ebitda": 46.27,
+      "entry_ev": 370.16,
+      "sponsor_equity": 114.8837,
+      "uses_total": 394.50370000000004,
+      "exit_ev": 516.9061099614241,
+      "exit_equity": 315.45910005498115,
+      "moic": 2.7458995493266767,
+      "irr": 0.22387462120837076,
+      "irr_avg": 0.2251537582183193,
+      "breakeven_exit_multiple": 7.5420183108582,
+      "tlb_end_2031": 173.71651835678423,
+      "cash_end_2031": 23.355327214405253,
+      "net_debt_2031": 201.447009906443
+    }
+  ],
+  "provenance": {
+    "synthetic": true,
+    "captureActor": "generate.py",
+    "capturedAt": "2026-07-09",
+    "note": "Python-verified spot values (the specification-test oracle)"
+  }
+}
