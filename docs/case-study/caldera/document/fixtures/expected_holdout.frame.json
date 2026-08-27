@@ -1,0 +1,15 @@
+{
+  "rows": [
+    {
+      "fy2031_revenue": 263.1630898332,
+      "fy2031_ebitda": 57.40330402427402,
+      "fy2027_revenue": 235.53
+    }
+  ],
+  "provenance": {
+    "synthetic": true,
+    "captureActor": "generate.py",
+    "capturedAt": "2026-07-09",
+    "note": "Python-verified operating build under the holdout plan (the ops_holdout oracle)"
+  }
+}

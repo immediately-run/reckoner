@@ -76,6 +76,16 @@ YEAR_PLAN = [
     {"year": 2031, "capex_pct": 0.040},
 ]
 
+# The holdout (downside) plan — R3-373's substitution fixture: growth 2pp lower and
+# margins 0.5pp lower than management's plan, per segment-year. Used by the
+# `ops_holdout` test to prove a test's declared inputs substitute for the subject's.
+HOLDOUT_DELTA_GROWTH = -0.020
+HOLDOUT_DELTA_MARGIN = -0.005
+HOLDOUT_PLAN = {
+    (s, y): {"growth": p["growth"] + HOLDOUT_DELTA_GROWTH, "margin": p["margin"] + HOLDOUT_DELTA_MARGIN}
+    for (s, y), p in PLAN.items()
+}
+
 A = {
     "entry_multiple": 8.0,      # EV / LTM EBITDA paid at close
     "exit_multiple": 8.0,       # EV / EBITDA assumed at exit (no multiple expansion)
@@ -115,8 +125,9 @@ def ltm_ebitda():
     return total
 
 
-def build_operating():
+def build_operating(plan=None):
     """Segment revenue paths (chained growth), then per-year company rows."""
+    plan = plan if plan is not None else PLAN
     seg_rows = []
     by_year = {y: {"revenue": 0.0, "ebitda": 0.0} for y in YEARS}
     prior_total = sum(h["fy2026"] for h in HIST)
@@ -128,8 +139,8 @@ def build_operating():
             rev = h["fy2026"]
             for yy in YEARS:
                 if yy <= y:
-                    rev *= 1 + PLAN[(s, yy)]["growth"]
-            ebitda = rev * PLAN[(s, y)]["margin"]
+                    rev *= 1 + plan[(s, yy)]["growth"]
+            ebitda = rev * plan[(s, y)]["margin"]
             seg_rows.append({"segment": s, "year": y, "revenue": rev, "ebitda": ebitda})
             by_year[y]["revenue"] += rev
             by_year[y]["ebitda"] += ebitda
@@ -287,6 +298,7 @@ def breakeven_exit_multiple(hurdle):
 # ── compute the truth ─────────────────────────────────────────────────────────
 ltm = ltm_ebitda()
 seg_rows, ops = build_operating()
+_, holdout_ops = build_operating(HOLDOUT_PLAN)
 su = sources_uses(ltm)
 sched, _ = schedule(ops, su, "begin")
 sched_avg, avg_iters = schedule(ops, su, "avg")
@@ -337,6 +349,7 @@ expected = {
     "exit_avg": {"exit_equity": exit_equity_avg, "irr": irr_avg},
     "breakeven_exit_multiple": breakeven,
     "sensitivity_grid": grid,
+    "holdout_operating": holdout_ops,
     "covenants": {"leverage_max": max(r["leverage"] for r in sched),
                   "coverage_min": min(r["coverage"] for r in sched),
                   "cash_min": min(r["cash_end"] for r in sched),
@@ -382,6 +395,14 @@ fixtures = {
     "ops_plan": frame([{"segment": s, "year": y, **PLAN[(s, y)]} for s in SEGMENTS for y in YEARS],
                       "management plan: growth + margin per segment-year"),
     "year_plan": frame(YEAR_PLAN, "company-level plan vectors (capex % of revenue)"),
+    "ops_plan_holdout": frame(
+        [{"segment": s, "year": y, **HOLDOUT_PLAN[(s, y)]} for s in SEGMENTS for y in YEARS],
+        "the downside holdout plan (growth -2pp, margins -0.5pp) — the substitution fixture for the ops_holdout test (R3-373)"),
+    "expected_holdout": frame([{
+        "fy2031_revenue": holdout_ops[-1]["revenue"],
+        "fy2031_ebitda": holdout_ops[-1]["ebitda"],
+        "fy2027_revenue": holdout_ops[0]["revenue"],
+    }], "Python-verified operating build under the holdout plan (the ops_holdout oracle)"),
     "expected_values": frame([{
         "ltm_ebitda": ltm,
         "entry_ev": su["entry_ev"], "sponsor_equity": su["sponsor_equity"],
@@ -391,6 +412,8 @@ fixtures = {
         "irr_avg": irr_avg, "breakeven_exit_multiple": breakeven,
         "tlb_end_2031": sched[-1]["tlb_end"], "cash_end_2031": sched[-1]["cash_end"],
         "net_debt_2031": net_debt,
+        "fy2031_revenue": ops[-1]["revenue"], "fy2031_ebitda": ops[-1]["ebitda"],
+        "net_debt_2031_avg": sched_avg[-1]["net_debt"],
     }], "Python-verified spot values (the specification-test oracle)"),
 }
 for name, fr in fixtures.items():

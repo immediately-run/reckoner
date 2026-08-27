@@ -30,7 +30,8 @@ import type { Value } from '../stdlib/types.ts';
 import type { ExternalValue, PublishedResult } from './types.ts';
 import { meetTiers } from './tier.ts';
 import { contentKey } from './hash.ts';
-import { resolveInputs } from './resolve.ts';
+import { resolveInputs, FEED_BUFFER_PREFIX } from './resolve.ts';
+import { resolversFor } from './graph.ts';
 import { CircuitBreaker, DEFAULT_BREAKER } from './circuitBreaker.ts';
 import type { BreakerConfig } from './circuitBreaker.ts';
 import type { WorkerTransport } from './workerTransport.ts';
@@ -38,6 +39,7 @@ import type {
   CellDescriptor,
   SubjectResult,
   SuiteContext,
+  TestInputContext,
   TestDescriptor,
   WorkbookDescriptor,
   WorkerResponse,
@@ -212,6 +214,10 @@ export class AsyncEngine {
       subject,
       subjectValue: this.#results.get(subject)?.value ?? null,
       inputs: this.#inputsFor(subject),
+      // R3-373: each test's declared inputs, resolved host-side against the same
+      // published state a cell's inputs resolve against. Name-matched entries become
+      // substitutions; name-unmatched ones are auxiliary context (oracle fixtures).
+      tests: this.#tests.filter((t) => t.subject === subject).map((t) => this.#resolveTestInputs(t)),
     }));
     const token = ++this.#token;
     return new Promise<Map<string, SubjectResult>>((resolve, reject) => {
@@ -246,6 +252,36 @@ export class AsyncEngine {
       externals: this.#externals,
       worksheets: this.#worksheets,
     }).values;
+  }
+
+  /**
+   * Resolve one test's declared inputs against published state (R3-373). An unresolvable
+   * reference — unknown cell/worksheet (from `resolversFor`), or an external the document
+   * has not supplied (absent fixture/feed/param) — is a failing test entry with a message,
+   * never a silent `null` substitution.
+   */
+  #resolveTestInputs(test: WorkbookDescriptor['tests'][number]): TestInputContext {
+    const { resolvers, diagnostics } = resolversFor(test.inputs, {
+      nodes: this.#nodesById,
+      worksheets: this.#worksheets,
+    });
+    if (diagnostics.length > 0) {
+      return { id: test.id, error: diagnostics[0] };
+    }
+    for (const r of resolvers) {
+      if (r.kind === 'external' && !this.#externals.has(r.key)) {
+        return { id: test.id, error: `test "${test.id}" input "${r.name}" references absent external "${r.key}".` };
+      }
+      if (r.kind === 'windowed-feed' && !this.#externals.has(`${FEED_BUFFER_PREFIX}${r.feed}`)) {
+        return { id: test.id, error: `test "${test.id}" windowed input "${r.name}" references feed "${r.feed}", which has no retained buffer.` };
+      }
+    }
+    const { values } = resolveInputs(resolvers, {
+      results: this.#results,
+      externals: this.#externals,
+      worksheets: this.#worksheets,
+    });
+    return { id: test.id, inputs: values };
   }
 
   snapshot(): AsyncPass {

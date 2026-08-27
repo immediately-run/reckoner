@@ -14,9 +14,9 @@ const cells: CellDescriptor[] = [
 ];
 
 const tests: TestDescriptor[] = [
-  { id: 'rev.nrr_sane', worksheet: 'rev', name: 'nrr_sane', kind: 'property', subject: 'rev.nrr' },
-  { id: 'rev.total_check', worksheet: 'rev', name: 'total_check', kind: 'specification', subject: 'rev.total' },
-  { id: 'rev.total_stale', worksheet: 'rev', name: 'total_stale', kind: 'characterization', subject: 'rev.total' },
+  { id: 'rev.nrr_sane', worksheet: 'rev', name: 'nrr_sane', kind: 'property', subject: 'rev.nrr', inputs: {} },
+  { id: 'rev.total_check', worksheet: 'rev', name: 'total_check', kind: 'specification', subject: 'rev.total', inputs: {} },
+  { id: 'rev.total_stale', worksheet: 'rev', name: 'total_stale', kind: 'characterization', subject: 'rev.total', inputs: {} },
 ];
 
 const results = new Map<string, SubjectResult>([

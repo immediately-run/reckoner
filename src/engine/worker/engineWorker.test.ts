@@ -68,8 +68,8 @@ export const other = cell({ doc: "untested", inputs: { b: "sheet.base" }, formul
     const d = w.build(SOURCES_WITH_TESTS);
     expect(d.cells.find((c) => c.id === 'sheet.base')?.doc).toBe('base cell');
     expect(d.tests).toEqual([
-      { id: 'sheet.base_check', worksheet: 'sheet', name: 'base_check', kind: 'specification', subject: 'sheet.base' },
-      { id: 'sheet.base_sane', worksheet: 'sheet', name: 'base_sane', kind: 'property', subject: 'sheet.base' },
+      { id: 'sheet.base_check', worksheet: 'sheet', name: 'base_check', kind: 'specification', subject: 'sheet.base', inputs: {} },
+      { id: 'sheet.base_sane', worksheet: 'sheet', name: 'base_sane', kind: 'property', subject: 'sheet.base', inputs: {} },
     ]);
     expect(() => structuredClone(d)).not.toThrow();
     expect(d.order).not.toContain('sheet.base_check'); // tests never enter the value graph

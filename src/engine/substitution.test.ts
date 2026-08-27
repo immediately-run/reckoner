@@ -1,9 +1,10 @@
-// Fixture substitution in suite runs (ARCHITECTURE_PLAN §6, the holdout shape). A test that
-// declares its own inputs runs the subject formula over `{ ...liveInputs, ...testInputs }`
-// (same-local-name override, partial allowed) and asserts against that substituted run; the
-// subject's published live value is untouched. Authoring errors — a test-local name absent
-// from the subject, an unresolvable reference, a subject error over the fixture — fail the
-// test with a message, never a silent null.
+// Test-input resolution + the two lanes (ARCHITECTURE_PLAN §6, R3-373). A test's declared
+// inputs resolve against the same published state a cell's do, then split by local name:
+// name-matched entries SUBSTITUTe (the subject formula re-runs over `{ ...live, ...sub }`;
+// the holdout shape), name-unmatched entries are AUXILIARY context for `expect`/`relation`
+// only (an oracle fixture) and never feed the formula. Authoring errors — an unresolvable
+// reference, an absent external, a subject error over the fixture — fail the test with a
+// message, never a silent null. The subject's published live value is untouched either way.
 
 import { describe, it, expect } from 'vitest';
 import * as stdlib from '../stdlib/index.ts';
@@ -46,7 +47,17 @@ const SOURCES: Record<string, string> = {
       kind: "specification",
       subject: "revenue.by_month",
       inputs: { orderz: "fixtures.orders_holdout" },
-      expect: ({ result }) => expectEqual(result, 40),
+      expect: ({ result, inputs }) =>
+        result === 190 && inputs.orderz.length === 2
+          ? { pass: true, message: "live subject + auxiliary fixture both visible; the unmatched name never fed the formula" }
+          : { pass: false, message: "result " + result + ", aux rows " + (inputs.orderz && inputs.orderz.length) },
+    });
+
+    export const absent_fixture = testCell({
+      kind: "specification",
+      subject: "revenue.by_month",
+      inputs: { ghost: "fixtures.no_such_fixture" },
+      expect: () => ({ pass: true, message: "unreached" }),
     });
 
     export const unknown_ref = testCell({
@@ -111,14 +122,23 @@ describe('Engine.runTests — fixture substitution (§6)', () => {
     expect(outcome.result.pass).toBe(true);
   });
 
-  it('a test-local name absent from the subject fails the test with a message', () => {
+  it('a name the subject does not declare is auxiliary: expect sees it, the formula does not', () => {
     const engine = makeEngine();
     engine.run(externals());
     const outcomes = engine.runTests().get('revenue.by_month')!.outcomes;
-    const wrong = outcomes.find((o) => o.result.message?.includes('"orderz"'));
+    const wrong = outcomes.find((o) => o.result.message?.includes('never fed the formula'));
     expect(wrong).toBeDefined();
-    expect(wrong!.result.pass).toBe(false);
-    expect(wrong!.result.message).toContain('subject declares: orders, region');
+    expect(wrong!.result.pass).toBe(true); // the live value (190) proves no substitution happened
+  });
+
+  it('an absent external fails the test loudly, never a silent null', () => {
+    const engine = makeEngine();
+    engine.run(externals());
+    const outcomes = engine.runTests().get('revenue.by_month')!.outcomes;
+    const absent = outcomes.find((o) => o.result.message?.includes('fixtures.no_such_fixture'));
+    expect(absent).toBeDefined();
+    expect(absent!.result.pass).toBe(false);
+    expect(absent!.result.message).toContain('absent external');
   });
 
   it('an unresolvable test-input reference fails the test with the build-style diagnostic', () => {

@@ -222,3 +222,70 @@ export const untouched = cell({ doc: "no tests", inputs: { t: "live.total" }, fo
     expect(engine.value('live.total')).toBe(5);
   });
 });
+
+describe('AsyncEngine.runTests — declared test inputs (R3-373)', () => {
+  const SRC = {
+    sheet: `import { cell, testCell, expectClose } from "@reckoner/stdlib";
+export const total = cell({ doc: "sum", inputs: { rows: "fixtures.data", k: "params.k" }, formula: ({ rows, k }) => rows.reduce((a, r) => a + r.v, 0) * k });
+export const holdout = testCell({ kind: "specification", subject: "sheet.total", inputs: { rows: "fixtures.data_holdout", oracle: "fixtures.oracle" }, expect: ({ result, inputs }) => expectClose(result, inputs.oracle[0].expected, { abs: 1e-9 }) });
+export const bad_ref = testCell({ kind: "specification", subject: "sheet.total", inputs: { ghost: "fixtures.no_such_fixture" }, expect: () => ({ pass: true, message: "unreached" }) });
+export const live_check = testCell({ kind: "specification", subject: "sheet.total", expect: ({ result }) => expectClose(result, 12, { abs: 1e-9 }) });
+`,
+  };
+
+  async function built() {
+    const engine = await AsyncEngine.fromSources(SRC, { transport: inMemoryTransport() });
+    await engine.run({
+      'fixtures.data': { value: [{ v: 1 }, { v: 2 }, { v: 3 }], tier: 'static' },
+      'fixtures.data_holdout': { value: [{ v: 10 }, { v: 5 }], tier: 'static' },
+      'fixtures.oracle': { value: [{ expected: 30 }], tier: 'static' },
+      'params.k': { value: 2, tier: 'static' },
+    });
+    return engine;
+  }
+
+  it('name-matched inputs substitute and re-run the subject; name-unmatched are auxiliary', async () => {
+    const engine = await built();
+    const results = await engine.runTests();
+    // holdout: rows → [10, 5] substituted, params.k stays live (2) → (10+5)*2 = 30, and the
+    // oracle arrives as auxiliary context — the pass proves both lanes are wired.
+    const holdout = results.get('sheet.total')?.outcomes.find((o) => o.id === 'sheet.holdout');
+    expect(holdout?.pass).toBe(true);
+  });
+
+  it('an unresolvable test-input reference fails that test with a message, never silent null', async () => {
+    const engine = await built();
+    const results = await engine.runTests();
+    const bad = results.get('sheet.total')?.outcomes.find((o) => o.id === 'sheet.bad_ref');
+    expect(bad?.pass).toBe(false);
+    expect(bad?.message).toContain('fixtures.no_such_fixture');
+  });
+
+  it('a test with no declared inputs still asserts the live value', async () => {
+    const engine = await built();
+    const results = await engine.runTests();
+    const live = results.get('sheet.total')?.outcomes.find((o) => o.id === 'sheet.live_check');
+    expect(live?.pass).toBe(true);
+  });
+
+  it('the sync Engine agrees with the async path', async () => {
+    const engine = await built();
+    const asyncResults = await engine.runTests();
+    const sync = Engine.fromSources(SRC, { ...stdlib });
+    sync.run({
+      'fixtures.data': { value: [{ v: 1 }, { v: 2 }, { v: 3 }], tier: 'static' },
+      'fixtures.data_holdout': { value: [{ v: 10 }, { v: 5 }], tier: 'static' },
+      'fixtures.oracle': { value: [{ expected: 30 }], tier: 'static' },
+      'params.k': { value: 2, tier: 'static' },
+    });
+    // Suite outcomes carry no ids in the sync path — compare pass/fail by declaration order.
+    for (const [subject, suite] of sync.runTests()) {
+      const asyncOutcomes = asyncResults.get(subject)!.outcomes;
+      const passes = suite.outcomes.map((o) => o.result.pass);
+      const asyncPasses = asyncOutcomes.map((o) => o.pass);
+      expect(asyncPasses, subject).toEqual(passes);
+      // holdout + live_check green, bad_ref failing loudly — in BOTH engines.
+      expect(passes, subject).toEqual([true, false, true]);
+    }
+  });
+});

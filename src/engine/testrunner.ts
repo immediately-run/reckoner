@@ -38,29 +38,24 @@ export interface TestRunContext {
 }
 
 /**
- * The test→subject input mapping (§6, pinned 2026-08-24): a test's declared inputs
- * **substitute for the subject's same-named inputs** — `{ ...subjectLive, ...testDeclared }`.
- * Partial substitution is the point: a holdout test swaps the data input for its fixture
- * while params/static/cell inputs stay live. A test-local name the subject does not declare
- * is an authoring error (the test cannot know what the formula should receive under that
- * name), so it fails the test with a message rather than substituting a silent `null`.
+ * The test→subject input semantics (§6, pinned 2026-08-24; **split into two lanes by
+ * R3-373, 2026-08-27**): a test's declared inputs are first **resolved** against the same
+ * published state a cell's inputs resolve against, then split by local name —
+ *
+ * - **name-matched → substitution**: the entry overrides the subject's same-named live
+ *   input and the subject formula **re-runs** over the merged set (`{ ...subjectLive,
+ *   ...substituted }`). This is the holdout pattern: swap the data input for its fixture
+ *   while params/static/cell inputs stay live.
+ * - **name-unmatched → auxiliary**: the entry is context for `expect`/`relation` only
+ *   (an oracle fixture such as `expected_values`) and **never feeds the formula**.
+ *
+ * The 2026-08-24 rule — "a test-local name the subject does not declare is an authoring
+ * error" — was narrowed by R3-373 to the *substitution* lane: an unknown name still never
+ * reaches the formula (the original mis-serialization concern stands), but it is no
+ * longer rejected outright, because ARCHITECTURE_PLAN §3.1's own holdout example declares
+ * exactly such a name (`rows:`). Unresolvable references (unknown cell/fixture) fail the
+ * test with a message at resolution time, never a silent `null`.
  */
-export function substituteInputs(
-  testInputs: Record<string, Value>,
-  subjectInputs: Record<string, Value>,
-): { ok: true; inputs: Record<string, Value> } | { ok: false; error: string } {
-  const unknown = Object.keys(testInputs).filter((n) => !(n in subjectInputs));
-  if (unknown.length > 0) {
-    const declared = Object.keys(subjectInputs);
-    return {
-      ok: false,
-      error:
-        `test input(s) ${unknown.map((n) => `"${n}"`).join(', ')} do not name a subject input ` +
-        `(subject declares: ${declared.length > 0 ? declared.join(', ') : 'none'}).`,
-    };
-  }
-  return { ok: true, inputs: { ...subjectInputs, ...testInputs } };
-}
 
 /** Run one test cell against its subject, returning a structured pass/fail record. */
 export function runTest(test: TestCellDef, ctx: TestRunContext): TestResult {
