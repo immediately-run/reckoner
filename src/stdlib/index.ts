@@ -69,6 +69,11 @@ export { coalesce, orElse, safeDiv } from './nulls.ts';
 export { irr, npv, xirr } from './financial.ts';
 export type { IrrOptions } from './financial.ts';
 
+// Explicit convergence (R3-378): the fixed-point helper — Excel's iterative-calc
+// circular reference, run as a visible, evidence-carrying loop.
+export { fixpoint } from './fixpoint.ts';
+export type { FixpointOptions, FixpointResult } from './fixpoint.ts';
+
 // Screening (assistant-facing message-finding tools).
 export { trend, outliers, deltas } from './screening.ts';
 export type { Trend } from './screening.ts';
