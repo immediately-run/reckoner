@@ -19,6 +19,7 @@ import { parseManifest } from './manifest.ts';
 import { parseFeedConfig } from './feeds.ts';
 import { parseFixtureFrame } from './fixtures.ts';
 import { validateFixtureProvenance } from './xref.ts';
+import { paramRefDiagnostics } from './paramRefs.ts';
 
 const WORKSHEET_SUFFIX = '.sheet.js';
 const TEMPLATE_SUFFIX = '.mdx';
@@ -46,6 +47,10 @@ export async function loadDocument(reader: DocumentReader, root: string): Promis
   // naming a feed the document does not declare. The worksheet-input half needs the
   // evaluated workbook, so it composes app-side (`validateExternalReferences`).
   diagnostics.push(...validateFixtureProvenance(fixtures, new Set(feeds.map((f) => f.name))));
+
+  // paramRefs (R3-377): each knob's `from` must name a loaded fixture and its `path`
+  // resolve inside it — referential errors are load diagnostics naming the key.
+  diagnostics.push(...paramRefDiagnostics({ root, manifest, worksheets, templates, feeds, fixtures, diagnostics: [] }));
 
   return { root, manifest, worksheets, templates, feeds, fixtures, diagnostics };
 }

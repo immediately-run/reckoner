@@ -3,7 +3,7 @@
 // rather than returning diagnostics.
 
 import type { Value } from '../stdlib/types.ts';
-import type { AuthoredWith, CompatBlock, ReckonerManifest } from './types.ts';
+import type { AuthoredWith, CompatBlock, ParamRef, ReckonerManifest } from './types.ts';
 import {
   asValue,
   isPlainObject,
@@ -38,14 +38,36 @@ export function parseManifest(json: unknown): ReckonerManifest {
     params = Object.fromEntries(Object.entries(obj.params).map(([k, v]) => [k, asValue(v)]));
   }
 
+  const paramRefs = parseParamRefs(obj.paramRefs);
+
   return {
     format,
     compat,
     authoredWith,
     worksheets,
     params,
+    paramRefs,
     title: optionalString(obj, 'title', WHAT),
   };
+}
+
+/** Parse the optional `paramRefs` map (R3-377). Shape errors are fatal; referential errors (unknown fixture, unresolvable path) surface later as load diagnostics. */
+function parseParamRefs(raw: unknown): Record<string, ParamRef> | undefined {
+  if (raw === undefined) return undefined;
+  if (!isPlainObject(raw)) throw new Error(`${WHAT}: "paramRefs" must be an object of { from, path } entries.`);
+  const out: Record<string, ParamRef> = {};
+  for (const [name, entry] of Object.entries(raw)) {
+    if (!isPlainObject(entry)) {
+      throw new Error(`${WHAT}: paramRefs.${name} must be an object with "from" and "path".`);
+    }
+    const from = optionalString(entry, 'from', `${WHAT}.paramRefs.${name}`);
+    const path = optionalString(entry, 'path', `${WHAT}.paramRefs.${name}`);
+    if (from === undefined || path === undefined || from.length === 0 || path.length === 0) {
+      throw new Error(`${WHAT}: paramRefs.${name} requires non-empty "from" and "path".`);
+    }
+    out[name] = { from, path };
+  }
+  return out;
 }
 
 function parseCompat(raw: unknown): CompatBlock {
