@@ -205,7 +205,7 @@ Egress-fixing is defense-in-depth; only the top layer is new.
 | CSP `connect-src` on the connector frame | **built-adjacent** (per-frame CSP, plan D5) | Browser-native defense-in-depth if the connector tries a direct socket |
 | Secret **injection** host-side, use-not-read (SECRETS_SPEC §6) | **built** (`netFetchPolicy` `injectSecret`) — but "never read" is **header-only** (review-2 D2-F3) | The connector reading the secret value from headers; injecting it into a non-templated request |
 
-### 3.1 A pinned egress path for secret-bearing feeds  *(proposal — NEW, review-2 D2-F5)*
+### 3.1 A pinned egress path for secret-bearing feeds  *(BUILT — was proposal, review-2 D2-F5; see the settlement note below)*
 
 The connector's secret-bearing feeds currently route browser-direct (unpinned) so the secret
 value never reaches the server. That trade — secret-confidentiality vs. rebind-resistance —
@@ -227,6 +227,36 @@ Options, to settle in build:
 proxy with server-side secret injection; the browser-direct unpinned path is **not** used for
 `feed:fetch`. Until this ships, secret-bearing feeds have **no rebind protection** and the spec
 says so.
+
+*(Settled and built, 2026-08-27 — (a), signed off by the repository owner; see
+`docs/status/CONNECTOR_EGRESS_FIXING_STATUS.md`, which governs implementation status. Two
+corrections and one gap, from the adversarial pass this path was owed:)*
+
+**Correction — this is a routing change, not a custody change.** `SECRETS_SPEC §2.1` C1/C5 separate
+**custody** (where key material *lives*) from **routing** (which network path a request takes).
+Option (a) keeps custody at `client-sealed` and moves only routing, landing in cell **T1** —
+*unsealed in the parent window, sent to the backend per request, injected upstream, never stored;
+seen in transit only*. T1 is **specified and already shipped** for LLM keys
+(`streamViaBackendProxy`, described in its own source as "the single place in the host that
+deliberately sends a user's key to our server"). The genuine custody change is `platform-held` /
+**T2** — a different cell, behind its own KMS + never-return + rotation criteria. **(a) is not
+that**, and arguing it as such points at the wrong gate: what it needs is a C2 enumeration edit
+plus the C6 routing disclosure.
+
+**Gap — the eligibility check C2 requires does not exist.** C2 enumerates the backend-proxied
+carve-out **by resource kind** and says widening it "is a spec edit somebody has to write, not a
+judgement call at a call site". §3.1 widened it to a second consumer and no such edit was written;
+nor does any layer check the kind. `feedTemplate.ts` types the selector
+`injectSecret?: { family?: string; type?: string }` — a free-form string, not `SecretType` — and
+copies it through unvalidated, while validating data-plane slot types strictly in the same
+compiler. And the realistic path is an **omitted** type rather than a declared one:
+`matchesSelector` treats a missing `type` as *match every kind*, so
+`injectSecret: { family: "acme" }` can select an `oauth-refresh` record — a whole-identity,
+auto-refreshing credential C2 excludes **unconditionally** — and route it through the server
+boundary. The rule and the fix are `SECRETS_SPEC §2.1` C2 (as amended) and roadmap **R3-394**:
+`api-key` compiles, `oauth-refresh` and `bearer-token` are refused **at template compile**, an
+omitted kind is not a wildcard on this path, and an ineligible feed is **refused rather than
+downgraded** to browser-direct.
 
 ## 4. The residual, named honestly — request-body / param exfiltration (TS-4)  *(normative intent)*
 
