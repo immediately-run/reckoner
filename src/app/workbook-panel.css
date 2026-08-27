@@ -443,3 +443,125 @@
   border-left: 3px solid var(--accent);
   color: var(--ink);
 }
+
+/* ── What-if & scratch (WHATIF_SHADOW_EVALUATION_SPEC §1) ───────────────────────────
+   Both surfaces are opt-in review chrome: the what-if section docks under the value
+   inspector, the scratch pad closes the workbook panel. Tokens only; the small-screen
+   block below is the §1.5 mobile floor (16px editor text defeats focus-zoom). */
+
+.rk-wi {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.rk-wi-editor {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  resize: vertical;
+  margin: 6px 0 8px;
+}
+
+.rk-wi-editor:focus {
+  outline: none;
+  border-color: var(--accent-violet);
+}
+
+.rk-wi-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.rk-wi-result {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.rk-wi-line {
+  display: grid;
+  gap: 4px;
+}
+
+.rk-wi-values {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.rk-wi-deltas {
+  display: grid;
+  gap: 4px;
+}
+
+.rk-wi-delta {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.rk-wi-note {
+  font-size: 0.75rem;
+  color: var(--ink-2);
+}
+
+.rk-wi-refusal {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: var(--accent-hot);
+  overflow-wrap: anywhere;
+}
+
+.rk-scratch {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 16px;
+}
+
+.rk-scratch-tag {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.rk-scratch-editor {
+  margin-top: 8px;
+}
+
+.rk-scratch-clear-armed {
+  color: var(--accent-hot);
+  border-color: var(--accent-hot);
+}
+
+/* §1.5 mobile floor: full-width stacking comes from the host panels; the editors go to
+   16px so focusing them does not zoom the page, and actions stay in reach. */
+@media (max-width: 560px) {
+  .rk-wi-editor {
+    font-size: 16px;
+  }
+
+  .rk-wi-actions {
+    flex-wrap: wrap;
+  }
+}

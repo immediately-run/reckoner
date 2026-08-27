@@ -16,7 +16,7 @@ describe('cumprod', () => {
       { period: 3, f: 1.07 },
     ];
     const out = scan(rows, { path: cumprod('f') }, { orderBy: 'period' });
-    expect(out.map((r) => r.path)).toEqual([1.08, 1.08, 1.1556000000000001]);
+    expect(out.map((r) => r.path)).toEqual([1.08, 1.08, 1.08 * 1.07]);
   });
 
   it('null until the first finite value', () => {

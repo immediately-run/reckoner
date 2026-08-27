@@ -64,3 +64,24 @@ describe('evaluateConfined — starvation', () => {
     expect((defs.probe as CellDef).formula({})).toBe('undefined');
   });
 });
+
+describe('evaluateWorksheet — line-anchored transform (WHATIF_SHADOW_EVALUATION_SPEC §3.3, G-WIF-1a)', () => {
+  it('leaves `export const` inside a formula string literal untouched and registers no phantom export', () => {
+    const sheet = `
+import { cell } from "@reckoner/stdlib";
+
+export const label = cell({
+  doc: "a formula whose result contains the token text",
+  formula: () => "export const x = 1",
+});
+`;
+    const defs = evaluateWorksheet(sheet, stdlib);
+    // No phantom `x` export collected from inside the string; the build succeeds.
+    expect(Object.keys(defs)).toEqual(['label']);
+    const def = defs.label as CellDef;
+    // The rewrite did not reach into the formula: toString round-trips file text verbatim,
+    // which is what the what-if splice's fidelity assumption rests on.
+    expect(def.formula.toString()).toContain('"export const x = 1"');
+    expect(def.formula({})).toBe('export const x = 1');
+  });
+});

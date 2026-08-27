@@ -68,6 +68,7 @@ function makeTransport(opts: { stuck?: Set<string>; evalDelayMs?: number } = {})
         restarts++;
         worker = createEngineWorker();
       },
+      dispose() {},
     },
     restarts: () => restarts,
     evalPosts: () => evalPosts,
@@ -208,6 +209,9 @@ export const untouched = cell({ doc: "no tests", inputs: { t: "live.total" }, fo
       restart() {
         withholdTests = false;
         base.restart();
+      },
+      dispose() {
+        base.dispose();
       },
     };
     const engine = await AsyncEngine.fromSources(SOURCES, {

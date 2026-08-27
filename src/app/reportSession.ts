@@ -44,6 +44,15 @@ export interface ReportSession {
   nodes: TemplateNode[];
   title: string;
   diagnostics: DocumentDiagnostic[];
+  /**
+   * Retained for shadow evaluation (WHATIF_SHADOW_EVALUATION_SPEC §2.2): the worksheet
+   * sources the engine was built from (the splice substrate), the loaded document and the
+   * runtime-feed names (the cross-reference universe the shadow build re-validates
+   * against, G-WIF-10).
+   */
+  sources: Record<string, string>;
+  loaded: LoadedDocument;
+  runtimeFeeds: string[];
 }
 
 function normTier(tag: string | undefined): Tier {
@@ -161,7 +170,17 @@ export async function buildReportSession(transport?: WorkerTransport): Promise<R
     ...xrefDiagnostics(loaded, engine.externalReferences(), nodes, [DEMO_FEED_NAME]),
   ];
 
-  return { engine, externals, paramRefs, nodes, title: loaded.manifest.title ?? 'Reckoner report', diagnostics };
+  return {
+    engine,
+    externals,
+    paramRefs,
+    nodes,
+    title: loaded.manifest.title ?? 'Reckoner report',
+    diagnostics,
+    sources: worksheetSources,
+    loaded,
+    runtimeFeeds: [DEMO_FEED_NAME],
+  };
 }
 
 /** The engine adapter the renderer resolves `source` bindings through. */

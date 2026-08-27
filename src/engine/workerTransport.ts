@@ -11,6 +11,12 @@ export interface WorkerTransport {
   onMessage(handler: (msg: WorkerResponse) => void): void;
   /** Terminate the current worker (abandoning any in-flight eval) and start a fresh one. */
   restart(): void;
+  /**
+   * Terminate without respawn (WHATIF_SHADOW_EVALUATION_SPEC §2.2, G-WIF-7): a discarded
+   * shadow context must be able to *stop*. A disposed transport delivers no further
+   * messages and drops subsequent posts.
+   */
+  dispose(): void;
 }
 
 /**
@@ -23,11 +29,15 @@ export interface WorkerTransport {
 export function inMemoryTransport(): WorkerTransport {
   let worker = createEngineWorker();
   let handler: (msg: WorkerResponse) => void = () => {};
+  let disposed = false;
   const deliver = (msg: WorkerResponse): void => {
-    queueMicrotask(() => handler(msg));
+    queueMicrotask(() => {
+      if (!disposed) handler(msg);
+    });
   };
   return {
     post(msg) {
+      if (disposed) return;
       if (msg.type === 'build') {
         try {
           deliver({ type: 'built', descriptor: worker.build(msg.sources) });
@@ -56,6 +66,10 @@ export function inMemoryTransport(): WorkerTransport {
     restart() {
       worker = createEngineWorker();
     },
+    dispose() {
+      disposed = true;
+      handler = () => {};
+    },
   };
 }
 
@@ -68,21 +82,29 @@ export function inMemoryTransport(): WorkerTransport {
 export function workerTransport(createWorker: () => Worker): WorkerTransport {
   let worker = createWorker();
   let handler: (msg: WorkerResponse) => void = () => {};
+  let disposed = false;
   const wire = (): void => {
     worker.onmessage = (e: MessageEvent<WorkerResponse>) => handler(e.data);
   };
   wire();
   return {
     post(msg) {
+      if (disposed) return;
       worker.postMessage(msg);
     },
     onMessage(h) {
       handler = h;
     },
     restart() {
+      if (disposed) return;
       worker.terminate();
       worker = createWorker();
       wire();
+    },
+    dispose() {
+      disposed = true;
+      handler = () => {};
+      worker.terminate();
     },
   };
 }

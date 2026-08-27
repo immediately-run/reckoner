@@ -212,7 +212,7 @@ describe('Caldera LBO case study', () => {
     // the flip, through the same sessionBindings path the app's params surface uses
     let rerendered = false;
     const bindings = sessionBindings(
-      { engine, externals, paramRefs, nodes: [], title: 't', diagnostics: [] },
+      { engine, externals, paramRefs, nodes: [], title: 't', diagnostics: [], sources: {}, loaded, runtimeFeeds: [] },
       () => { rerendered = true; },
     );
     const originalAssumptions = externals['fixtures.assumptions']!.value;

@@ -1086,6 +1086,11 @@ equivalent and deliberately won't in v1:
   not where a hypothesis is explored. (If usage shows this scope cut is untenable for the
   RevOps persona the case study invokes, the fix is a real ephemeral-cell scratch surface +
   a tabular multi-cell inspector — a booked *future* item, R-6, not a v1 hand-wave.)
+  *(2026-08-27 — the scratch/what-if slice of R-6 is now designed and shipped:
+  `docs/specs/WHATIF_SHADOW_EVALUATION_SPEC.md` (ephemeral shadow evaluation — a what-if
+  panel in the inspector and a scratch-pad worksheet in the workbook panel, never
+  persisted; R3-395…R3-397). The tabular multi-cell inspector and range-select-sum remain
+  open under R-6.)*
 - **Agent-first for non-trivial logic, and honest that the direct path is for simple
   edits + review.** Changing a *number* or an assumption (`static.*`, a `Params` widget) is
   first-class and instant. Changing *logic* by hand is a code-editing task (the quick-add
@@ -1448,6 +1453,9 @@ sprint (D2).
   accept the scope cut, the fix (ephemeral scratch surface + tabular multi-cell inspector +
   a wider structured no-code path) is a booked future item, not a v1 hand-wave. Named here
   so it is not the one un-scrutinized corner it was in the pre-review draft.
+  *(2026-08-27 — partially closed: the ephemeral scratch surface and a per-cell what-if
+  path shipped as `WHATIF_SHADOW_EVALUATION_SPEC` (R3-395…R3-397); the tabular multi-cell
+  inspector and the wider structured no-code path stay open under this risk.)*
 - **R-7 (recalc liveness, review-1 F2/F6 — now mitigated, tracked):** the engine's value
   model was always sound; its *liveness* rested on invariants the earlier draft left
   implicit. Those are now stated in §4.1/§4.2 (run-to-completion supersession; error-as-value
