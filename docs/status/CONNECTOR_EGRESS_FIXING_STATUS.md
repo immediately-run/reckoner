@@ -4,7 +4,7 @@
 secret path are implemented and gated; the `feed:fetch` protocol wiring and the consent
 surface's rendering are the remainder.** *(2026-08-27: the protocol wiring and the SDK surface have
 since landed — site-main #376, sdk 0.54.0. One new residual: the §3.1 path enforces no
-credential-kind eligibility — roadmap R3-383, in Residuals below.)* · **Created:** 2026-08-27 (roadmap R3-227)
+credential-kind eligibility — roadmap R3-388, in Residuals below.)* · **Created:** 2026-08-27 (roadmap R3-227)
 
 > This document is the **single implementation-status source** for
 > [`specs/CONNECTOR_EGRESS_FIXING_SPEC.md`](../specs/CONNECTOR_EGRESS_FIXING_SPEC.md).
@@ -74,7 +74,7 @@ does as a regression in the description, not an improvement in the mechanism.
   **unvalidated** — the E3 comprehension study has not run and must now include an
   outbound-feed arm. A `POST`-with-cell-body feed is a named residual, not a contained
   threat.
-- **Credential-kind eligibility on the §3.1 path is unenforced (roadmap R3-383, found
+- **Credential-kind eligibility on the §3.1 path is unenforced (roadmap R3-388, found
   2026-08-27).** `SECRETS_SPEC §2.1` C2 enumerates the backend-proxied carve-out **by resource
   kind** and says widening it "is a spec edit somebody has to write, not a judgement call at a call
   site". §3.1 widened it to a second consumer, the edit was not written, and **no layer checks the

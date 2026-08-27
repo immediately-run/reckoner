@@ -253,7 +253,7 @@ compiler. And the realistic path is an **omitted** type rather than a declared o
 `matchesSelector` treats a missing `type` as *match every kind*, so
 `injectSecret: { family: "acme" }` can select an `oauth-refresh` record — a whole-identity,
 auto-refreshing credential C2 excludes **unconditionally** — and route it through the server
-boundary. The rule and the fix are `SECRETS_SPEC §2.1` C2 (as amended) and roadmap **R3-383**:
+boundary. The rule and the fix are `SECRETS_SPEC §2.1` C2 (as amended) and roadmap **R3-388**:
 `api-key` compiles, `oauth-refresh` and `bearer-token` are refused **at template compile**, an
 omitted kind is not a wildcard on this path, and an ineligible feed is **refused rather than
 downgraded** to browser-direct.
