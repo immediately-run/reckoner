@@ -68,7 +68,13 @@ export class Scheduler {
   /** The resolved input values (local name → value) for a node, from current published state. */
   inputsFor(id: string): Record<string, Value> {
     const node = this.graph.nodes.get(id);
-    return node === undefined ? {} : this.#resolveInputs(node).values;
+    if (node === undefined) return {};
+    return this.resolve(node.resolvers).values;
+  }
+
+  /** Whether an external key has been supplied (R3-373: test-input resolution fails loud). */
+  hasExternal(key: string): boolean {
+    return this.#externals.has(key);
   }
 
   /**

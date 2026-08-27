@@ -57,7 +57,8 @@ describe('Caldera LBO case study', () => {
     const { loaded } = await loadCase();
     expect(loaded.worksheets.map((w) => w.name)).toEqual(['model', 'checks']);
     expect(loaded.fixtures.map((f) => f.name).sort()).toEqual([
-      'assumptions', 'expected_values', 'historical_segments', 'ops_plan', 'year_plan',
+      'assumptions', 'expected_holdout', 'expected_values', 'historical_segments',
+      'ops_plan', 'ops_plan_holdout', 'year_plan',
     ]);
     expect(loaded.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   });
@@ -142,6 +143,14 @@ describe('Caldera LBO case study', () => {
       }
     }
     expect(failing).toEqual([]);
+
+    // R3-373's exit gates, exercised through the real engine: the holdout test
+    // substitutes the downside plan fixture and passes against its own oracle…
+    const holdout = results.get('model.operating')?.outcomes.find((o) => o.id === 'checks.ops_holdout');
+    expect(holdout?.pass).toBe(true);
+    // …and an oracle test that used to inline constants now reads its fixture.
+    const suOracle = results.get('model.sources_uses')?.outcomes.find((o) => o.id === 'checks.su_vs_oracle');
+    expect(suOracle?.pass).toBe(true);
 
     // the review-surface verdict taxonomy in action: the load-bearing cells
     // carry a metamorphic/property leg, so they read "validated"

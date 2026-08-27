@@ -170,11 +170,13 @@ function classifyInput(name: string, spec: InputSpec, ctx: ClassifyCtx): void {
  * Resolvers for a declared-inputs map held by a *non-graph* consumer — the test runner's
  * fixture substitution (a test's declared inputs resolve against the same published state
  * a cell's do). Unresolvable references come back as diagnostics for the caller to surface;
- * they are the same errors `buildGraph` would emit for a cell.
+ * they are the same errors `buildGraph` would emit for a cell. `graph` is the structural
+ * minimum the classifier needs (an id→node map for cell-existence checks + the worksheet
+ * lists), so the async engine can pass its descriptor maps directly.
  */
 export function resolversFor(
   inputs: Record<string, InputSpec>,
-  graph: DependencyGraph,
+  graph: { nodes: Map<string, unknown>; worksheets: Map<string, string[]> },
 ): { resolvers: InputResolver[]; diagnostics: string[] } {
   const diagnostics: GraphDiagnostic[] = [];
   const resolvers: InputResolver[] = [];

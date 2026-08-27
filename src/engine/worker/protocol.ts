@@ -12,6 +12,7 @@
 
 import type { Value } from '../../stdlib/types.ts';
 import type { TestKind } from '../../stdlib/cell.ts';
+import type { InputSpec } from '../../stdlib/inputs.ts';
 import type { CellVerdict } from '../testrunner.ts';
 import type { GraphDiagnostic, InputResolver } from '../types.ts';
 
@@ -38,6 +39,14 @@ export interface TestDescriptor {
   kind: TestKind;
   /** The `<worksheet>.<cell>` this test validates. */
   subject: string;
+  /**
+   * The test's declared inputs (normalized InputSpecs — plain data). The host resolves
+   * these against published state and sends the values back per-test in
+   * {@link SuiteContext.tests}: name-matched entries substitute for the subject's live
+   * inputs (the holdout pattern), name-unmatched entries are auxiliary context for
+   * `expect`/`relation` (an oracle fixture) and never feed the formula.
+   */
+  inputs: Record<string, InputSpec>;
 }
 
 /** The serializable workbook the host schedules over. */
@@ -60,6 +69,19 @@ export interface SuiteContext {
   subject: string;
   subjectValue: Value;
   inputs: Record<string, Value>;
+  /**
+   * Per-test declared-input values the host resolved against published state (R3-373).
+   * An entry with `error` fails that test's outcome with the message — an unresolvable
+   * reference is never a silent `null`.
+   */
+  tests?: TestInputContext[];
+}
+
+/** One test's host-resolved declared inputs, or the error that resolution hit. */
+export interface TestInputContext {
+  id: string;
+  inputs?: Record<string, Value>;
+  error?: string;
 }
 
 /** One test's outcome, as the review surface renders it. */

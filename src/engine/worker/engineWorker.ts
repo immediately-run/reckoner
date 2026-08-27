@@ -57,7 +57,7 @@ export function createEngineWorker(): EngineWorker {
             formulas.set(`${worksheet}.${name}`, def.formula);
           } else {
             const id = `${worksheet}.${name}`;
-            tests.push({ id, worksheet, name, kind: def.testKind, subject: def.subject });
+            tests.push({ id, worksheet, name, kind: def.testKind, subject: def.subject, inputs: def.inputs });
             const list = testsBySubject.get(def.subject) ?? [];
             list.push({ id, def });
             testsBySubject.set(def.subject, list);
@@ -102,18 +102,53 @@ export function createEngineWorker(): EngineWorker {
       const out: SubjectResult[] = [];
       for (const ctx of suites) {
         const tests = testsBySubject.get(ctx.subject) ?? [];
-        const reevaluate = (inputs: Record<string, Value>): Value => {
-          const formula = formulas.get(ctx.subject);
-          if (formula === undefined) throw new Error(`unknown cell "${ctx.subject}"`);
-          return formula(inputs);
-        };
         let suite: SuiteResult;
         try {
-          suite = runSuite(tests.map((t) => t.def), () => ({
-            subject: ctx.subjectValue,
-            inputs: ctx.inputs,
-            reevaluate,
-          }));
+          suite = runSuite(tests.map((t) => t.def), (def) => {
+            const formula = formulas.get(ctx.subject);
+            const reevaluate =
+              formula === undefined
+                ? undefined
+                : (inputs: Record<string, Value>): Value => formula(inputs);
+            const id = tests.find((t) => t.def === def)?.id;
+            const entry = id === undefined ? undefined : ctx.tests?.find((t) => t.id === id);
+            if (entry !== undefined && entry.error !== undefined) {
+              return { subject: ctx.subjectValue, inputs: ctx.inputs, error: entry.error };
+            }
+            if (entry === undefined || entry.inputs === undefined) {
+              // No declared inputs resolved for this test — the live context, as before.
+              return { subject: ctx.subjectValue, inputs: ctx.inputs, reevaluate };
+            }
+
+            // R3-373: name-matched entries SUBSTITUTe for the subject's live inputs (the
+            // subject formula re-runs over the merged set — the holdout pattern);
+            // name-unmatched entries are AUXILIARY context for expect/relation only
+            // (an oracle fixture) and never feed the formula.
+            const substituted: Record<string, Value> = {};
+            const auxiliary: Record<string, Value> = {};
+            for (const [name, value] of Object.entries(entry.inputs)) {
+              if (name in ctx.inputs) substituted[name] = value;
+              else auxiliary[name] = value;
+            }
+
+            if (Object.keys(substituted).length === 0) {
+              return { subject: ctx.subjectValue, inputs: { ...ctx.inputs, ...auxiliary }, reevaluate };
+            }
+            const merged = { ...ctx.inputs, ...substituted };
+            try {
+              const subject = formula!(merged);
+              return { subject, inputs: { ...merged, ...auxiliary }, reevaluate };
+            } catch (e) {
+              // The subject errored over the substituted inputs — a data-shape mismatch
+              // between the fixture and the formula, which is exactly what the test
+              // should report.
+              return {
+                subject: null,
+                inputs: { ...merged, ...auxiliary },
+                error: `subject errored over substituted inputs: ${(e as Error).message}`,
+              };
+            }
+          });
         } catch (e) {
           // A test's own machinery threw (not a plain assertion failure) — every outcome
           // records the error; the suite still settles with a verdict.

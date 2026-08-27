@@ -1,0 +1,100 @@
+{
+  "rows": [
+    {
+      "segment": "seals",
+      "year": 2027,
+      "growth": 0.06,
+      "margin": 0.259
+    },
+    {
+      "segment": "seals",
+      "year": 2028,
+      "growth": 0.06,
+      "margin": 0.263
+    },
+    {
+      "segment": "seals",
+      "year": 2029,
+      "growth": 0.05,
+      "margin": 0.267
+    },
+    {
+      "segment": "seals",
+      "year": 2030,
+      "growth": 0.05,
+      "margin": 0.271
+    },
+    {
+      "segment": "seals",
+      "year": 2031,
+      "growth": 0.039999999999999994,
+      "margin": 0.275
+    },
+    {
+      "segment": "bearings",
+      "year": 2027,
+      "growth": 0.02,
+      "margin": 0.187
+    },
+    {
+      "segment": "bearings",
+      "year": 2028,
+      "growth": 0.02,
+      "margin": 0.189
+    },
+    {
+      "segment": "bearings",
+      "year": 2029,
+      "growth": 0.02,
+      "margin": 0.191
+    },
+    {
+      "segment": "bearings",
+      "year": 2030,
+      "growth": 0.015000000000000003,
+      "margin": 0.193
+    },
+    {
+      "segment": "bearings",
+      "year": 2031,
+      "growth": 0.015000000000000003,
+      "margin": 0.195
+    },
+    {
+      "segment": "fabrication",
+      "year": 2027,
+      "growth": 0.005000000000000001,
+      "margin": 0.122
+    },
+    {
+      "segment": "fabrication",
+      "year": 2028,
+      "growth": 0.005000000000000001,
+      "margin": 0.124
+    },
+    {
+      "segment": "fabrication",
+      "year": 2029,
+      "growth": 0.0,
+      "margin": 0.126
+    },
+    {
+      "segment": "fabrication",
+      "year": 2030,
+      "growth": 0.0,
+      "margin": 0.128
+    },
+    {
+      "segment": "fabrication",
+      "year": 2031,
+      "growth": 0.0,
+      "margin": 0.13
+    }
+  ],
+  "provenance": {
+    "synthetic": true,
+    "captureActor": "generate.py",
+    "capturedAt": "2026-07-09",
+    "note": "the downside holdout plan (growth -2pp, margins -0.5pp) \u2014 the substitution fixture for the ops_holdout test (R3-373)"
+  }
+}

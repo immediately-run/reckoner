@@ -27,7 +27,7 @@ const cell: CellDescriptor = {
 };
 
 const tests: TestDescriptor[] = [
-  { id: 'revenue.total_check', worksheet: 'revenue', name: 'total_check', kind: 'specification', subject: 'revenue.total' },
+  { id: 'revenue.total_check', worksheet: 'revenue', name: 'total_check', kind: 'specification', subject: 'revenue.total', inputs: {} },
 ];
 
 const outcome: SubjectResult = {
