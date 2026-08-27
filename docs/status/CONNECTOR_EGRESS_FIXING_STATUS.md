@@ -2,7 +2,9 @@
 
 **Overall: PARTIALLY BUILT — the target-fixing core, the request-body cap and the pinned
 secret path are implemented and gated; the `feed:fetch` protocol wiring and the consent
-surface's rendering are the remainder.** · **Created:** 2026-08-27 (roadmap R3-227)
+surface's rendering are the remainder.** *(2026-08-27: the protocol wiring and the SDK surface have
+since landed — site-main #376, sdk 0.54.0. One new residual: the §3.1 path enforces no
+credential-kind eligibility — roadmap R3-383, in Residuals below.)* · **Created:** 2026-08-27 (roadmap R3-227)
 
 > This document is the **single implementation-status source** for
 > [`specs/CONNECTOR_EGRESS_FIXING_SPEC.md`](../specs/CONNECTOR_EGRESS_FIXING_SPEC.md).
@@ -72,6 +74,20 @@ does as a regression in the description, not an improvement in the mechanism.
   **unvalidated** — the E3 comprehension study has not run and must now include an
   outbound-feed arm. A `POST`-with-cell-body feed is a named residual, not a contained
   threat.
+- **Credential-kind eligibility on the §3.1 path is unenforced (roadmap R3-383, found
+  2026-08-27).** `SECRETS_SPEC §2.1` C2 enumerates the backend-proxied carve-out **by resource
+  kind** and says widening it "is a spec edit somebody has to write, not a judgement call at a call
+  site". §3.1 widened it to a second consumer, the edit was not written, and **no layer checks the
+  kind**: `feedTemplate.ts` types the selector `{ family?: string; type?: string }` (a free-form
+  string, not `SecretType`) and copies it through unvalidated — while validating data-plane slot
+  types strictly in the same compiler — and `resolveSecret` → `feedFetchHandler` inject whatever
+  matches. The path that actually fires is an **omitted** type: `matchesSelector` treats a missing
+  `type` as *match every kind*, so `injectSecret: { family: "acme" }` can select an `oauth-refresh`
+  record — which C2 excludes **unconditionally** — and route it to the server. Bounded by the
+  record existing, matching, and being `boundOrigin`-bound to that feed's origin under a grant this
+  app holds. **This qualifies the §3.1 row above rather than retracting it:** the mechanism is
+  built and sound; the gate on *which credential may use it* is missing. Note the scope — this is a
+  **routing** widening (C5 cell **T1**), not a custody one; no feed credential is `platform-held`.
 - **Availability cost of §3.1.** `feed:fetch` refuses when the pinned server path is
   unavailable rather than falling back. That is deliberate — the fallback path is the
   unpinned one — and it means a connector does not poll while the backend is down.
