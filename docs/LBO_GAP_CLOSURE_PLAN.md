@@ -248,6 +248,11 @@ a real document needs convergence *diagnostics* (iteration counts surfaced in
 the review surface, budget accounting), not merely convergence. If W6 has
 covered every need by then, close this item as `helper-only, recorded`.
 
+> **Outcome (2026-08-27, R3-379): helper-only, recorded** — the decision, the
+> pinned idiom, and the three behavioral reopening criteria live in
+> [`specs/CONVERGENCE_SPEC.md`](specs/CONVERGENCE_SPEC.md) §4–§6, with the
+> adversarial self-review of that decision in §6.
+
 ### W8 — Sweep construct: measure-first (G4, measure, S)
 
 **Problem.** Excel's data table is 2 minutes; Reckoner's sensitivity is a
