@@ -37,15 +37,17 @@ export {
   asofJoin,
   cummax,
   cummin,
+  cumprod,
   cumsum,
   cumulative,
   ema,
   lag,
   lead,
+  rollforward,
   runningMean,
   scan,
 } from './ordered.ts';
-export type { AsofOptions, LagOptions, ScanOp, WindowOptions } from './ordered.ts';
+export type { AsofOptions, LagOptions, RollforwardOptions, ScanOp, WindowOptions } from './ordered.ts';
 
 // Pure date helpers (no ambient clock).
 export {
@@ -61,6 +63,11 @@ export type { DateInput, DateRange, FiscalPeriod } from './dates.ts';
 
 // Null / empty semantics.
 export { coalesce, orElse, safeDiv } from './nulls.ts';
+
+// Financial functions (R3-376: irr/npv/xirr — deterministic bracketed bisection;
+// unbracketable flows throw visibly rather than returning a wrong number).
+export { irr, npv, xirr } from './financial.ts';
+export type { IrrOptions } from './financial.ts';
 
 // Screening (assistant-facing message-finding tools).
 export { trend, outliers, deltas } from './screening.ts';

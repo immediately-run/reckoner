@@ -1,4 +1,4 @@
-import { cell, table, derive, scan, sort, sum } from "@reckoner/stdlib";
+import { cell, table, rollforward, cumprod, irr, sum } from "@reckoner/stdlib";
 
 // Caldera Components LBO — the model worksheet.
 //
@@ -11,7 +11,11 @@ import { cell, table, derive, scan, sort, sum } from "@reckoner/stdlib";
 //                        iterative-calc circular reference, here an explicit,
 //                        per-year converged fixed point inside one cell)
 //   Sens_Models/grid   → `sensitivity` (25 full model re-runs)
-//   Returns            → `returns`, `irr`, `moic`, `breakeven_exit_multiple`
+//   Returns            → `returns`, `sponsor_irr`, `moic`, `breakeven_exit_multiple`
+//
+// Naming note: a worksheet export shadows any same-named stdlib callable in module
+// scope (the import is stripped; stdlib functions arrive as compartment globals) —
+// hence `sponsor_irr`, not `irr`, for the scalar tile.
 //
 // Everything below is pure: plain values in, plain values out, no ambient
 // anything. The module-scope helpers are the "model as a function" the
@@ -22,48 +26,26 @@ import { cell, table, derive, scan, sort, sum } from "@reckoner/stdlib";
 const YEARS_ORDER = "year";
 
 // ── module-scope model helpers (shared by cells and the grid) ────────────────
+// (The hand-rolled npv/irrBisect that lived here is R3-376's receipt: the stdlib's
+// irr() replaced it, deleted rather than kept.)
 
-function npv(rate, flows) {
-  let total = 0;
-  for (let t = 0; t < flows.length; t += 1) total += flows[t] / Math.pow(1 + rate, t);
-  return total;
-}
-
-// Bisection IRR — the flows have one sign change, so NPV(r) is monotone.
-// Excel ships IRR(); the stdlib does not (a gap this case study records).
-function irrBisect(flows) {
-  let lo = -0.99;
-  let hi = 10.0;
-  for (let i = 0; i < 200; i += 1) {
-    const mid = (lo + hi) / 2;
-    if (npv(mid, flows) > 0) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
-}
-
-// The operating build: segment revenue paths (chained growth via a custom
-// cumulative-product scan — cumsum exists, cumprod does not), margin-weighted
-// EBITDA, D&A / capex / ΔNWC per year. Fluent stdlib throughout.
+// The operating build: segment revenue paths (base × the compounded growth factors via
+// cumprod), margin-weighted EBITDA, D&A / capex / ΔNWC per year. Fluent stdlib throughout.
 function buildOperating(hist, plan, yearPlan, a) {
   const baseTotal = hist.reduce((acc, h) => acc + h.fy2026, 0);
   const paths = table(hist)
     .join(plan, { on: "segment" })
+    .derive({ growth_factor: (r) => 1 + r.growth })
     .scan(
-      { seg_revenue: (part) => {
-        let r = null;
-        return part.map((row) => {
-          r = r === null ? row.fy2026 * (1 + row.growth) : r * (1 + row.growth);
-          return r;
-        });
-      } },
+      { factor_path: cumprod("growth_factor") },
       { partitionBy: "segment", orderBy: YEARS_ORDER },
     )
-    .derive({ seg_ebitda: (r) => r.seg_revenue * r.margin })
+    .derive({ seg_revenue: (r) => r.fy2026 * r.factor_path, seg_ebitda: (r) => r.fy2026 * r.factor_path * r.margin })
     .groupBy("year")
     .rollup({ revenue: sum("seg_revenue"), ebitda: sum("seg_ebitda") })
     .rows();
-  return table(sort(paths, YEARS_ORDER))
+  return table(paths)
+    .sort(YEARS_ORDER)
     .lag("revenue", { as: "prior_revenue", fill: baseTotal })
     .join(yearPlan, { on: "year" })
     .derive({
@@ -135,23 +117,25 @@ function yearPass(op, a, su, bal, mode) {
   };
 }
 
-// The 5-year roll-forward as a multi-state fold. This is the structure Excel
-// calls a "debt schedule" (unrolled across columns); here it is one custom
-// packed-state scan op — the stdlib has cumsum/cummax but no multi-state
-// roll-forward primitive (a gap this case study records).
+// The 5-year roll-forward on the stdlib's multi-state primitive (R3-375): the
+// state tuple {rev, tlb, mezz, cash} evolves through each year's waterfall —
+// the structure Excel unrolls across columns. 'avg' mode iterates each year's
+// step to a fixed point (Excel's iterative-calc circular reference, explicit).
 function scheduleYears(ops, a, su, mode) {
   let iterations = 0;
-  const stateful = (part) => {
-    let bal = { rev: 0, tlb: su.tlb0, mezz: su.mezz0, cash: a.min_cash, est: null };
-    return part.map((op) => {
+  return rollforward(ops, {
+    orderBy: YEARS_ORDER,
+    begin: { rev: 0, tlb: su.tlb0, mezz: su.mezz0, cash: a.min_cash },
+    step: (op, bal) => {
       let out;
       if (mode === "begin") {
         out = yearPass(op, a, su, bal, "begin");
       } else {
         let est = null;
+        const trial = { rev: bal.rev, tlb: bal.tlb, mezz: bal.mezz, cash: bal.cash, est: null };
         for (let i = 0; i < 200; i += 1) {
-          bal.est = est === null ? { rev: bal.rev, tlb: bal.tlb, mezz: bal.mezz } : est;
-          out = yearPass(op, a, su, bal, "avg");
+          trial.est = est === null ? { rev: bal.rev, tlb: bal.tlb, mezz: bal.mezz } : est;
+          out = yearPass(op, a, su, trial, "avg");
           const e = out.end;
           if (est !== null &&
               Math.abs(e.rev - est.rev) < 1e-12 && Math.abs(e.tlb - est.tlb) < 1e-12 &&
@@ -162,33 +146,19 @@ function scheduleYears(ops, a, su, mode) {
           est = e;
           iterations += 1;
         }
-        bal.est = null;
       }
-      bal = { rev: out.end.rev, tlb: out.end.tlb, mezz: out.end.mezz, cash: out.end.cash, est: null };
-      return out;
-    });
-  };
-  const packed = scan(ops, { state: stateful }, { orderBy: YEARS_ORDER });
-  return derive(packed, {
-    year: (r) => r.year,
-    ebitda: (r) => r.ebitda,
-    interest: (r) => r.state.interest,
-    cfadr: (r) => r.state.cfadr,
-    mand: (r) => r.state.mand,
-    sweep: (r) => r.state.sweep,
-    retained: (r) => r.state.retained,
-    rev_draw: (r) => r.state.rev_draw,
-    rev_repay: (r) => r.state.rev_repay,
-    tlb_begin: (r) => r.state.begin.tlb,
-    tlb_end: (r) => r.state.end.tlb,
-    mezz_begin: (r) => r.state.begin.mezz,
-    mezz_end: (r) => r.state.end.mezz,
-    rev_end: (r) => r.state.end.rev,
-    cash_end: (r) => r.state.end.cash,
-    net_debt: (r) => r.state.end.tlb + r.state.end.mezz + r.state.end.rev - r.state.end.cash,
-    leverage: (r) => (r.state.end.tlb + r.state.end.mezz + r.state.end.rev - r.state.end.cash) / r.ebitda,
-    coverage: (r) => r.ebitda / r.state.interest,
-  }).map((r) => ({ ...r, iterations }));
+      const netDebt = out.end.tlb + out.end.mezz + out.end.rev - out.end.cash;
+      return {
+        out: {
+          interest: out.interest, cfadr: out.cfadr, mand: out.mand, sweep: out.sweep,
+          retained: out.retained, rev_draw: out.rev_draw, rev_repay: out.rev_repay,
+          net_debt: netDebt, leverage: netDebt / op.ebitda, coverage: op.ebitda / out.interest,
+          iterations,
+        },
+        next: out.end,
+      };
+    },
+  });
 }
 
 // The whole model as one pure function of the fixtures + overrides — what the
@@ -212,7 +182,7 @@ function runModel(a, hist, plan, yearPlan, o) {
   const flows = [-su.sponsor_equity].concat(Array(a.hold_years - 1).fill(0)).concat([exit_equity]);
   return {
     su, exit_ev, net_debt: lastS.net_debt, exit_equity,
-    moic: exit_equity / su.sponsor_equity, irr: irrBisect(flows),
+    moic: exit_equity / su.sponsor_equity, irr: irr(flows),
   };
 }
 
@@ -292,7 +262,7 @@ export const returns = cell({
     const flows = [-su.sponsor_equity].concat(Array(a[0].hold_years - 1).fill(0)).concat([exit_equity]);
     return {
       exit_ev, net_debt: lastS.net_debt, exit_equity, sponsor_equity: su.sponsor_equity,
-      moic: exit_equity / su.sponsor_equity, irr: irrBisect(flows),
+      moic: exit_equity / su.sponsor_equity, irr: irr(flows),
     };
   },
 });
@@ -309,12 +279,12 @@ export const returns_avg = cell({
     const exit_ev = exit * last.ebitda;
     const exit_equity = exit_ev - lastS.net_debt;
     const flows = [-su.sponsor_equity].concat(Array(a[0].hold_years - 1).fill(0)).concat([exit_equity]);
-    return { exit_ev, exit_equity, irr: irrBisect(flows), moic: exit_equity / su.sponsor_equity };
+    return { exit_ev, exit_equity, irr: irr(flows), moic: exit_equity / su.sponsor_equity };
   },
 });
 
 // Thin named scalars the template and tests bind to.
-export const irr = cell({
+export const sponsor_irr = cell({
   doc: "Base-case sponsor IRR as a scalar, for the Kpi tile",
   inputs: { r: "model.returns" },
   formula: ({ r }) => r.irr,

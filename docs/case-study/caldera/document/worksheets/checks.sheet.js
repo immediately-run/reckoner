@@ -1,4 +1,4 @@
-import { cell, testCell, expectClose, conservation, permutationInvariance, property } from "@reckoner/stdlib";
+import { cell, testCell, expectClose, conservation, permutationInvariance, scaleInvariance, property } from "@reckoner/stdlib";
 
 // Caldera Components LBO — the checks worksheet.
 //
@@ -112,6 +112,16 @@ export const ops_permutation = testCell({
   kind: "metamorphic",
   subject: "model.operating",
   relation: permutationInvariance({ over: "plan" }),
+});
+
+// R3-374 unlocked this: LTM EBITDA is linear in the historical revenue base, but
+// the same rows carry margins — `leaves` scales the revenues only. (The operating
+// build itself is NOT a fit here: its `year` column is a numeric label that does
+// not scale — scale-invariance wants subjects whose outputs are genuinely linear.)
+export const ltm_scales = testCell({
+  kind: "metamorphic",
+  subject: "model.ltm_ebitda",
+  relation: scaleInvariance({ over: "hist", by: 2, leaves: ["fy2024", "fy2025", "fy2026"] }),
 });
 
 export const ops_shape = testCell({

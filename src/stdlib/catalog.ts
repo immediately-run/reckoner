@@ -22,6 +22,7 @@ export type CallableKind =
   | 'window'
   | 'date'
   | 'null'
+  | 'financial'
   | 'constructor'
   | 'testing'
   | 'relation'
@@ -293,6 +294,33 @@ const entries: SelfDescription[] = [
     examples: ['scan(rows, { rt: cumsum("amount") }, { orderBy: "day" })'],
   },
   {
+    name: 'cumprod',
+    kind: 'window',
+    summary: 'Running product (growth paths, index compounding); null until the first finite value, then carried across nulls.',
+    params: [col('Column of factors to compound.')],
+    returns: 'ScanOp for scan/cumulative.',
+    examples: [
+      'scan(derive(rows, { factor: (r) => 1 + r.growth }), { path: cumprod("factor") }, { partitionBy: "segment", orderBy: "year" })',
+    ],
+  },
+  {
+    name: 'rollforward',
+    kind: 'window',
+    summary: 'The multi-state roll-forward (debt schedules, NWC, PP&E): co-evolving balances, each row closing into the next row opening. Use this — not a hand-rolled scan/reduce — whenever a schedule carries more than one co-evolving balance.',
+    params: [
+      rows,
+      {
+        name: 'opts',
+        type: '{ orderBy, begin, step }',
+        doc: 'orderBy (required): step order. begin: column → opening value. step: (row, balance) → { out?: columns, next: closing balance }.',
+      },
+    ],
+    returns: 'Row[] with the original columns, one <k>_begin/<k>_end pair per state key, and the out columns — flattened.',
+    examples: [
+      'rollforward(years, { orderBy: "year", begin: { tlb: 231.4, cash: 8 }, step: (r, bal) => ({ out: { sweep: bal.tlb * 0.05 }, next: { tlb: bal.tlb - bal.tlb * 0.05, cash: bal.cash + 1 } }) })',
+    ],
+  },
+  {
     name: 'cummax',
     kind: 'window',
     summary: 'Running maximum of the finite values seen so far.',
@@ -448,6 +476,46 @@ const entries: SelfDescription[] = [
     ],
     returns: 'number | null.',
     examples: ['safeDiv(churned, starting) // gross churn %, null when starting is 0'],
+  },
+
+  // --- financial (R3-376) --------------------------------------------------------
+  {
+    name: 'npv',
+    kind: 'financial',
+    summary: 'Net present value; flows[0] sits at t=0 UNDISCOUNTED (the investment-at-t0 convention — NOT Excel NPV(), which discounts the first flow at t=1).',
+    params: [
+      { name: 'rate', type: 'number', doc: 'Periodic discount rate (> -1).' },
+      { name: 'flows', type: 'Value[]', doc: 'flows[t] = the flow at period t.' },
+    ],
+    returns: 'number.',
+    examples: ['npv(0.1, [-100, 55, 60.5]) // 0 — the 10% NPV of buy-then-two-cashflows'],
+  },
+  {
+    name: 'irr',
+    kind: 'financial',
+    summary: 'Internal rate of return of periodic flows, by deterministic bracketed bisection (default bracket -99%…1000%). Requires one negative and one positive flow and an NPV straddling zero over the bracket — otherwise it THROWS (a visible cell error, never a confident wrong number).',
+    params: [
+      { name: 'flows', type: 'Value[]', doc: 'flows[0] = the t=0 investment (negative), later flows the returns.' },
+      { name: 'opts', type: '{ lo?, hi? }', doc: 'Bracket bounds for out-of-range deals.', optional: true },
+    ],
+    returns: 'number (the periodic rate; annual if the flows are annual).',
+    examples: [
+      'irr([-equity, 0, 0, 0, 0, exit_equity]) // the LBO sponsor IRR',
+      'irr([-100, 12, 12, 112]) // a 3-year bond: 12% coupon, par at maturity',
+    ],
+  },
+  {
+    name: 'xirr',
+    kind: 'financial',
+    summary: 'Internal rate of return of DATED flows ({ amount, date } rows, ISO dates, ACT/365.25 day count, earliest date = t0). Same throw-don\'t-guess contract as irr.',
+    params: [
+      { name: 'rows', type: 'Row[]', doc: 'One row per flow: amount + the date field.' },
+      { name: 'opts', type: '{ by?, lo?, hi? }', doc: 'by: the date field name (default "date").', optional: true },
+    ],
+    returns: 'number (annualized).',
+    examples: [
+      "xirr([{ amount: -equity, date: '2026-12-31' }, { amount: dividend, date: '2028-06-30' }, { amount: exit_equity, date: '2031-12-31' }])",
+    ],
   },
 
   // --- registration constructors -------------------------------------------------
