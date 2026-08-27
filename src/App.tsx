@@ -11,6 +11,7 @@ import './index.css';
 import './app/report-page.css';
 import { useEffect, useMemo, useState } from 'react';
 import { useReport } from './hooks/useReport.ts';
+import { CALDERA_SEED } from './app/reportSession.ts';
 import { ReportView } from './report/index.ts';
 import WorkbookPanel from './app/WorkbookPanel.tsx';
 import ValueInspector from './app/ValueInspector.tsx';
@@ -18,7 +19,7 @@ import WhatIfPanel from './app/WhatIfPanel.tsx';
 import { useVerdicts } from './hooks/useVerdicts.ts';
 
 function App() {
-  const report = useReport();
+  const report = useReport(CALDERA_SEED);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [inspected, setInspected] = useState<string | null>(null);
   // What-if buffer text is SESSION-SCOPED app state (WHATIF_SHADOW_EVALUATION_SPEC §1.4):
