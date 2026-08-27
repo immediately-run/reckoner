@@ -30,7 +30,22 @@ import type { Bindings, BoundValue } from '../report/render/bindings.ts';
 import type { Value } from '../stdlib/types.ts';
 import { memoryReader } from './memoryReader.ts';
 import { SEED_FILES, SEED_ROOT } from '../seed/document.ts';
+import { CALDERA_FILES, CALDERA_ROOT } from '../seed/caldera.ts';
 import { DEMO_FEED_NAME } from './demoFeed.ts';
+
+/**
+ * A bundled document the app can open with zero prompts. `demoFeed` marks the document
+ * as reading the app-supplied live demo feed (Meridian does; Caldera does not, so its
+ * session skips the feed runtime and the feed's xref allowance).
+ */
+export interface SeedDocument {
+  root: string;
+  files: Record<string, string>;
+  demoFeed?: boolean;
+}
+
+export const MERIDIAN_SEED: SeedDocument = { root: SEED_ROOT, files: SEED_FILES, demoFeed: true };
+export const CALDERA_SEED: SeedDocument = { root: CALDERA_ROOT, files: CALDERA_FILES, demoFeed: false };
 
 const EXTERNAL_NAMESPACES = ['feeds.', 'fixtures.', 'static.', 'params.'];
 const TIERS: ReadonlySet<string> = new Set(['static', 'pulled', 'live']);
@@ -138,10 +153,13 @@ export function xrefDiagnostics(
   });
 }
 
-/** Load the bundled demo document and run the full cold pipeline through the worker engine. */
-export async function buildReportSession(transport?: WorkerTransport): Promise<ReportSession> {
+/** Load a bundled document and run the full cold pipeline through the worker engine. */
+export async function buildReportSession(
+  transport?: WorkerTransport,
+  seed: SeedDocument = MERIDIAN_SEED,
+): Promise<ReportSession> {
   const t = transport ?? (await makeTransport());
-  const loaded = await loadDocument(memoryReader(SEED_FILES), SEED_ROOT);
+  const loaded = await loadDocument(memoryReader(seed.files), seed.root);
 
   const worksheetSources: Record<string, string> = {};
   for (const w of loaded.worksheets) worksheetSources[w.name] = w.source;
@@ -155,10 +173,11 @@ export async function buildReportSession(transport?: WorkerTransport): Promise<R
 
   // Cross-reference validation: the demo feed is app-supplied runtime infra, not a document
   // feed, so it counts as available here (and only here — a document-internal check, like
-  // fixture provenance, would rightly not see it).
+  // fixture provenance, would rightly not see it) — but only for documents that read it.
+  const runtimeFeeds = seed.demoFeed === true ? [DEMO_FEED_NAME] : [];
   const diagnostics = [
     ...loaded.diagnostics,
-    ...xrefDiagnostics(loaded, engine.externalReferences(), nodes, [DEMO_FEED_NAME]),
+    ...xrefDiagnostics(loaded, engine.externalReferences(), nodes, runtimeFeeds),
   ];
 
   return { engine, externals, paramRefs, nodes, title: loaded.manifest.title ?? 'Reckoner report', diagnostics };

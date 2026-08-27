@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildReportSession, makeTransport, sessionBindings, xrefDiagnostics } from './reportSession.ts';
+import { CALDERA_SEED } from './reportSession.ts';
 import { inMemoryTransport } from '../engine/workerTransport.ts';
 import { execSummary, mrrMovements } from '../seed/data.ts';
 
@@ -178,5 +179,34 @@ describe('makeTransport — module-semantics degradation (the import.meta platfo
   it('the worker URL module itself resolves under real ESM (vitest) to the engine entry', async () => {
     const { ENGINE_WORKER_URL } = await import('./workerUrl.ts');
     expect(ENGINE_WORKER_URL.href).toContain('entry/engine.ts');
+  });
+});
+
+describe('the Caldera seed (the live LBO demo branch)', () => {
+  it('builds the session over the generated seed: clean diagnostics, parsed template, live cells', async () => {
+    const session = await buildReportSession(inMemoryTransport(), CALDERA_SEED);
+    expect(session.title).toBe('Caldera Components — LBO');
+    expect(session.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    expect(session.nodes.length).toBeGreaterThan(5); // Kpis, charts, tables, the params block
+
+    const bindings = sessionBindings(session, () => {});
+    const irr = bindings.resolve('model.sponsor_irr');
+    expect(irr.status).toBe('ok');
+    expect(irr.value).toBeCloseTo(0.22387462120837076, 10);
+    const equity = bindings.resolve('model.sponsor_equity');
+    expect(equity.value).toBeCloseTo(114.8837, 4);
+    expect(bindings.resolve('params.tax_rate')).toMatchObject({ status: 'ok', value: 0.25 });
+  });
+
+  it('a live deal-knob flip recomputes the returns (the interaction loop, finance edition)', async () => {
+    const session = await buildReportSession(inMemoryTransport(), CALDERA_SEED);
+    let settled: () => void = () => {};
+    const bindings = sessionBindings(session, () => settled());
+    const before = bindings.resolve('model.sponsor_irr').value as number;
+
+    const recomputed = new Promise<void>((r) => (settled = r));
+    bindings.setParam('exit_multiple', 9);
+    await recomputed;
+    expect(bindings.resolve('model.sponsor_irr').value as number).toBeGreaterThan(before);
   });
 });
