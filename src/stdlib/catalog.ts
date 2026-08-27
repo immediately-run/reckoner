@@ -23,6 +23,7 @@ export type CallableKind =
   | 'date'
   | 'null'
   | 'financial'
+  | 'convergence'
   | 'constructor'
   | 'testing'
   | 'relation'
@@ -515,6 +516,20 @@ const entries: SelfDescription[] = [
     returns: 'number (annualized).',
     examples: [
       "xirr([{ amount: -equity, date: '2026-12-31' }, { amount: dividend, date: '2028-06-30' }, { amount: exit_equity, date: '2031-12-31' }])",
+    ],
+  },
+  {
+    name: 'fixpoint',
+    kind: 'convergence',
+    summary: 'Iterate a pure step until the state stops moving — the explicit form of Excel\'s iterative-calc circular reference. Returns the EVIDENCE ({ converged, iterations, value }); a converged: false is the caller\'s to surface, never silent.',
+    params: [
+      { name: 'initial', type: 'Value', doc: 'The starting state (a plain value — typically an object of balances).' },
+      { name: 'step', type: '(state) => Value', doc: 'One iteration; pure, plain value in and out.' },
+      { name: 'opts', type: '{ tol?, maxIterations? }', doc: 'tol: absolute per numeric leaf (default 1e-12); maxIterations (default 200).', optional: true },
+    ],
+    returns: '{ converged, iterations, value }.',
+    examples: [
+      'const fp = fixpoint({ tlb: begin }, (s) => ({ tlb: interest_on(s) }), { tol: 1e-12 });\nif (!fp.converged) throw new Error("avg-balance interest did not converge");',
     ],
   },
 

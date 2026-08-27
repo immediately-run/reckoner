@@ -1,4 +1,4 @@
-import { cell, table, rollforward, cumprod, irr, sum } from "@reckoner/stdlib";
+import { cell, table, rollforward, cumprod, irr, fixpoint, sum } from "@reckoner/stdlib";
 
 // Caldera Components LBO — the model worksheet.
 //
@@ -131,21 +131,28 @@ function scheduleYears(ops, a, su, mode) {
       if (mode === "begin") {
         out = yearPass(op, a, su, bal, "begin");
       } else {
-        let est = null;
+        // The within-year fixed point on the stdlib's fixpoint helper (R3-378):
+        // iterate the average-balance estimate until it stops moving, then take
+        // one final pass at the converged state so the year's output columns are
+        // exactly consistent with it. Non-convergence surfaces as a thrown error
+        // — visible, the opposite of Excel's silent iterative calc.
         const trial = { rev: bal.rev, tlb: bal.tlb, mezz: bal.mezz, cash: bal.cash, est: null };
-        for (let i = 0; i < 200; i += 1) {
-          trial.est = est === null ? { rev: bal.rev, tlb: bal.tlb, mezz: bal.mezz } : est;
-          out = yearPass(op, a, su, trial, "avg");
-          const e = out.end;
-          if (est !== null &&
-              Math.abs(e.rev - est.rev) < 1e-12 && Math.abs(e.tlb - est.tlb) < 1e-12 &&
-              Math.abs(e.mezz - est.mezz) < 1e-12 && Math.abs(e.cash - est.cash) < 1e-12) {
-            est = e;
-            break;
-          }
-          est = e;
-          iterations += 1;
+        let lastOut = null;
+        const fp = fixpoint(
+          { rev: bal.rev, tlb: bal.tlb, mezz: bal.mezz, cash: bal.cash },
+          (est) => {
+            trial.est = est;
+            const pass = yearPass(op, a, su, trial, "avg");
+            lastOut = pass;
+            return pass.end;
+          },
+          { tol: 1e-12, maxIterations: 200 },
+        );
+        if (!fp.converged) {
+          throw new Error("average-balance interest did not converge in year " + op.year);
         }
+        iterations += fp.iterations;
+        out = lastOut;
       }
       const netDebt = out.end.tlb + out.end.mezz + out.end.rev - out.end.cash;
       return {
