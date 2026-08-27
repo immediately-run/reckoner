@@ -16,8 +16,8 @@ average-balance variant lives in the workbook cells.
 
 <Row>
   <Kpi source="model.sponsor_irr" format="percent" />
-  <Kpi source="model.moic" format="number" />
-  <Kpi source="model.sponsor_equity" format="currency" />
+  <Kpi source="model.moic" format="multiple" />
+  <Kpi source="model.sponsor_equity" format="currency" unit="m" />
 </Row>
 
 ## The deleveraging story.
@@ -25,14 +25,14 @@ average-balance variant lives in the workbook cells.
 <Chart source="model.debt_schedule" kind="bar" x="year" y="tlb_end" />
 <Chart source="model.operating" kind="line" x="year" y="ebitda" />
 
-<Table source="model.debt_schedule" columns={["year", "ebitda", "interest", "cfadr", "mand", "sweep", "tlb_end", "mezz_end", "cash_end", "net_debt", "leverage", "coverage"]} sortable />
+<Table source="model.debt_schedule" columns={["year", "ebitda", "interest", "cfadr", "mand", "sweep", { field: "tlb_end", format: "currency", unit: "m" }, { field: "mezz_end", format: "currency", unit: "m" }, { field: "cash_end", format: "currency", unit: "m" }, { field: "net_debt", format: "currency", unit: "m" }, { field: "leverage", format: "multiple" }, { field: "coverage", format: "multiple" }]} sortable />
 
 ## Sensitivity — sponsor IRR by exit multiple and leverage.
 
 Twenty-five full model re-runs over the base fixtures; the live deal knobs above
 do not bend this grid (it sweeps the model as a function, not the params).
 
-<Table source="model.sensitivity" columns={["exit_multiple", "tlb_turns", "sponsor_equity", "exit_equity", "moic", "irr"]} sortable />
+<Table source="model.sensitivity" columns={["exit_multiple", "tlb_turns", { field: "sponsor_equity", format: "currency", unit: "m" }, { field: "exit_equity", format: "currency", unit: "m" }, { field: "moic", format: "multiple" }, { field: "irr", format: "percent" }]} sortable />
 
 <Callout tone="info">
   Breakeven exit multiple for the 20 percent hurdle:

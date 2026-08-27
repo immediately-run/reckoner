@@ -87,7 +87,8 @@ const COMPONENTS: ComponentSchema[] = [
     attributes: [
       source('source'),
       source('compare', false),
-      { name: 'format', type: 'enum', values: ['number', 'currency', 'percent'] },
+      { name: 'format', type: 'enum', values: ['number', 'currency', 'percent', 'multiple'] },
+      { name: 'unit', type: 'string' },
       { name: 'spark', type: 'boolean' },
     ],
   },
@@ -95,6 +96,10 @@ const COMPONENTS: ComponentSchema[] = [
   {
     name: 'Table',
     attributes: [source('source'), { name: 'columns', type: 'literal-array', required: true }, { name: 'sortable', type: 'boolean' }],
+    // R3-382: a `columns` entry may be a field-name string OR a literal object
+    // { field, format?, unit? } — format selects number/currency/percent/multiple;
+    // unit ("EUR m") rides in the column header. Currency negatives render in
+    // parentheses (the accounting convention).
   },
   MAP,
   { name: 'Facets', container: true, childRule: 'single-chart', attributes: [source('source'), field('by', true)] },
@@ -102,7 +107,7 @@ const COMPONENTS: ComponentSchema[] = [
   { name: 'Value', attributes: [source('source')] },
   {
     name: 'Gauge',
-    attributes: [source('source'), { name: 'min', type: 'number' }, { name: 'max', type: 'number' }, { name: 'format', type: 'enum', values: ['number', 'currency', 'percent'] }],
+    attributes: [source('source'), { name: 'min', type: 'number' }, { name: 'max', type: 'number' }, { name: 'format', type: 'enum', values: ['number', 'currency', 'percent', 'multiple'] }, { name: 'unit', type: 'string' }],
   },
   { name: 'Section', container: true, attributes: [] },
   { name: 'Row', container: true, attributes: [] },

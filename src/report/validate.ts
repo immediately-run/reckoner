@@ -149,7 +149,12 @@ function checkAttr(component: string, attr: AttrSchema, value: AttrValue, ctx: C
       }
       return;
     case 'literal-array':
-      if (!Array.isArray(v) || v.some((e) => !isScalar(e))) err(`"${attr.name}" must be a literal array of scalars.`);
+      // R3-382: Table's `columns` accepts literal objects too ({ field, format?, unit? }) —
+      // plain data, captured by the render-as-data path; the enum `format` value is
+      // validated when the component reads it.
+      if (!Array.isArray(v) || v.some((e) => !isScalar(e) && !isPlainLiteral(e))) {
+        err(`"${attr.name}" must be a literal array of scalars (or literal objects, where the component allows them).`);
+      }
       return;
   }
 }
@@ -197,4 +202,13 @@ function checkStructuralRules(node: ComponentNode, schema: ComponentSchema, ctx:
 
 function isScalar(v: Value): boolean {
   return v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+}
+
+/** A plain literal object (values recursively scalar) — the R3-382 column-spec shape. */
+function isPlainLiteral(v: Value): boolean {
+  if (Array.isArray(v)) return v.every(isPlainLiteral);
+  if (v !== null && typeof v === 'object') {
+    return Object.values(v).every((e) => isScalar(e) || isPlainLiteral(e));
+  }
+  return isScalar(v);
 }

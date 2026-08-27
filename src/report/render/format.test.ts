@@ -29,3 +29,36 @@ describe('format', () => {
     expect(d.label).toMatch(/\+.*10%/);
   });
 });
+
+describe('finance formats (R3-382)', () => {
+  it('multiple renders 2.75x', () => {
+    expect(formatNumber(2.7458995493266767, 'multiple')).toMatch(/^2\.75x$/);
+    expect(formatNumber(1.2, 'multiple')).toBe('1.2x');
+  });
+
+  it('currency negatives render in parentheses (the accounting convention)', () => {
+    const out = formatNumber(-1234, 'currency');
+    expect(out).toMatch(/1,?234/);      // grouped magnitude
+    expect(out).toMatch(/[()]/);        // parenthesized negative
+    expect(out).not.toMatch(/-/);
+  });
+
+  it('thousands separators are on (locale-default grouping)', () => {
+    expect(formatNumber(1234567.891, 'number')).toMatch(/1[,.]234[,.]567/);
+  });
+
+  it('a unit suffix rides after the number', () => {
+    expect(formatNumber(370.16, 'number', 'EUR m')).toBe(`${NF(370.16)} EUR m`);
+    expect(formatNumber(2.75, 'multiple', 'MOIC')).toBe('2.75x MOIC');
+  });
+
+  it('formatScalar threads format + unit for numbers only', () => {
+    expect(formatScalar(46.27, 'number', 'EUR m')).toMatch(/46\.27 EUR m/);
+    expect(formatScalar('all', 'number', 'EUR m')).toBe('all');
+    expect(formatScalar(null, 'number', 'EUR m')).toBe('—');
+  });
+});
+
+function NF(n: number): string {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(n);
+}
