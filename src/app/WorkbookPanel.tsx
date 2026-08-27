@@ -6,22 +6,31 @@
 // story is theater. Author-side surface (viewers never see worksheets, brief A3): opened
 // from the report header, closed by default, run-mode report untouched. Card clicks open
 // the value inspector (App owns the inspected cell, shared with the on-pixel affordance).
-import type { AsyncEngine } from '../engine/asyncEngine.ts';
+//
+// The scratch pad (WHATIF_SHADOW_EVALUATION_SPEC §1.2) rides at the bottom: an unsaved
+// worksheet evaluated through the shadow session, sharing this panel's suite results as
+// the verdict-diff base. Its buffer text is App-owned (§1.4 — survives panel close).
 import { useVerdicts } from '../hooks/useVerdicts.ts';
 import { summarizeSuite } from '../engine/suiteReport.ts';
+import type { ReportSession } from './reportSession.ts';
 import WorkbookPanelBody from './WorkbookPanelBody.tsx';
+import ScratchPad from './ScratchPad.tsx';
 import './workbook-panel.css';
 
 interface WorkbookPanelProps {
-  engine: AsyncEngine;
+  session: ReportSession;
   /** The report's re-render tick — suites re-run when the workbook recomputes. */
   tick: number;
   /** Open the value inspector on a cell (card click). */
   onInspect: (cellId: string) => void;
   onClose: () => void;
+  /** The scratch pad's session-scoped buffer text (App owns it; spec §1.4). */
+  scratchText: string;
+  onScratchChange: (text: string) => void;
 }
 
-function WorkbookPanel({ engine, tick, onInspect, onClose }: WorkbookPanelProps) {
+function WorkbookPanel({ session, tick, onInspect, onClose, scratchText, onScratchChange }: WorkbookPanelProps) {
+  const engine = session.engine;
   const { results, error, running, rerun } = useVerdicts(engine, tick);
   const cells = engine.cells();
   // S4a (R3-231): the workbook-level answer in one line, from the SAME verdicts the cards
@@ -55,6 +64,7 @@ function WorkbookPanel({ engine, tick, onInspect, onClose }: WorkbookPanelProps)
         valueOf={(id) => engine.value(id)}
         onInspect={onInspect}
       />
+      <ScratchPad session={session} baseVerdicts={results} text={scratchText} onTextChange={onScratchChange} />
     </aside>
   );
 }

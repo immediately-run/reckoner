@@ -29,6 +29,24 @@ export type { CellDescriptor, WorkbookDescriptor, WorkerRequest, WorkerResponse 
 export { meetTier, meetTiers, compareTier, isAutonomousMonotone } from './tier.ts';
 export type { Tier } from './tier.ts';
 export { contentKey } from './hash.ts';
+export {
+  SCRATCH_WORKSHEET,
+  spliceFormula,
+  patchSources,
+  dependentsClosure,
+  diffPasses,
+  diffVerdicts,
+} from './shadow.ts';
+export type {
+  ShadowPatch,
+  PatchError,
+  PatchErrorCode,
+  PatchResult,
+  SpliceResult,
+  ValueDelta,
+  DeltaKind,
+  VerdictFlip,
+} from './shadow.ts';
 export type {
   DependencyGraph,
   ExternalValue,

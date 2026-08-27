@@ -288,6 +288,32 @@ export class AsyncEngine {
     return { results: new Map(this.#results), errors: new Map(this.#errors), quarantined: this.#breaker.quarantined() };
   }
 
+  /**
+   * A coherent settled baseline for shadow evaluation (WHATIF_SHADOW_EVALUATION_SPEC §2.1,
+   * G-WIF-3): awaits quiescence (no pass in flight, nothing pending — bounded by single-slot
+   * supersession), then returns the settled pass **and** the externals that produced it as
+   * one pair. The externals are **deep copies** (structured clone; every external crossed the
+   * worker boundary, so clonability holds by construction) — a correctness requirement on the
+   * in-process transport, where handing out live references would let a shadow formula mutate
+   * the base session's inputs.
+   */
+  async settledSnapshot(): Promise<{ pass: AsyncPass; externals: Record<string, ExternalValue> }> {
+    while (this.#running || this.#pendingExternals !== null) {
+      if (!this.#running) {
+        // Pending-but-idle is unreachable via run()/update() (both drive synchronously),
+        // but a caller racing the microtask gap lands here — drive rather than spin.
+        await this.#drive();
+      } else {
+        await this.#runningPromise;
+      }
+    }
+    const externals: Record<string, ExternalValue> = {};
+    for (const [k, v] of this.#externals) {
+      externals[k] = structuredClone({ value: v.value, tier: v.tier });
+    }
+    return { pass: this.snapshot(), externals };
+  }
+
   // --- internals -----------------------------------------------------------------
 
   #emptyPass(): AsyncPass {

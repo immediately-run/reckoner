@@ -53,6 +53,7 @@ function delayingTransport(delays: Record<string, number>): WorkerTransport {
     restart() {
       worker = createEngineWorker();
     },
+    dispose() {},
   };
 }
 

@@ -14,12 +14,18 @@ import { useReport } from './hooks/useReport.ts';
 import { ReportView } from './report/index.ts';
 import WorkbookPanel from './app/WorkbookPanel.tsx';
 import ValueInspector from './app/ValueInspector.tsx';
+import WhatIfPanel from './app/WhatIfPanel.tsx';
 import { useVerdicts } from './hooks/useVerdicts.ts';
 
 function App() {
   const report = useReport();
   const [reviewOpen, setReviewOpen] = useState(false);
   const [inspected, setInspected] = useState<string | null>(null);
+  // What-if buffer text is SESSION-SCOPED app state (WHATIF_SHADOW_EVALUATION_SPEC §1.4):
+  // closing a panel must never destroy typed source, so the per-cell variants and the
+  // scratch pad's buffer live here, above the panels' mount/unmount lifecycle.
+  const [variants, setVariants] = useState<Record<string, string>>({});
+  const [scratchText, setScratchText] = useState('');
   const title = report.status === 'ready' ? report.session.title : undefined;
   useEffect(() => {
     if (title !== undefined) document.title = title;
@@ -65,10 +71,12 @@ function App() {
           <ReportView nodes={report.session.nodes} bindings={report.bindings} inspection={inspection ?? undefined} />
           {reviewOpen && (
             <WorkbookPanel
-              engine={report.session.engine}
+              session={report.session}
               tick={report.tick}
               onInspect={setInspected}
               onClose={() => setReviewOpen(false)}
+              scratchText={scratchText}
+              onScratchChange={setScratchText}
             />
           )}
           {inspectedCell !== null && (
@@ -81,6 +89,13 @@ function App() {
                 result={report.session.engine.result(inspectedCell.id)}
                 onNavigate={setInspected}
                 onClose={() => setInspected(null)}
+              />
+              <WhatIfPanel
+                session={report.session}
+                cell={inspectedCell}
+                baseVerdicts={verdicts.results}
+                text={variants[inspectedCell.id] ?? inspectedCell.formulaSource}
+                onTextChange={(cellId, text) => setVariants((v) => ({ ...v, [cellId]: text }))}
               />
             </div>
           )}

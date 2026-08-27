@@ -20,8 +20,15 @@ declare const Compartment: new (endowments?: Record<string, unknown>) => {
   evaluate: (source: string) => unknown;
 };
 
+// Both regexes are LINE-ANCHORED (WHATIF_SHADOW_EVALUATION_SPEC §3.3, G-WIF-1a): the token
+// sequence `export const` inside a formula's single-line string literal or comment must
+// neither be rewritten (which would make `formula.toString()` diverge from file text and
+// break the what-if splice) nor collect a phantom export name (which would break the
+// register call). Residual, accepted: a string literal containing a newline followed by
+// `export const` still matches — such a sheet breaks the base build today regardless.
 const STDLIB_IMPORT = /^\s*import\s+[^;]*from\s+['"]@reckoner\/stdlib['"];?\s*$/gm;
-const EXPORT_CONST = /export\s+const\s+(\w+)/g;
+const EXPORT_CONST = /^\s*export\s+const\s+(\w+)/gm;
+const EXPORT_PREFIX = /^(\s*)export\s+const\s+/gm;
 
 /**
  * Evaluate a worksheet module inside a fresh SES Compartment and return its registered
@@ -35,7 +42,7 @@ export function evaluateWorksheet(
   stdlib: Record<string, unknown>,
 ): Record<string, NodeDef> {
   const names = [...source.matchAll(EXPORT_CONST)].map((m) => m[1]);
-  const body = source.replace(STDLIB_IMPORT, '').replace(/export\s+const\s+/g, 'const ');
+  const body = source.replace(STDLIB_IMPORT, '').replace(EXPORT_PREFIX, '$1const ');
 
   let collected: Record<string, unknown> = {};
   const register = (obj: Record<string, unknown>): void => {
