@@ -37,15 +37,17 @@ export {
   asofJoin,
   cummax,
   cummin,
+  cumprod,
   cumsum,
   cumulative,
   ema,
   lag,
   lead,
+  rollforward,
   runningMean,
   scan,
 } from './ordered.ts';
-export type { AsofOptions, LagOptions, ScanOp, WindowOptions } from './ordered.ts';
+export type { AsofOptions, LagOptions, RollforwardOptions, ScanOp, WindowOptions } from './ordered.ts';
 
 // Pure date helpers (no ambient clock).
 export {

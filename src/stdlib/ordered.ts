@@ -73,6 +73,11 @@ export function cumsum(col: string): ScanOp {
   return runningReduce(col, (acc, v) => (acc === null ? v : acc + v));
 }
 
+/** Running product; `null` until the first finite value, then carried across nulls. */
+export function cumprod(col: string): ScanOp {
+  return runningReduce(col, (acc, v) => (acc === null ? v : acc * v));
+}
+
 /** Running maximum of the finite values seen so far. */
 export function cummax(col: string): ScanOp {
   return runningReduce(col, (acc, v) => (acc === null ? v : Math.max(acc, v)));
@@ -119,6 +124,44 @@ export interface AsofOptions {
   /** The ordered key matched by nearest-preceding (`backward`) or nearest-following (`forward`). */
   match: string;
   direction?: 'backward' | 'forward';
+}
+
+export interface RollforwardOptions {
+  /** The column (or SortKey list) defining step order — required: a roll-forward is order-dependent. */
+  orderBy: string | SortKey[];
+  /** The opening state: column name → initial value. Becomes `<k>_begin` on the first row. */
+  begin: Record<string, Value>;
+  /**
+   * One step of the schedule: the current row + the opening balance → the row's output
+   * columns (`out`, spread as-is) and the closing balance (`next`; becomes `<k>_end`, and
+   * the opening balance of the following row). Outputs are sanitized (NaN/±Infinity →
+   * `null`), per the stdlib's null semantics.
+   */
+  step: (row: Row, balance: Record<string, Value>) => { out?: Row; next: Record<string, Value> };
+}
+
+/**
+ * The multi-state roll-forward — THE financial-modeling structure (debt schedules, NWC,
+ * PP&E, CAGR bridges): a tuple of co-evolving balances, each row's closing balance
+ * becoming the next row's opening. Spec-by-example: the Caldera case study's debt
+ * schedule (R3-375, gap G5 — this replaces the custom packed-`scan` workaround).
+ *
+ * Output rows carry the original columns, one `<k>_begin` / `<k>_end` pair per state
+ * key, and the `out` columns from each step — flattened, no unpack step.
+ */
+export function rollforward(rows: Row[], opts: RollforwardOptions): Row[] {
+  const ordered = sort(rows, opts.orderBy);
+  const stateKeys = Object.keys(opts.begin);
+  let balance: Record<string, Value> = { ...opts.begin };
+  return ordered.map((row) => {
+    const outRow: Row = { ...row };
+    for (const k of stateKeys) outRow[`${k}_begin`] = balance[k] ?? null;
+    const { out = {}, next } = opts.step(row, balance);
+    for (const [k, v] of Object.entries(out)) outRow[k] = sanitize(v);
+    for (const k of stateKeys) outRow[`${k}_end`] = sanitize(next[k] ?? null);
+    balance = next;
+    return outRow;
+  });
 }
 
 /**

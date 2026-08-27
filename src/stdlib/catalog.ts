@@ -293,6 +293,33 @@ const entries: SelfDescription[] = [
     examples: ['scan(rows, { rt: cumsum("amount") }, { orderBy: "day" })'],
   },
   {
+    name: 'cumprod',
+    kind: 'window',
+    summary: 'Running product (growth paths, index compounding); null until the first finite value, then carried across nulls.',
+    params: [col('Column of factors to compound.')],
+    returns: 'ScanOp for scan/cumulative.',
+    examples: [
+      'scan(derive(rows, { factor: (r) => 1 + r.growth }), { path: cumprod("factor") }, { partitionBy: "segment", orderBy: "year" })',
+    ],
+  },
+  {
+    name: 'rollforward',
+    kind: 'window',
+    summary: 'The multi-state roll-forward (debt schedules, NWC, PP&E): co-evolving balances, each row closing into the next row opening. Use this — not a hand-rolled scan/reduce — whenever a schedule carries more than one co-evolving balance.',
+    params: [
+      rows,
+      {
+        name: 'opts',
+        type: '{ orderBy, begin, step }',
+        doc: 'orderBy (required): step order. begin: column → opening value. step: (row, balance) → { out?: columns, next: closing balance }.',
+      },
+    ],
+    returns: 'Row[] with the original columns, one <k>_begin/<k>_end pair per state key, and the out columns — flattened.',
+    examples: [
+      'rollforward(years, { orderBy: "year", begin: { tlb: 231.4, cash: 8 }, step: (r, bal) => ({ out: { sweep: bal.tlb * 0.05 }, next: { tlb: bal.tlb - bal.tlb * 0.05, cash: bal.cash + 1 } }) })',
+    ],
+  },
+  {
     name: 'cummax',
     kind: 'window',
     summary: 'Running maximum of the finite values seen so far.',
