@@ -58,6 +58,20 @@ describe('permutationInvariance', () => {
   it('fails when the runner did not supply a transformed result', () => {
     expect(rel.evaluate({ result: [] }).pass).toBe(false);
   });
+
+  // R3-374: reordering float summation legitimately moves results by ulps — an
+  // order-invariance check must not compare bit-for-bit. (0.1+0.2)+0.3 vs
+  // (0.3+0.2)+0.1 differ; strict deepEqual fails, the tolerant default passes.
+  it('passes a last-ulp reorder difference that strict deepEqual would fail', () => {
+    const fwd = 0.1 + 0.2 + 0.3; // 0.6000000000000001
+    const rev = 0.3 + 0.2 + 0.1; // 0.6
+    expect(Object.is(fwd, rev)).toBe(false); // the test bites: they really differ
+    expect(rel.evaluate({ result: [{ total: fwd }], transformedResult: [{ total: rev }] }).pass).toBe(true);
+  });
+
+  it('still fails on a real numeric difference beyond the tolerance', () => {
+    expect(rel.evaluate({ result: [{ total: 0.6 }], transformedResult: [{ total: 0.600001 }] }).pass).toBe(false);
+  });
 });
 
 describe('scaleInvariance', () => {
@@ -77,6 +91,35 @@ describe('scaleInvariance', () => {
     const base: Value = [{ region: 'EU', revenue: 100 }];
     expect(rel.evaluate({ result: base, transformedResult: [{ region: 'EU', revenue: 150 }] }).pass).toBe(false);
     expect(rel.evaluate({ result: base, transformedResult: [{ region: 'US', revenue: 200 }] }).pass).toBe(false);
+  });
+
+  // R3-374: `leaves` names the only fields that scale — the escape for inputs that
+  // also carry rates/percentages (the Caldera historical_segments shape: revenue
+  // scales, margins must not).
+  it('leaves: only the named input fields scale; everything else must be unchanged', () => {
+    const sel = scaleInvariance({ over: 'hist', by: 2, leaves: ['fy2026'] });
+    const hist: Value = [
+      { segment: 'seals', fy2026: 96, margin_fy2026: 0.26 },
+      { segment: 'bearings', fy2026: 74, margin_fy2026: 0.19 },
+    ];
+    expect(sel.transform?.(hist)).toEqual([
+      { segment: 'seals', fy2026: 192, margin_fy2026: 0.26 },
+      { segment: 'bearings', fy2026: 148, margin_fy2026: 0.19 },
+    ]);
+    // a linear subject over the selected leaves: ltm ebitda = Σ fy2026 × margin
+    type H = { fy2026: number; margin_fy2026: number };
+    const ltm = (rows: unknown): Value =>
+      (rows as H[]).reduce((a, r) => a + r.fy2026 * r.margin_fy2026, 0);
+    expect(
+      sel.evaluate({ result: ltm(hist), transformedResult: ltm(sel.transform!(hist)) }).pass,
+    ).toBe(true);
+    // and a margin that moved is caught: the unselected leaves must be unchanged
+    expect(
+      sel.evaluate({
+        result: ltm(hist),
+        transformedResult: ltm(hist.map((r) => ({ ...(r as object), margin_fy2026: 0.5 }))),
+      }).pass,
+    ).toBe(false);
   });
 });
 
