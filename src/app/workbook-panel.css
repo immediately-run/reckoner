@@ -388,3 +388,58 @@
 .rk-prec-detail {
   color: var(--ink-3);
 }
+
+/* S4a (R3-231): the one-action suite run and its workbook-level summary line.
+   Deliberately quiet — it sits above the cards and answers "did it pass" without
+   competing with them; the per-cell chips remain where coverage is read. */
+.rk-wb-actions {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.rk-wb-run {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.rk-wb-run:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+
+.rk-wb-run:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rk-wb-summary {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  color: var(--ink-2);
+}
+
+/* Pass and fail differ by the LEFT RULE, not by a coloured fill: the per-cell
+   verdict chips already own colour in this panel, and a second colour system
+   above them would compete with the distinction §6 needs to stay legible. */
+.rk-wb-summary--ok {
+  border-left: 3px solid var(--line-2);
+}
+
+.rk-wb-summary--fail {
+  border-left: 3px solid var(--accent);
+  color: var(--ink);
+}

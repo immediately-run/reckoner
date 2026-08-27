@@ -8,6 +8,7 @@
 // the value inspector (App owns the inspected cell, shared with the on-pixel affordance).
 import type { AsyncEngine } from '../engine/asyncEngine.ts';
 import { useVerdicts } from '../hooks/useVerdicts.ts';
+import { summarizeSuite } from '../engine/suiteReport.ts';
 import WorkbookPanelBody from './WorkbookPanelBody.tsx';
 import './workbook-panel.css';
 
@@ -21,20 +22,34 @@ interface WorkbookPanelProps {
 }
 
 function WorkbookPanel({ engine, tick, onInspect, onClose }: WorkbookPanelProps) {
-  const { results, error } = useVerdicts(engine, tick);
+  const { results, error, running, rerun } = useVerdicts(engine, tick);
+  const cells = engine.cells();
+  // S4a (R3-231): the workbook-level answer in one line, from the SAME verdicts the cards
+  // below render — the in-platform equivalent of a test-runner summary, no terminal.
+  const report = summarizeSuite(cells, results);
 
   return (
     <aside className="rk-wb-panel" aria-label="Workbook review">
       <header className="rk-wb-head">
         <h2>Workbook</h2>
-        <button type="button" className="rk-wb-close" onClick={onClose}>
-          Close
-        </button>
+        <div className="rk-wb-actions">
+          <button type="button" className="rk-wb-run" onClick={rerun} disabled={running}>
+            {running ? 'Running…' : 'Run suite'}
+          </button>
+          <button type="button" className="rk-wb-close" onClick={onClose}>
+            Close
+          </button>
+        </div>
       </header>
       {error !== null && <div className="rk-wb-error">{error}</div>}
       {results === null && error === null && <div className="rk-wb-note">Running suites…</div>}
+      {results !== null && (
+        <div className={`rk-wb-summary ${report.ok ? 'rk-wb-summary--ok' : 'rk-wb-summary--fail'}`} role="status">
+          {report.line}
+        </div>
+      )}
       <WorkbookPanelBody
-        cells={engine.cells()}
+        cells={cells}
         tests={engine.tests()}
         results={results}
         valueOf={(id) => engine.value(id)}

@@ -29,6 +29,34 @@ describe('classifyCell — the review-surface verdict (§6)', () => {
     expect(classifyCell([{ kind: 'characterization', pass: true }])).toBe('pinned');
     expect(classifyCell([{ kind: 'specification', pass: true }, { kind: 'characterization', pass: true }])).toBe('pinned');
   });
+
+  // G-HRM-8 (`HOLDOUT_REDACTED_MOUNT_SPEC` §6, roadmap R3-228). A holdout test is emitted
+  // as a `specification` cell, and this is the assertion that keeps D9 honest about what
+  // it bought: the mechanism closes the trivial read, it does NOT make the formula
+  // correct. §5.1's test-oracle channel and §5.2's affine reconstruction both survive
+  // path separation, so a green holdout run is a tripwire — and a review surface that
+  // promoted it to "validated" would be claiming exactly the certification two adversarial
+  // passes withdrew.
+  //
+  // The rule this pins predates D9 (it is §6's example-based/oracle-free split). It is
+  // asserted here under the gate's name so the ladder has a test that fails if a later
+  // change to the verdict rule quietly re-promotes a holdout-only cell.
+  it('G-HRM-8: a holdout-only cell is pinned, never validated — a tripwire, not a proof', () => {
+    // The mainline shape: the host withheld rows and emitted one `specification` test.
+    expect(classifyCell([{ kind: 'specification', pass: true }])).toBe('pinned');
+    // Piling on more holdout legs does not add up to validation.
+    expect(
+      classifyCell([
+        { kind: 'specification', pass: true },
+        { kind: 'specification', pass: true },
+        { kind: 'specification', pass: true },
+      ]),
+    ).toBe('pinned');
+    // Only an oracle-free leg promotes it — and that leg needs no hidden data at all.
+    expect(classifyCell([{ kind: 'specification', pass: true }, { kind: 'metamorphic', pass: true }])).toBe('validated');
+    // The tripwire still fires: a broken held-out row is a real, loud signal.
+    expect(classifyCell([{ kind: 'specification', pass: false }])).toBe('failing');
+  });
 });
 
 describe('runTest — expect', () => {

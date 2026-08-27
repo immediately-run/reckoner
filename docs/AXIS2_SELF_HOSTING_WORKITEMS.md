@@ -4,7 +4,7 @@
 `ARCHITECTURE_PLAN.md` §0.2. Reckoner forces not only the platform's *runtime* capabilities
 (the nine deltas) but its ability to **host its own development**. These are the platform
 self-hosting gaps that keep Reckoner development from being fully in-platform, scoped as
-actionable items. · **Updated:** 2026-07-15
+actionable items. · **Updated:** 2026-08-27
 
 > **Reads first:** `ARCHITECTURE_PLAN.md` §0.2 (the dogfooding stance + the S1–S6 gradient),
 > §10 (the in-platform work-item tags); `LOCAL_DEVELOPMENT_SPEC.md`, `EDITOR_AS_APP_SPEC.md`,
@@ -102,7 +102,28 @@ verified without external CI.
 - **S4b (when built):** a source change's `build`+`lint`+`unit-test` verdict is available
   in-platform; until then, the plan/status honestly marks source CI as ✗ (external).
 
-**In-platform tag:** S4a ◐ (with the M1 engine); S4b ✗ (needs the platform capability).
+> **S4a DELIVERED, 2026-08-27 (roadmap R3-231).** The workbook panel carries a **Run
+> suite** action and a one-line workbook-level summary
+> (`Suite passed — 4 validated · 3 pinned · 3 untested of 10 cells.`), computed by
+> `src/engine/suiteReport.ts` from the **same** `SubjectResult.verdict` map the cards
+> render. That sameness is the acceptance clause, so it is structural rather than
+> incidental: `classifyCell` stays the single owner of the §6 rule and `summarizeSuite`
+> only counts — there is no second classification that could disagree with the cards
+> beneath it. `useVerdicts` gained `running` + `rerun` so the action re-runs
+> `engine.runTests()` on demand rather than waiting for a recompute.
+>
+> Two things it deliberately is not. **Mutation score** is `(later)` in this item and is
+> an optional field that stays *absent* until something measures it — never a zero that
+> would read as a measured 0%. And **`ok` means nothing failed, not that the workbook is
+> covered**: an entirely untested workbook is green by that measure, which is honest, and
+> is why the coverage counts sit next to it instead of being folded into one number.
+>
+> **S4b remains ✗ and is not scheduled.** `tsc`, `eslint`, `vitest` and Stryker are Node
+> processes; nothing runs them in-browser, so source-level CI stays external. That is the
+> honest exception the §0.2 ✗ tag marks, and S4a does not narrow it — a document-test gate
+> and a source CI gate answer different questions.
+
+**In-platform tag:** S4a ✅ (2026-08-27); S4b ✗ (needs the platform capability).
 **Owner:** S4a Reckoner (editor integration of the engine test run); S4b `immediately-run-site-main`
 + platform. **Depends on:** S4a → the engine (M1) + S2; S4b → a platform runner (new).
 
@@ -115,7 +136,7 @@ verified without external CI.
 | S1 | Edit → live-preview loop for content & source | ✅ exists | editor + agent write-port + `local` provider host preview |
 | S2 | In-platform document-test execution | ◐ by construction at M1 | tests-as-cells run in the engine; S4a exposes it |
 | **S3** | **In-platform commit/push** | ✅ **delivered** (reconciled 2026-07-15) | ships on `protocol-contribute` + the `panel.contribute` affordance — see the §S3 correction note |
-| **S4** | **In-platform CI gate** | **S4a ◐ / S4b ✗ → this doc** | document tests in-platform; source CI is the tracked gap |
+| **S4** | **In-platform CI gate** | **S4a ✅ (2026-08-27) / S4b ✗** | the workbook suite runs from the editor with the review surface's own verdicts; source CI is the tracked gap |
 | S5 | Dep resolution for SES / CodeMirror in-platform | ✅ **proven** (2026-07-12) | live spike: the module-fetch path resolves `ses`+`@endo/*`+`@codemirror/*`, and a starved SES `Compartment` runs in-platform — see [`spikes/S5_SES_MODULE_RESOLUTION.md`](spikes/S5_SES_MODULE_RESOLUTION.md) |
 | S6 | Run the real four-realm composite in-platform | ✗ gated on D1–D9 | the recursion; resolves as the deltas land (M3) — and needs Spine 2's topology to express a multi-appKey launch (`COMPOSITE_CAPABILITY_TOPOLOGY_SPEC` OQ-3) |
 
@@ -123,8 +144,8 @@ verified without external CI.
 
 1. **S3** — ✅ **delivered by reconciliation** (2026-07-15): the content-authoring commit/push
    loop already ships on `protocol-contribute` (see the §S3 correction note); no new code.
-2. **S4a** — folds into the M1/M2 editor work; formalizes the document-test gate S2 already
-   enables.
+2. **S4a** — ✅ **delivered** (2026-08-27, R3-231): the **Run suite** action + the
+   workbook-level summary in the review panel, from the review surface's own verdicts.
 3. **S5 spike** — ✅ **DONE, positive** (2026-07-12): the module-fetch path resolves
    SES + CodeMirror and a starved SES `Compartment` runs in-platform, so the engine realm is
    buildable in-platform. Findings: [`spikes/S5_SES_MODULE_RESOLUTION.md`](spikes/S5_SES_MODULE_RESOLUTION.md).
