@@ -102,6 +102,55 @@ do not reorder the ends:
    Never report a formula as done with failing or unrun tests. Never claim
    correctness a test does not show — say what is tested and what is not.
 
+## Parameter sweeps: the model-as-a-function idiom
+
+A cell cannot re-run other cells — there is no ambient registry and never will
+be. So when the user asks for a sensitivity ("IRR by exit multiple ×
+leverage", "what if growth were 2pp lower across the grid"), do **not** try to
+reach other cells from inside a formula, and do **not** paste a model's logic
+into N copies. Refactor the model into **pure module-scope helper functions**
+once, then express the sweep as one cell that maps the helper over the
+parameter grid:
+
+```js
+// helpers, module scope, pure — the model as a function
+function runModel(a, hist, plan, yearPlan, overrides) { /* … */ }
+
+export const sensitivity = cell({
+  doc: "Two-way IRR sensitivity: exit multiple 7.0–9.0x × TLB leverage 4.0–6.0x, 25 full model re-runs",
+  inputs: { a: "fixtures.assumptions", hist: "fixtures.historical_segments",
+            plan: "fixtures.ops_plan", yearPlan: "fixtures.year_plan" },
+  formula: ({ a, hist, plan, yearPlan }) => {
+    const rows = [];
+    for (const exit_m of [7.0, 7.5, 8.0, 8.5, 9.0]) {
+      for (const lev of [4.0, 4.5, 5.0, 5.5, 6.0]) {
+        const r = runModel(a[0], hist, plan, yearPlan, { exit_multiple: exit_m, tlb_turns: lev });
+        rows.push({ exit_multiple: exit_m, tlb_turns: lev, ...r });
+      }
+    }
+    return rows;
+  },
+});
+```
+
+Rules of the idiom:
+
+- **Sweep the base fixtures, not the live params.** The grid is a function of
+  the document's data with the swept parameters overridden explicitly; a
+  viewer flipping a param must not silently bend the grid. (If the user wants
+  a live sweep, say so and discuss — that is a different cell.)
+- **The helper takes everything it reads as arguments** — same discipline as
+  `inputs` for cells. No free variables from module scope that secretly carry
+  model state.
+- **One model, one function.** The interactive cells and the sweep call the
+  SAME helpers; the sweep must never be a second, drifting copy of the model.
+- **Prefer stdlib callables inside the helpers** — `rollforward` for
+  multi-state schedules, `irr`/`npv`/`xirr` for returns, `fixpoint` for
+  convergent calculations. Hand-rolling any of these is a defect, not style.
+- **The sweep is testable like any cell** — pin grid corners to oracle values,
+  and state monotonicity properties (finance sweeps are usually monotone in
+  their axes; assert it).
+
 ## Testing: what certifies what
 
 Every test cell carries a `kind`, and the kinds are not interchangeable:
