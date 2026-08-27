@@ -1,15 +1,42 @@
 // Table — matrix display (§3.3). Binds a `source` to rows and shows the literal `columns`
 // list; `sortable` makes headers toggle an in-view sort (a pure view op — the data channel is
-// untouched). Cells format by value type. Non-table / non-ok binding → broken tile.
+// untouched). A column entry is a field name string or a literal object
+// `{ field, format?, unit? }` (R3-382) — `format` selects the number/currency/percent/multiple
+// presentation and `unit` a display suffix ("EUR m"), both literal. Non-table / non-ok
+// binding → broken tile.
 import { useState } from 'react';
 import type { ComponentNode } from '../../nodes.ts';
 import type { Row, Value } from '../../../stdlib/types.ts';
 import { useSource } from '../bindingsContext.ts';
 import { asRows } from '../shape.ts';
-import { attrString, attrBool, attrStringArray } from '../attrs.ts';
+import { attrString, attrBool, attrArray } from '../attrs.ts';
 import { formatScalar } from '../format.ts';
+import type { NumberFormat } from '../format.ts';
 import BrokenTile from './BrokenTile.tsx';
 import TierSlot from './TierSlot.tsx';
+
+interface ColumnSpec {
+  field: string;
+  format?: NumberFormat;
+  unit?: string;
+}
+
+/** Normalize the literal `columns` array: strings, or `{ field, format?, unit? }` objects. */
+function readColumns(raw: unknown): ColumnSpec[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((e): ColumnSpec[] => {
+    if (typeof e === 'string') return [{ field: e }];
+    if (e !== null && typeof e === 'object' && typeof (e as { field?: unknown }).field === 'string') {
+      const o = e as { field: string; format?: unknown; unit?: unknown };
+      return [{
+        field: o.field,
+        format: typeof o.format === 'string' ? (o.format as NumberFormat) : undefined,
+        unit: typeof o.unit === 'string' ? o.unit : undefined,
+      }];
+    }
+    return [];
+  });
+}
 
 function compare(a: Value, b: Value): number {
   if (typeof a === 'number' && typeof b === 'number') return a - b;
@@ -18,7 +45,7 @@ function compare(a: Value, b: Value): number {
 
 export default function Table({ node }: { node: ComponentNode }) {
   const bound = useSource(attrString(node, 'source'));
-  const columns = attrStringArray(node, 'columns');
+  const columns = readColumns(attrArray(node, 'columns'));
   const sortable = attrBool(node, 'sortable');
   const [sort, setSort] = useState<{ col: string; dir: 1 | -1 } | null>(null);
 
@@ -27,7 +54,7 @@ export default function Table({ node }: { node: ComponentNode }) {
   }
   const rowsR = asRows(bound.value);
   if (!rowsR.ok) return <BrokenTile component="Table" reason={rowsR.reason} />;
-  const cols = columns.length > 0 ? columns : Object.keys(rowsR.data[0] ?? {});
+  const cols: ColumnSpec[] = columns.length > 0 ? columns : Object.keys(rowsR.data[0] ?? {}).map((field): ColumnSpec => ({ field }));
 
   let rows: Row[] = rowsR.data;
   if (sort !== null) {
@@ -47,9 +74,10 @@ export default function Table({ node }: { node: ComponentNode }) {
           <thead>
             <tr>
               {cols.map((c) => (
-                <th key={c} onClick={() => onSort(c)} aria-sort={sort?.col === c ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
-                  {c}
-                  {sortable && sort?.col === c ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
+                <th key={c.field} onClick={() => onSort(c.field)} aria-sort={sort?.col === c.field ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
+                  {c.field}
+                  {c.unit ? <span className="rk-col-unit"> ({c.unit})</span> : ''}
+                  {sortable && sort?.col === c.field ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
                 </th>
               ))}
             </tr>
@@ -58,10 +86,10 @@ export default function Table({ node }: { node: ComponentNode }) {
             {rows.map((r, i) => (
               <tr key={i}>
                 {cols.map((c) => {
-                  const v = r[c] ?? null;
+                  const v = r[c.field] ?? null;
                   return (
-                    <td key={c} data-numeric={typeof v === 'number' || undefined}>
-                      {formatScalar(typeof v === 'object' && v !== null ? null : v)}
+                    <td key={c.field} data-numeric={typeof v === 'number' || undefined}>
+                      {formatScalar(typeof v === 'object' && v !== null ? null : v, c.format)}
                     </td>
                   );
                 })}

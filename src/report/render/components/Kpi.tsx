@@ -14,6 +14,7 @@ import TierSlot from './TierSlot.tsx';
 export default function Kpi({ node }: { node: ComponentNode }) {
   const source = attrString(node, 'source');
   const format = (attrString(node, 'format') ?? 'number') as NumberFormat;
+  const unit = attrString(node, 'unit');
   const bound = useSource(source);
   const compare = useSource(attrString(node, 'compare'));
 
@@ -29,7 +30,7 @@ export default function Kpi({ node }: { node: ComponentNode }) {
   return (
     <div className="rk-kpi rk-tile">
       <TierSlot tier={bound.tier} />
-      <div className="rk-kpi-value">{formatScalar(scalar.data, format)}</div>
+      <div className="rk-kpi-value">{formatScalar(scalar.data, format, unit)}</div>
       {delta && (
         <div className="rk-kpi-delta" data-direction={delta.direction}>
           {delta.label}

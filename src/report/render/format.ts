@@ -1,27 +1,39 @@
 // Value formatting for the report components (§3.3). The catalog's `format` enum
-// (`number` | `currency` | `percent`) selects a presentation; everything else falls back to
-// a compact, locale-default rendering. Pure — no DOM, no engine — so it is unit-testable and
-// shared by Kpi / Gauge / Value / Table cells.
+// (`number` | `currency` | `percent` | `multiple`) selects a presentation; everything else
+// falls back to a compact, locale-default rendering. An optional `unit` suffix (R3-382 —
+// "EUR m", "x", "bps") is display-only and rides after the number. Currency uses the
+// **accounting** negative convention (parentheses) — the finance-reader default. Pure —
+// no DOM, no engine — so it is unit-testable and shared by Kpi / Gauge / Value / Table cells.
 
 import type { Value } from '../../stdlib/types.ts';
 
-export type NumberFormat = 'number' | 'currency' | 'percent';
+export type NumberFormat = 'number' | 'currency' | 'percent' | 'multiple';
 
 const NF = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
-const CF = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const CF = new Intl.NumberFormat(undefined, {
+  style: 'currency', currency: 'EUR', currencySign: 'accounting', maximumFractionDigits: 0,
+});
 const PF = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 });
 
-/** Format a number by the catalog `format` enum. `percent` treats the value as a ratio. */
-export function formatNumber(n: number, format: NumberFormat = 'number'): string {
+/** Format a number by the catalog `format` enum; `percent` treats the value as a ratio, `multiple` renders "2.75x". */
+export function formatNumber(n: number, format: NumberFormat = 'number', unit?: string): string {
   if (!Number.isFinite(n)) return '—';
+  let base: string;
   switch (format) {
     case 'currency':
-      return CF.format(n);
+      base = CF.format(n);
+      break;
     case 'percent':
-      return PF.format(n);
+      base = PF.format(n);
+      break;
+    case 'multiple':
+      base = `${NF.format(n)}x`;
+      break;
     case 'number':
-      return NF.format(n);
+      base = NF.format(n);
+      break;
   }
+  return unit === undefined || unit === '' ? base : `${base} ${unit}`;
 }
 
 /**
@@ -29,9 +41,9 @@ export function formatNumber(n: number, format: NumberFormat = 'number'): string
  * directly; `null` is the empty marker (`—`); a non-scalar (a row set bound where a scalar
  * was expected) is a shape mismatch surfaced by the caller, not stringified here.
  */
-export function formatScalar(v: Value, format?: NumberFormat): string {
+export function formatScalar(v: Value, format?: NumberFormat, unit?: string): string {
   if (v === null) return '—';
-  if (typeof v === 'number') return formatNumber(v, format);
+  if (typeof v === 'number') return formatNumber(v, format, unit);
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   if (typeof v === 'string') return v;
   return String(v);
