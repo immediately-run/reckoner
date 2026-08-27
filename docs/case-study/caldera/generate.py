@@ -178,7 +178,7 @@ def sources_uses(ltm, overrides=None):
     }
 
 
-def year_pass(op, su, bal, mode):
+def year_pass(op, a, su, bal, mode):
     """One year of the debt waterfall given opening balances.
 
     mode 'begin': cash interest on beginning balances (no circularity).
@@ -186,29 +186,29 @@ def year_pass(op, su, bal, mode):
                   iterates this pass to a fixed point.
     """
     if mode == "begin":
-        e_tlb, e_mezz, e_rev, e_undrawn = bal["tlb"], bal["mezz"], bal["rev"], max(0.0, A["revolver_capacity"] - bal["rev"])
+        e_tlb, e_mezz, e_rev, e_undrawn = bal["tlb"], bal["mezz"], bal["rev"], max(0.0, a["revolver_capacity"] - bal["rev"])
     else:
         e_tlb = (bal["tlb"] + bal["est"]["tlb"]) / 2
         e_mezz = (bal["mezz"] + bal["est"]["mezz"]) / 2
         e_rev = (bal["rev"] + bal["est"]["rev"]) / 2
-        e_undrawn = max(0.0, (A["revolver_capacity"] - bal["rev"] + A["revolver_capacity"] - bal["est"]["rev"]) / 2)
-    interest = A["tlb_rate"] * e_tlb + A["mezz_cash_rate"] * e_mezz + A["revolver_rate"] * e_rev + A["commitment_fee"] * e_undrawn
+        e_undrawn = max(0.0, (a["revolver_capacity"] - bal["rev"] + a["revolver_capacity"] - bal["est"]["rev"]) / 2)
+    interest = a["tlb_rate"] * e_tlb + a["mezz_cash_rate"] * e_mezz + a["revolver_rate"] * e_rev + a["commitment_fee"] * e_undrawn
     ebt = op["ebitda"] - op["da"] - interest
-    tax = max(0.0, ebt * A["tax_rate"])
+    tax = max(0.0, ebt * a["tax_rate"])
     ni = ebt - tax
     cfadr = ni + op["da"] - op["capex"] - op["delta_nwc"]
     rev_repay = min(bal["rev"], max(0.0, cfadr))
-    rev_draw = min(max(0.0, A["revolver_capacity"] - bal["rev"]), max(0.0, -cfadr))
+    rev_draw = min(max(0.0, a["revolver_capacity"] - bal["rev"]), max(0.0, -cfadr))
     res1 = cfadr - rev_repay + rev_draw
-    mand = min(A["tlb_amort_pct"] * su["tlb0"], bal["tlb"])
+    mand = min(a["tlb_amort_pct"] * su["tlb0"], bal["tlb"])
     res2 = res1 - mand
-    draw2 = min(max(0.0, A["revolver_capacity"] - (bal["rev"] + rev_draw)), max(0.0, -res2))
+    draw2 = min(max(0.0, a["revolver_capacity"] - (bal["rev"] + rev_draw)), max(0.0, -res2))
     res2 = res2 + draw2
-    sweep = min(A["cash_sweep_pct"] * max(0.0, res2), bal["tlb"] - mand)
+    sweep = min(a["cash_sweep_pct"] * max(0.0, res2), bal["tlb"] - mand)
     end = {
         "rev": bal["rev"] + rev_draw + draw2 - rev_repay,
         "tlb": bal["tlb"] - mand - sweep,
-        "mezz": bal["mezz"] * (1 + A["mezz_pik_rate"]),
+        "mezz": bal["mezz"] * (1 + a["mezz_pik_rate"]),
         "cash": bal["cash"] + res2 - sweep,
     }
     return {"interest": interest, "ebt": ebt, "tax": tax, "ni": ni, "cfadr": cfadr,
@@ -216,19 +216,20 @@ def year_pass(op, su, bal, mode):
             "sweep": sweep, "retained": res2 - sweep, "end": end}
 
 
-def schedule(ops, su, mode):
+def schedule(ops, su, mode, a=None):
     """The 5-year roll-forward. 'avg' iterates each year to a fixed point (≤ 1e-12)."""
-    bal = {"rev": 0.0, "tlb": su["tlb0"], "mezz": su["mezz0"], "cash": A["min_cash"], "est": None}
+    a = a if a is not None else A
+    bal = {"rev": 0.0, "tlb": su["tlb0"], "mezz": su["mezz0"], "cash": a["min_cash"], "est": None}
     rows = []
     iterations = 0
     for op in ops:
         if mode == "begin":
-            out = year_pass(op, su, bal, "begin")
+            out = year_pass(op, a, su, bal, "begin")
         else:
             est = None
             for _ in range(200):
                 bal["est"] = est if est else {"rev": bal["rev"], "tlb": bal["tlb"], "mezz": bal["mezz"]}
-                out = year_pass(op, su, bal, "avg")
+                out = year_pass(op, a, su, bal, "avg")
                 e = out["end"]
                 if est and all(abs(e[k] - est[k]) < 1e-12 for k in ("rev", "tlb", "mezz", "cash")):
                     est = e
@@ -299,6 +300,14 @@ def breakeven_exit_multiple(hurdle):
 ltm = ltm_ebitda()
 seg_rows, ops = build_operating()
 _, holdout_ops = build_operating(HOLDOUT_PLAN)
+
+# The tax-rate variant (R3-377): the assumptions-as-params receipt — the schedule and
+# returns recomputed under tax_rate = 0.30, everything else held at base. This is the
+# oracle a live `params.tax_rate` flip must reproduce.
+A30 = dict(A, tax_rate=0.30)
+su30 = sources_uses(ltm, A30)
+sched30, _ = schedule(ops, su30, "begin", A30)
+irr30 = irr([-su30["sponsor_equity"]] + [0.0] * 4 + [A30["exit_multiple"] * ops[-1]["ebitda"] - sched30[-1]["net_debt"]])
 su = sources_uses(ltm)
 sched, _ = schedule(ops, su, "begin")
 sched_avg, avg_iters = schedule(ops, su, "avg")
@@ -350,6 +359,12 @@ expected = {
     "breakeven_exit_multiple": breakeven,
     "sensitivity_grid": grid,
     "holdout_operating": holdout_ops,
+    "tax30_variant": {
+        "tax_rate": 0.30,
+        "schedule": sched30,
+        "irr": irr30,
+        "sponsor_equity": su30["sponsor_equity"],
+    },
     "covenants": {"leverage_max": max(r["leverage"] for r in sched),
                   "coverage_min": min(r["coverage"] for r in sched),
                   "cash_min": min(r["cash_end"] for r in sched),

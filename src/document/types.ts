@@ -31,6 +31,14 @@ export interface AuthoredWith {
   catalog?: string;
 }
 
+/** One `paramRefs` entry: a live knob whose default lives at a path inside a fixture. */
+export interface ParamRef {
+  /** The external the leaf lives in — `fixtures.<name>` (the documented v1 scope). */
+  from: string;
+  /** Dotted path into the fixture's value; numeric segments index arrays ("0.tax_rate"). */
+  path: string;
+}
+
 export interface ReckonerManifest {
   /** The document-schema major. A breaking change bumps it; an app refuses a major it predates. */
   format: number;
@@ -40,6 +48,14 @@ export interface ReckonerManifest {
   worksheets: string[];
   /** Param default values, keyed by param name (the `<Params>` widgets' `default`s). */
   params: Record<string, Value>;
+  /**
+   * Assumptions-as-params (R3-377): each entry exposes a fixture leaf as a live `params.<name>`
+   * knob whose default is read from the leaf; a runtime write shadows the leaf **inside the
+   * injected fixture value** (structural sharing) — formulas see one coherent frozen snapshot,
+   * never a second ambient channel. The engine is unchanged: the update rides the existing
+   * externals path for `fixtures.<name>`.
+   */
+  paramRefs?: Record<string, ParamRef>;
   title?: string;
 }
 

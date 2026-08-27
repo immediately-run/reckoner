@@ -20,7 +20,8 @@ import type { Tier } from '../engine/tier.ts';
 import { loadDocument } from '../document/loader.ts';
 import { validateExternalReferences } from '../document/xref.ts';
 import type { ExternalReference } from '../document/xref.ts';
-import type { DocumentDiagnostic, LoadedDocument } from '../document/types.ts';
+import type { DocumentDiagnostic, LoadedDocument, ParamRef } from '../document/types.ts';
+import { resolveParamRefs, paramShadow } from '../document/paramRefs.ts';
 import { WIDGETS } from '../report/catalog.ts';
 import { parseTemplate } from '../report/parse/mdx.ts';
 import type { TemplateNode } from '../report/nodes.ts';
@@ -38,6 +39,8 @@ export interface ReportSession {
   engine: AsyncEngine;
   /** Live external inputs (fixtures + params), keyed by dotted binding name. */
   externals: Record<string, ExternalValue>;
+  /** paramRefs knobs (R3-377): name → the fixture leaf a runtime write shadows. */
+  paramRefs: Record<string, ParamRef>;
   nodes: TemplateNode[];
   title: string;
   diagnostics: DocumentDiagnostic[];
@@ -47,8 +50,11 @@ function normTier(tag: string | undefined): Tier {
   return tag !== undefined && TIERS.has(tag) ? (tag as Tier) : 'static';
 }
 
-/** Assemble the engine's externals from the document's fixtures + manifest param defaults. */
-function assembleExternals(loaded: LoadedDocument): Record<string, ExternalValue> {
+/** Assemble the engine's externals from the document's fixtures + manifest param defaults + paramRefs knobs (R3-377). Exported for the case-study harness; the app wires it via {@link buildReportSession}. */
+export function assembleExternals(loaded: LoadedDocument): {
+  externals: Record<string, ExternalValue>;
+  paramRefs: Record<string, ParamRef>;
+} {
   const externals: Record<string, ExternalValue> = {};
   for (const fx of loaded.fixtures) {
     externals[`fixtures.${fx.name}`] = { value: fx.frame.rows as Value, tier: normTier(fx.frame.tier) };
@@ -56,7 +62,14 @@ function assembleExternals(loaded: LoadedDocument): Record<string, ExternalValue
   for (const [name, value] of Object.entries(loaded.manifest.params)) {
     externals[`params.${name}`] = { value, tier: 'static' };
   }
-  return externals;
+  // Assumptions-as-params: each knob's default is read from its fixture leaf and also
+  // published as `params.<name>` (for template binding + the params surface).
+  const { defaults, refs, diagnostics } = resolveParamRefs(loaded.manifest.paramRefs, loaded.fixtures);
+  for (const [key, ext] of Object.entries(defaults)) {
+    if (externals[key] === undefined) externals[key] = { value: ext.value, tier: ext.tier };
+  }
+  void diagnostics; // already surfaced by the loader's paramRefDiagnostics
+  return { externals, paramRefs: refs };
 }
 
 /**
@@ -116,7 +129,11 @@ export function xrefDiagnostics(
   return validateExternalReferences(references, {
     feeds: new Set([...loaded.feeds.map((f) => f.name), ...runtimeFeeds]),
     fixtures: new Set(loaded.fixtures.map((f) => f.name)),
-    params: new Set([...Object.keys(loaded.manifest.params), ...widgetParamNames(nodes)]),
+    params: new Set([
+      ...Object.keys(loaded.manifest.params),
+      ...Object.keys(loaded.manifest.paramRefs ?? {}),
+      ...widgetParamNames(nodes),
+    ]),
     worksheetPaths: Object.fromEntries(loaded.worksheets.map((w) => [w.name, w.path])),
   });
 }
@@ -130,7 +147,7 @@ export async function buildReportSession(transport?: WorkerTransport): Promise<R
   for (const w of loaded.worksheets) worksheetSources[w.name] = w.source;
 
   const engine = await AsyncEngine.fromSources(worksheetSources, { transport: t });
-  const externals = assembleExternals(loaded);
+  const { externals, paramRefs } = assembleExternals(loaded);
   await engine.run(externals);
 
   const template = loaded.templates.find((t) => t.name === 'weekly') ?? loaded.templates[0];
@@ -144,7 +161,7 @@ export async function buildReportSession(transport?: WorkerTransport): Promise<R
     ...xrefDiagnostics(loaded, engine.externalReferences(), nodes, [DEMO_FEED_NAME]),
   ];
 
-  return { engine, externals, nodes, title: loaded.manifest.title ?? 'Reckoner report', diagnostics };
+  return { engine, externals, paramRefs, nodes, title: loaded.manifest.title ?? 'Reckoner report', diagnostics };
 }
 
 /** The engine adapter the renderer resolves `source` bindings through. */
@@ -161,6 +178,21 @@ export function sessionBindings(session: ReportSession, onChange: () => void): B
       return result === undefined ? missing(source) : { value: result.value, tier: result.tier, status: 'ok' };
     },
     setParam(name, value) {
+      // A paramRefs knob (R3-377) shadows its leaf INSIDE the fixture value — one
+      // coherent frozen snapshot for the formulas, riding the existing externals path,
+      // so exactly the cells that declared that fixture recompute.
+      const ref = session.paramRefs[name];
+      if (ref !== undefined) {
+        const fixtureValue = session.externals[ref.from]?.value;
+        if (fixtureValue !== undefined) {
+          const patch = paramShadow(name, value, ref, fixtureValue);
+          for (const [key, { value: v }] of Object.entries(patch)) {
+            session.externals[key] = { value: v, tier: 'static' };
+          }
+          void session.engine.update(patch as Record<string, ExternalValue>).then(onChange);
+          return;
+        }
+      }
       const key = `params.${name}`;
       const ext: ExternalValue = { value, tier: 'static' };
       session.externals[key] = ext;

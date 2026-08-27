@@ -17,6 +17,8 @@ import type { ExternalValue } from '../engine/types.ts';
 import type { LoadedDocument } from './types.ts';
 import { parseTemplate } from '../report/parse/mdx.ts';
 import { validateTemplate } from '../report/validate.ts';
+import { assembleExternals } from '../app/reportSession.ts';
+import { sessionBindings } from '../app/reportSession.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CASE = join(HERE, '..', '..', 'docs', 'case-study', 'caldera');
@@ -187,5 +189,52 @@ describe('Caldera LBO case study', () => {
     const validation = validateTemplate(nodes);
     expect(validation.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     expect(validation.placeholders).toEqual([]);
+  });
+
+  // R3-377: assumptions-as-params. A paramRefs knob shadows its leaf inside the injected
+  // fixture value — flipping params.tax_rate 0.25 → 0.30 must reproduce the Python truth
+  // for the 30% variant exactly, leave every other fixture untouched, and keep the
+  // cells that do not depend on the assumptions fixture at their published values.
+  it('a live tax-rate flip (paramRefs) reproduces the Python 30% variant', async () => {
+    const { loaded, expected } = await loadCase();
+    const engine = await AsyncEngine.fromSources(
+      Object.fromEntries(loaded.worksheets.map((w) => [w.name, w.source])),
+      { transport: inMemoryTransport() },
+    );
+    const { externals, paramRefs } = assembleExternals(loaded);
+    await engine.run(externals);
+
+    expect(paramRefs.tax_rate).toEqual({ from: 'fixtures.assumptions', path: '0.tax_rate' });
+    expect(externals['params.tax_rate']?.value).toBe(0.25);
+    const baseIrr = (engine.value('model.returns') as Record<string, number>).irr;
+    const baseLtm = engine.value('model.ltm_ebitda');
+
+    // the flip, through the same sessionBindings path the app's params surface uses
+    let rerendered = false;
+    const bindings = sessionBindings(
+      { engine, externals, paramRefs, nodes: [], title: 't', diagnostics: [] },
+      () => { rerendered = true; },
+    );
+    const originalAssumptions = externals['fixtures.assumptions']!.value;
+    bindings.setParam('tax_rate', 0.30);
+    while (!rerendered) await new Promise((r) => setTimeout(r, 0));
+
+    const variant = expected.tax30_variant as { schedule: Record<string, number>[]; irr: number };
+    const sched = engine.value('model.debt_schedule') as Record<string, number>[];
+    expect(sched.length).toBe(5);
+    for (let i = 0; i < 5; i += 1) {
+      expect(sched[i].tlb_end).toBeCloseTo(variant.schedule[i].tlb_end, 6);
+      expect(sched[i].cash_end).toBeCloseTo(variant.schedule[i].cash_end, 6);
+    }
+    const flippedIrr = (engine.value('model.returns') as Record<string, number>).irr;
+    expect(flippedIrr).toBeCloseTo(variant.irr, 10);
+    expect(flippedIrr).toBeLessThan(baseIrr); // more tax, less sweep, worse returns
+
+    // structural sharing: the fixture value the document shipped is untouched, and the
+    // cells that never declared the assumptions fixture are unchanged
+    expect((originalAssumptions as Record<string, number>[])[0].tax_rate).toBe(0.25);
+    expect((externals['fixtures.assumptions']!.value as Record<string, number>[])[0].tax_rate).toBe(0.30);
+    expect(engine.value('model.ltm_ebitda')).toBe(baseLtm);
+    expect(externals['params.tax_rate']?.value).toBe(0.30);
   });
 });

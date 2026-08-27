@@ -4,5 +4,9 @@
   "authoredWith": { "app": "reckoner", "stdlib": "0.1.0", "catalog": "0.1.0" },
   "worksheets": ["model", "checks"],
   "params": { "entry_multiple": 8, "exit_multiple": 8, "tlb_turns": 5 },
+  "paramRefs": {
+    "tax_rate": { "from": "fixtures.assumptions", "path": "0.tax_rate" },
+    "cash_sweep_pct": { "from": "fixtures.assumptions", "path": "0.cash_sweep_pct" }
+  },
   "title": "Caldera Components — LBO"
 }
