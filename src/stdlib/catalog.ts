@@ -506,6 +506,22 @@ const entries: SelfDescription[] = [
     ],
   },
   {
+    name: 'solve',
+    kind: 'financial',
+    summary: "1-D monotone goal seek (Excel's Goal Seek, deterministic): the x in [lo, hi] where fn(x) = target, by bisection — the same contract as irr. Throws on an unbracketed target, a non-finite fn, or (by default probe) a multi-root bracket; multi-variate Solver is out of scope.",
+    params: [
+      { name: 'fn', type: '(x: number) => number', doc: 'The objective; must be monotone over the bracket.' },
+      { name: 'target', type: 'number', doc: 'The value to hit.' },
+      { name: 'lo', type: 'number', doc: 'Bracket lower bound (fn(lo) must be on the far side of target from fn(hi)).' },
+      { name: 'hi', type: 'number', doc: 'Bracket upper bound.' },
+      { name: 'opts', type: '{ probes? }', doc: 'probes: monotonicity probe count (default 32; 1 disables).', optional: true },
+    ],
+    returns: 'number — the root, exact to double precision in 200 iterations.',
+    examples: [
+      'const breakeven = solve((m) => runModel({ exit_multiple: m }).irr, hurdle, 4, 12)',
+    ],
+  },
+  {
     name: 'xirr',
     kind: 'financial',
     summary: 'Internal rate of return of DATED flows ({ amount, date } rows, ISO dates, ACT/365.25 day count, earliest date = t0). Same throw-don\'t-guess contract as irr.',

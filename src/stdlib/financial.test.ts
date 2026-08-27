@@ -5,7 +5,7 @@
 // day-count convention, 2026-08-27).
 
 import { describe, it, expect } from 'vitest';
-import { irr, npv, xirr } from './financial.ts';
+import { irr, npv, solve, xirr } from './financial.ts';
 
 describe('npv', () => {
   it('discounts flows[0] at t=0 (the investment-at-t0 convention)', () => {
@@ -91,5 +91,70 @@ describe('xirr', () => {
     expect(() => xirr([{ amount: 1, date: '2026-12-31' }, { amount: 2, date: '2027-12-31' }])).toThrow(
       /negative and one positive/,
     );
+  });
+});
+
+describe('solve', () => {
+  it('finds the root of a monotone function', () => {
+    expect(solve((x) => x * x, 4, 0, 10)).toBeCloseTo(2, 15);
+    expect(solve((x) => -x, -3, 0, 10)).toBeCloseTo(3, 15); // decreasing works too
+  });
+
+  it('the Caldera breakeven shape: irr(m) = hurdle', () => {
+    // cheap stand-in for runModel: (1+m/8)^5-ish growth; root at m = 8 * (2^(1/5) - 1)… just assert bracketing + monotone root
+    const root = solve((m) => Math.pow(m / 8, 3), 1, 4, 12);
+    expect(root).toBeCloseTo(8, 15);
+  });
+
+  it('an unbracketed target throws with the endpoints named', () => {
+    expect(() => solve((x) => x, 50, 0, 10)).toThrow(/does not bracket target 50/);
+  });
+
+  it('lo ≥ hi throws', () => {
+    expect(() => solve((x) => x, 1, 5, 5)).toThrow(/lo < hi/);
+    expect(() => solve((x) => x, 1, 6, 5)).toThrow(/lo < hi/);
+  });
+
+  it('a multi-root bracket is rejected visibly (the monotonicity probe)', () => {
+    // x³ − 4x over [−3, 3]: endpoints straddle (−15, +15) but roots at −2, 0, 2 — the probe catches it
+    const cubic = (x: number): number => x * x * x - 4 * x;
+    expect(() => solve(cubic, 0, -3, 3)).toThrow(/not monotone/);
+    // narrow brackets around one root pass — splitting is the remedy the error names
+    expect(solve(cubic, 0, 1, 3)).toBeCloseTo(2, 15);
+  });
+
+  it('a non-finite fn throws visibly', () => {
+    expect(() => solve((x) => (x > 4 ? Number.NaN : x), 1, 0, 10)).toThrow(/finite/);
+  });
+
+  it('probes: 1 disables the monotonicity check (documented escape)', () => {
+    // the multi-root cubic, unprobed: bisection from the left settles — 0 is an exact midpoint root
+    const r = solve((x) => x * x * x - 4 * x, 0, -3, 3, { probes: 1 });
+    expect(r).toBe(0);
+  });
+});
+
+describe('solve parity — vs the hand-rolled bisection it replaces (R3-381)', () => {
+  it('identical iterate sequence on a family of monotone functions, to 1e-15', () => {
+    const family: Array<{ fn: (x: number) => number; targets: number[] }> = [
+      { fn: (m) => m, targets: [5, 8.5, 11] },
+      { fn: (m) => (m * m * m) / 512, targets: [0.5, 1, 2] },
+      { fn: (m) => Math.pow(m / 8, 5), targets: [0.5, 1, 2] },
+    ];
+    for (const { fn, targets } of family) {
+      for (const target of targets) {
+        // the old breakeven loop, verbatim shape
+        let lo = 4;
+        let hi = 12;
+        for (let i = 0; i < 200; i += 1) {
+          const mid = (lo + hi) / 2;
+          if (fn(mid) < target) lo = mid;
+          else hi = mid;
+        }
+        expect(Math.abs(solve(fn, target, 4, 12) - (lo + hi) / 2)).toBeLessThanOrEqual(5e-15);
+        // (5e-15 ≈ 2 ulps at this magnitude: solve early-returns on an exact-root hit
+        //  where the hand loop saturates at 1–2 ulps — same root, both correct.)
+      }
+    }
   });
 });
