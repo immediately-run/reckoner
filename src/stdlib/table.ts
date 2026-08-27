@@ -96,6 +96,11 @@ export class Table {
     return new Table(ordered.scan(this.#rows, spec, opts));
   }
 
+  /** The multi-state roll-forward (see `rollforward`). */
+  rollforward(opts: ordered.RollforwardOptions): Table {
+    return new Table(ordered.rollforward(this.#rows, opts));
+  }
+
   asofJoin(right: Rowish, opts: AsofOptions): Table {
     return new Table(ordered.asofJoin(this.#rows, toRows(right), opts));
   }
