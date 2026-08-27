@@ -1,0 +1,100 @@
+{
+  "rows": [
+    {
+      "segment": "seals",
+      "year": 2027,
+      "growth": 0.08,
+      "margin": 0.264
+    },
+    {
+      "segment": "seals",
+      "year": 2028,
+      "growth": 0.08,
+      "margin": 0.268
+    },
+    {
+      "segment": "seals",
+      "year": 2029,
+      "growth": 0.07,
+      "margin": 0.272
+    },
+    {
+      "segment": "seals",
+      "year": 2030,
+      "growth": 0.07,
+      "margin": 0.276
+    },
+    {
+      "segment": "seals",
+      "year": 2031,
+      "growth": 0.06,
+      "margin": 0.28
+    },
+    {
+      "segment": "bearings",
+      "year": 2027,
+      "growth": 0.04,
+      "margin": 0.192
+    },
+    {
+      "segment": "bearings",
+      "year": 2028,
+      "growth": 0.04,
+      "margin": 0.194
+    },
+    {
+      "segment": "bearings",
+      "year": 2029,
+      "growth": 0.04,
+      "margin": 0.196
+    },
+    {
+      "segment": "bearings",
+      "year": 2030,
+      "growth": 0.035,
+      "margin": 0.198
+    },
+    {
+      "segment": "bearings",
+      "year": 2031,
+      "growth": 0.035,
+      "margin": 0.2
+    },
+    {
+      "segment": "fabrication",
+      "year": 2027,
+      "growth": 0.025,
+      "margin": 0.127
+    },
+    {
+      "segment": "fabrication",
+      "year": 2028,
+      "growth": 0.025,
+      "margin": 0.129
+    },
+    {
+      "segment": "fabrication",
+      "year": 2029,
+      "growth": 0.02,
+      "margin": 0.131
+    },
+    {
+      "segment": "fabrication",
+      "year": 2030,
+      "growth": 0.02,
+      "margin": 0.133
+    },
+    {
+      "segment": "fabrication",
+      "year": 2031,
+      "growth": 0.02,
+      "margin": 0.135
+    }
+  ],
+  "provenance": {
+    "synthetic": true,
+    "captureActor": "generate.py",
+    "capturedAt": "2026-07-09",
+    "note": "management plan: growth + margin per segment-year"
+  }
+}

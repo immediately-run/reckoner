@@ -1,0 +1,30 @@
+{
+  "rows": [
+    {
+      "year": 2027,
+      "capex_pct": 0.055
+    },
+    {
+      "year": 2028,
+      "capex_pct": 0.05
+    },
+    {
+      "year": 2029,
+      "capex_pct": 0.045
+    },
+    {
+      "year": 2030,
+      "capex_pct": 0.04
+    },
+    {
+      "year": 2031,
+      "capex_pct": 0.04
+    }
+  ],
+  "provenance": {
+    "synthetic": true,
+    "captureActor": "generate.py",
+    "capturedAt": "2026-07-09",
+    "note": "company-level plan vectors (capex % of revenue)"
+  }
+}

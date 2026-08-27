@@ -1,0 +1,31 @@
+{
+  "rows": [
+    {
+      "segment": "seals",
+      "fy2024": 86.2,
+      "fy2025": 91.0,
+      "fy2026": 96.0,
+      "margin_fy2026": 0.26
+    },
+    {
+      "segment": "bearings",
+      "fy2024": 70.1,
+      "fy2025": 72.1,
+      "fy2026": 74.0,
+      "margin_fy2026": 0.19
+    },
+    {
+      "segment": "fabrication",
+      "fy2024": 60.5,
+      "fy2025": 59.2,
+      "fy2026": 58.0,
+      "margin_fy2026": 0.125
+    }
+  ],
+  "provenance": {
+    "synthetic": true,
+    "captureActor": "generate.py",
+    "capturedAt": "2026-07-09",
+    "note": "FY2024-26 segment revenue + FY2026 margins (LTM at close)"
+  }
+}
