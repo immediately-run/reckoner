@@ -66,8 +66,8 @@ export { coalesce, orElse, safeDiv } from './nulls.ts';
 
 // Financial functions (R3-376: irr/npv/xirr — deterministic bracketed bisection;
 // unbracketable flows throw visibly rather than returning a wrong number).
-export { irr, npv, xirr } from './financial.ts';
-export type { IrrOptions } from './financial.ts';
+export { irr, npv, solve, xirr } from './financial.ts';
+export type { IrrOptions, SolveOptions } from './financial.ts';
 
 // Explicit convergence (R3-378): the fixed-point helper — Excel's iterative-calc
 // circular reference, run as a visible, evidence-carrying loop.

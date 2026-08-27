@@ -132,3 +132,75 @@ export function xirr(rows: Row[], opts: { by?: string } & IrrOptions = {}): numb
   }
   return (a + b) / 2;
 }
+
+export interface SolveOptions {
+  /**
+   * Monotonicity probe count (default 32): the bracket is sampled at this many points
+   * and must change sign exactly once across consecutive samples — a cheap visible
+   * rejection of multi-root brackets. Set to 1 to disable (document why).
+   */
+  probes?: number;
+}
+
+/**
+ * 1-D monotone goal seek: the `x` in `[lo, hi]` where `fn(x) = target`, by bisection
+ * (deterministic; exact to double precision in 200 iterations — the same contract as
+ * `irr`, which is `solve` over NPV). The bracket must straddle the target and probe
+ * monotone — otherwise it **throws** with the endpoints named, never a confident wrong
+ * root. Interactive/multi-variate Solver is deliberately out of scope.
+ */
+export function solve(
+  fn: (x: number) => number,
+  target: number,
+  lo: number,
+  hi: number,
+  opts: SolveOptions = {},
+): number {
+  if (!(lo < hi)) {
+    throw new Error(`solve: bracket requires lo < hi (got ${lo}, ${hi}).`);
+  }
+  const g = (x: number): number => fn(x) - target;
+  const gLo = g(lo);
+  const gHi = g(hi);
+  if (!Number.isFinite(gLo) || !Number.isFinite(gHi)) {
+    throw new Error(`solve: fn must be finite at both bracket ends (fn(${lo}) = ${gLo + target}, fn(${hi}) = ${gHi + target}).`);
+  }
+  if (gLo === 0) return lo;
+  if (gHi === 0) return hi;
+  if (gLo * gHi > 0) {
+    throw new Error(
+      `solve: [${lo}, ${hi}] does not bracket target ${target} (fn(${lo}) − target = ${gLo}, fn(${hi}) − target = ${gHi}); widen the bracket or check the model.`,
+    );
+  }
+  const probes = opts.probes ?? 32;
+  if (probes > 1) {
+    let crossings = 0;
+    let prev = gLo;
+    for (let i = 1; i < probes; i += 1) {
+      const x = lo + ((hi - lo) * i) / (probes - 1);
+      const gi = g(x);
+      if (!Number.isFinite(gi)) {
+        throw new Error(`solve: fn must be finite across the bracket (fn(${x}) is not).`);
+      }
+      if (gi === 0) continue; // a probe landing exactly on the root is not a crossing
+      if (prev !== 0 && prev * gi < 0) crossings += 1;
+      prev = gi;
+    }
+    if (crossings > 1) {
+      throw new Error(
+        `solve: fn changes sign ${crossings}× across [${lo}, ${hi}] — not monotone; bisection would return an arbitrary root. Split the bracket or model the branches.`,
+      );
+    }
+  }
+  let a = lo;
+  let b = hi;
+  const signLo = Math.sign(gLo);
+  for (let i = 0; i < 200; i += 1) {
+    const mid = (a + b) / 2;
+    const gm = g(mid);
+    if (gm === 0) return mid;
+    if (Math.sign(gm) === signLo) a = mid;
+    else b = mid;
+  }
+  return (a + b) / 2;
+}

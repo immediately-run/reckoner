@@ -1,4 +1,4 @@
-import { cell, table, rollforward, cumprod, irr, fixpoint, sum } from "@reckoner/stdlib";
+import { cell, table, rollforward, cumprod, irr, solve, fixpoint, sum } from "@reckoner/stdlib";
 
 // Caldera Components LBO — the model worksheet.
 //
@@ -197,14 +197,9 @@ function runModel(a, hist, plan, yearPlan, o) {
 // Excel does this interactively (Data → What-If → Goal Seek); here it is an
 // explicit bisection, so it recomputes with the model and is testable.
 function breakevenExitMultiple(a, hist, plan, yearPlan, hurdle) {
-  let lo = 4.0;
-  let hi = 12.0;
-  for (let i = 0; i < 200; i += 1) {
-    const mid = (lo + hi) / 2;
-    if (runModel(a, hist, plan, yearPlan, { exit_multiple: mid }).irr < hurdle) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
+  // Goal seek on the stdlib's solve (R3-381): IRR is increasing in the exit
+  // multiple, so the bracket is monotone and bisection is exact.
+  return solve((m) => runModel(a, hist, plan, yearPlan, { exit_multiple: m }).irr, hurdle, 4.0, 12.0);
 }
 
 // ── cells ─────────────────────────────────────────────────────────────────────
