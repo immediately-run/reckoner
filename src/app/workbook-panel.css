@@ -594,3 +594,14 @@
   font-size: 0.85rem;
   color: var(--ink-2);
 }
+
+/* file:line anchors from the descriptor spans (R3-427) — plain located data beside the
+   formula and test rows, so nobody searches a source file for the right declaration. */
+.rk-ins-fileline {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--ink-3);
+  margin-left: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}

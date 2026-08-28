@@ -7,6 +7,7 @@ import type { AsyncPass } from './asyncEngine.ts';
 import type { CellDescriptor, SubjectResult } from './worker/protocol.ts';
 import { contentKey } from './hash.ts';
 import {
+  spliceFormulaInSpan,
   SCRATCH_WORKSHEET,
   dependentsClosure,
   diffPasses,
@@ -158,3 +159,60 @@ describe('diffVerdicts (§4)', () => {
     expect(diffVerdicts(null, shadow)).toEqual([{ subject: 'm.a', before: 'untested', after: 'failing' }]);
   });
 });
+
+describe('spliceFormulaInSpan (R3-427)', () => {
+  //             0         1         2         3         4         5         6         7
+  //             0123456789012345678901234567890123456789012345678901234567890123456789012345
+  const sheet = 'export const a = cell({ formula: () => 1 });\nexport const b = cell({ formula: () => 1 });\n';
+  const spanA = { start: 0, end: 45 };
+  const spanB = { start: 45, end: sheet.length };
+
+  it('identical formulas in two cells splice unambiguously, each within its own block', () => {
+    const a = spliceFormulaInSpan(sheet, spanA, '() => 1', '() => 2');
+    expect(a).toEqual({ ok: true, source: sheet.replace('formula: () => 1 });\nexport', 'formula: () => 2 });\nexport') });
+    const b = spliceFormulaInSpan(sheet, spanB, '() => 1', '() => 3');
+    expect(b.ok).toBe(true);
+    if (b.ok) {
+      expect(b.source.slice(spanB.start)).toContain('() => 3');
+      expect(b.source.slice(0, spanB.start)).toContain('() => 1'); // a untouched
+    }
+  });
+
+  it('a short formula that is a substring of another cell splices without refusal', () => {
+    const s = 'export const long = cell({ formula: (i) => i.x + 1 });\nexport const short = cell({ formula: (i) => i.x });\n';
+    const shortSpan = { start: s.indexOf('export const short'), end: s.length };
+    const out = spliceFormulaInSpan(s, shortSpan, '(i) => i.x', '(i) => i.y');
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.source).toContain('(i) => i.y });');
+      expect(out.source).toContain('(i) => i.x + 1'); // the long cell untouched
+    }
+  });
+
+  it('keeps the typed refusals for the degenerate within-block cases', () => {
+    expect(spliceFormulaInSpan(sheet, spanA, '() => 9', 'x')).toEqual({ ok: false, code: 'formula-not-found' });
+    const twice = 'export const t = cell({ formula: () => 1, note: "() => 1" });\n';
+    expect(spliceFormulaInSpan(twice, { start: 0, end: twice.length }, '() => 1', 'x')).toEqual({ ok: false, code: 'formula-ambiguous' });
+  });
+});
+
+describe('patchSources with spans (R3-427)', () => {
+  it('two variants in one worksheet apply in descending block order — earlier spans stay valid', () => {
+    const sheet = 'export const a = cell({ formula: () => 1 });\nexport const b = cell({ formula: () => 1 });\n';
+    const mk = (id: string, start: number, end: number): CellDescriptor => ({
+      ...cellDescFor(id), formulaSource: '() => 1', span: { start, end, line: 1 },
+    });
+    const cells = [mk('m.a', 0, 45), mk('m.b', 45, sheet.length)];
+    const out = patchSources({ m: sheet }, cells, { variants: { 'm.a': '() => 10', 'm.b': '() => 20' } });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.sources.m).toContain('const a = cell({ formula: () => 10');
+      expect(out.sources.m).toContain('const b = cell({ formula: () => 20');
+    }
+  });
+});
+
+function cellDescFor(id: string): CellDescriptor {
+  const [worksheet, cell] = id.split('.');
+  return { id, worksheet, cell, doc: '', formulaSource: '', deps: [], externals: [], resolvers: [] };
+}

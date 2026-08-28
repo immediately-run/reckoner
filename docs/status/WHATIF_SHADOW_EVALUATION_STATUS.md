@@ -56,7 +56,10 @@ This document is the single implementation-status source for
 - In-process transport: no realm isolation/lockdown, and a synchronously divergent
   variant is unrecoverable (spec §5 — named residual; self-resolves with real workers
   in-platform; Q7 books the lockdown alternative).
-- Splice refusal rate on short/duplicated formulas (span-on-descriptor is the booked
-  successor, spec §10).
+- ~~Splice refusal rate on short/duplicated formulas~~ — **closed 2026-08-28 by R3-427**:
+  descriptors carry declaration-block spans; the splice patches within the varied cell's
+  own block (cross-cell duplicates/substrings no longer refuse), and the inspector shows
+  `file:line` for formulas and tests. Open-at-line *links* still ride the navigator work
+  + the editor line-hint delta.
 - Scratch-text reload persistence; apply/promote; sweeps; the structured mobile variant
   flow (Q6); ad-hoc scratch tests on durable subjects (Q5).

@@ -235,6 +235,15 @@ The splice is defensive, with typed errors (never a silent wrong patch):
   panel. The clean successor — a build-time source span on `CellDescriptor` — is booked
   (§10) and becomes v1.5 the moment refusal rates annoy in practice.
 
+*(R3-427 landed, 2026-08-28 — the successor is built: the worker build computes each
+cell's and test's declaration-block span on the raw source (the same line-anchored
+matches as the §3.3 transform), the splice patches **within the varied cell's own
+block** — so cross-cell identical and substring formulas no longer refuse — and the
+typed refusals remain only for the degenerate within-block cases. Span-less descriptors
+keep the unique-occurrence fallback above, so a mixed old/new engine is never a silent
+wrong patch. Spans also surface as `file:line` on the inspector's formula and test rows;
+the clickable open-at-line rides the navigator work and the editor line-hint delta.)*
+
 The patched source then goes through the ordinary build path; a variant that no longer
 parses or breaks the graph surfaces as the ordinary `build-error` / diagnostics, shown in
 the panel.

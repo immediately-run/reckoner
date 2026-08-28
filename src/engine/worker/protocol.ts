@@ -14,6 +14,7 @@ import type { Value } from '../../stdlib/types.ts';
 import type { TestKind } from '../../stdlib/cell.ts';
 import type { InputSpec } from '../../stdlib/inputs.ts';
 import type { CellVerdict } from '../testrunner.ts';
+import type { ExportSpan } from '../compartment.ts';
 import type { GraphDiagnostic, InputResolver } from '../types.ts';
 
 /** One cell's graph structure, sans its formula (which stays in the worker). */
@@ -25,6 +26,13 @@ export interface CellDescriptor {
   doc: string;
   /** The formula's source text (`Function.prototype.toString` at build) — read-only display. */
   formulaSource: string;
+  /**
+   * The declaration block's location in the RAW worksheet source (R3-427): offsets for
+   * the what-if span-splice, 1-based `line` for file:line display and future editor
+   * open-at-line. Optional — a descriptor without one falls back to the
+   * unique-occurrence splice; plain data, structured-clone-safe.
+   */
+  span?: ExportSpan;
   deps: string[];
   externals: string[];
   resolvers: InputResolver[];
@@ -39,6 +47,8 @@ export interface TestDescriptor {
   kind: TestKind;
   /** The `<worksheet>.<cell>` this test validates. */
   subject: string;
+  /** The test declaration's location in the raw worksheet source (R3-427) — the fix-a-test-by-hand anchor. */
+  span?: ExportSpan;
   /**
    * The test's declared inputs (normalized InputSpecs — plain data). The host resolves
    * these against published state and sends the values back per-test in

@@ -13,7 +13,8 @@ import * as stdlib from '../../stdlib/index.ts';
 import type { Value } from '../../stdlib/types.ts';
 import type { CellDef, Formula, TestCellDef } from '../../stdlib/cell.ts';
 import type { Workbook } from '../types.ts';
-import { evaluateWorksheet } from '../compartment.ts';
+import { evaluateWorksheet, exportSpans } from '../compartment.ts';
+import type { ExportSpan } from '../compartment.ts';
 import { buildGraph } from '../graph.ts';
 import { analyze } from '../cycles.ts';
 import { runSuite } from '../testrunner.ts';
@@ -48,16 +49,21 @@ export function createEngineWorker(): EngineWorker {
       testsBySubject.clear();
       const cellWorkbook: Workbook = {};
       const tests: WorkbookDescriptor['tests'] = [];
+      // Per-cell declaration spans, computed on the RAW source (R3-427): the what-if
+      // splice patches within a cell's own block, and review surfaces show file:line.
+      const spansById = new Map<string, ExportSpan>();
       for (const [worksheet, source] of Object.entries(sources)) {
         const defs = evaluateWorksheet(source, { ...stdlib });
+        const spans = exportSpans(source);
         const sheet: Record<string, CellDef> = {};
         for (const [name, def] of Object.entries(defs)) {
+          if (spans[name] !== undefined) spansById.set(`${worksheet}.${name}`, spans[name]);
           if (def.kind === 'cell') {
             sheet[name] = def;
             formulas.set(`${worksheet}.${name}`, def.formula);
           } else {
             const id = `${worksheet}.${name}`;
-            tests.push({ id, worksheet, name, kind: def.testKind, subject: def.subject, inputs: def.inputs });
+            tests.push({ id, worksheet, name, kind: def.testKind, subject: def.subject, span: spans[name], inputs: def.inputs });
             const list = testsBySubject.get(def.subject) ?? [];
             list.push({ id, def });
             testsBySubject.set(def.subject, list);
@@ -79,6 +85,7 @@ export function createEngineWorker(): EngineWorker {
           // The formula itself stays in the worker; its source text crosses for the value
           // inspector's read-only display. SES preserves function sources across lockdown.
           formulaSource: n.def.kind === 'cell' ? n.def.formula.toString() : '',
+          span: spansById.get(n.id),
           deps: n.deps,
           externals: n.externals,
           resolvers: n.resolvers,
