@@ -51,6 +51,8 @@ async function calderaSession(): Promise<{ session: ReportSession; expected: Rec
       sources,
       loaded,
       runtimeFeeds: [],
+      authorsNodes: [],
+      authorsFromDocument: false,
     },
     expected,
   };

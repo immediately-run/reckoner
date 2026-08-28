@@ -18,6 +18,10 @@ import Row from './components/Row.tsx';
 import ShowAbove from './components/ShowAbove.tsx';
 import ShowBelow from './components/ShowBelow.tsx';
 import Params from './components/Params.tsx';
+import FormulaIndex from './components/FormulaIndex.tsx';
+import TestIndex from './components/TestIndex.tsx';
+import DataInventory from './components/DataInventory.tsx';
+import SuiteSummary from './components/SuiteSummary.tsx';
 import Select from './widgets/Select.tsx';
 import Toggle from './widgets/Toggle.tsx';
 import Range from './widgets/Range.tsx';
@@ -39,6 +43,10 @@ export const componentMap: Record<string, NodeComponent> = {
   ShowAbove,
   ShowBelow,
   Params,
+  FormulaIndex,
+  TestIndex,
+  DataInventory,
+  SuiteSummary,
   Select,
   Toggle,
   Range,

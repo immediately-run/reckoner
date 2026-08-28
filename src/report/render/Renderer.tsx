@@ -15,6 +15,8 @@ import type { TemplateNode } from '../nodes.ts';
 import { BindingsContext } from './bindingsContext.ts';
 import { InspectionContext } from './inspectionContext.ts';
 import type { InspectionPort } from './inspectionContext.ts';
+import { ReflectionContext } from './reflectionContext.ts';
+import type { ReflectionPort } from './reflectionContext.ts';
 import { RenderContext } from './renderContext.ts';
 import { componentMap } from './componentMap.ts';
 import Inspectable from './Inspectable.tsx';
@@ -47,14 +49,22 @@ interface ReportViewProps {
   bindings: Bindings;
   /** The V3 inspection port — absent in plain run mode (no affordance rendered). */
   inspection?: InspectionPort;
+  /**
+   * The reflection port (AUTHORS_VIEW_SPEC §3/§6) — provided ONLY for the author's-view
+   * render. Withholding it everywhere else is what makes "reflection components render
+   * only in the author's view" structural: without it they degrade to the broken tile.
+   */
+  reflection?: ReflectionPort;
 }
 
-export default function ReportView({ nodes, bindings, inspection }: ReportViewProps) {
+export default function ReportView({ nodes, bindings, inspection, reflection }: ReportViewProps) {
   return (
     <BindingsContext.Provider value={bindings}>
       <RenderContext.Provider value={renderNodes}>
         <InspectionContext.Provider value={inspection ?? null}>
-          <div className="rk-report">{renderNodes(nodes)}</div>
+          <ReflectionContext.Provider value={reflection ?? null}>
+            <div className="rk-report">{renderNodes(nodes)}</div>
+          </ReflectionContext.Provider>
         </InspectionContext.Provider>
       </RenderContext.Provider>
     </BindingsContext.Provider>

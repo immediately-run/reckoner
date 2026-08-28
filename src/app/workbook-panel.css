@@ -572,3 +572,25 @@
   margin-left: 8px;
   text-transform: none;
 }
+
+/* ── The author's view page (AUTHORS_VIEW_SPEC §1.2) ── */
+.rk-authors {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.rk-authors-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+}
+
+.rk-authors-title {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}

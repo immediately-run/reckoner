@@ -48,6 +48,9 @@ export function parseManifest(json: unknown): ReckonerManifest {
     params,
     paramRefs,
     title: optionalString(obj, 'title', WHAT),
+    // AUTHORS_VIEW_SPEC §4: the optional author's-view template name (the reserved
+    // template name `authors_view` applies when absent).
+    authorsView: optionalString(obj, 'authorsView', WHAT),
   };
 }
 

@@ -17,6 +17,7 @@ import { ReportView } from './report/index.ts';
 import WorkbookPanel from './app/WorkbookPanel.tsx';
 import ValueInspector from './app/ValueInspector.tsx';
 import WhatIfPanel from './app/WhatIfPanel.tsx';
+import AuthorsView from './app/AuthorsView.tsx';
 import { useVerdicts } from './hooks/useVerdicts.ts';
 
 function App() {
@@ -38,6 +39,10 @@ function App() {
   // Keyed by cell id rather than reset in an effect: navigating to another cell makes
   // the door closed again by derivation (react-hooks/set-state-in-effect stays happy).
   const [whatIfOpenFor, setWhatIfOpenFor] = useState<string | null>(null);
+  // The author's view (AUTHORS_VIEW_SPEC §1.2): opened from the workbook panel (its
+  // door), rendered in place of the report with an explicit way back. Component state,
+  // not a route.
+  const [authorsOpen, setAuthorsOpen] = useState(false);
   const title = report.status === 'ready' ? report.session.title : undefined;
   useEffect(() => {
     if (title !== undefined) document.title = title;
@@ -80,13 +85,26 @@ function App() {
               {reviewOpen ? 'Close review' : 'Review'}
             </button>
           </header>
-          <ReportView nodes={report.session.nodes} bindings={report.bindings} inspection={inspection ?? undefined} />
+          {authorsOpen ? (
+            <AuthorsView
+              session={report.session}
+              bindings={report.bindings}
+              verdicts={verdicts.results}
+              onClose={() => setAuthorsOpen(false)}
+            />
+          ) : (
+            <ReportView nodes={report.session.nodes} bindings={report.bindings} inspection={inspection ?? undefined} />
+          )}
           {reviewOpen && (
             <WorkbookPanel
               session={report.session}
-              tick={report.tick}
+              verdicts={verdicts}
               onInspect={setInspected}
               onClose={() => setReviewOpen(false)}
+              onOpenAuthors={() => {
+                setReviewOpen(false);
+                setAuthorsOpen(true);
+              }}
               scratchText={scratchText}
               onScratchChange={setScratchText}
             />

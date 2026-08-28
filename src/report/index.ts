@@ -12,7 +12,7 @@
 export type { AttrValue, ComponentNode, MarkdownNode, TemplateNode } from './nodes.ts';
 export { component, inert, lit, markdown } from './nodes.ts';
 
-export { catalog, componentNames, WIDGETS } from './catalog.ts';
+export { catalog, componentNames, WIDGETS, REFLECTION } from './catalog.ts';
 export type { AttrSchema, AttrType, ComponentSchema, Variants } from './catalog.ts';
 
 export { validateTemplate } from './validate.ts';
@@ -26,4 +26,5 @@ export { parseTemplate } from './parse/mdx.ts';
 // injected Bindings port. See ./render/index.ts for the deferred-enrichment notes.
 export { ReportView } from './render/index.ts';
 export type { Bindings, BoundValue, BindingStatus } from './render/index.ts';
+export type { ReflectionPort, FixtureSummary, FeedSummary } from './render/index.ts';
 export { missing } from './render/index.ts';

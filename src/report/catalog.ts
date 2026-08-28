@@ -118,10 +118,33 @@ const COMPONENTS: ComponentSchema[] = [
   { name: 'Toggle', attributes: [{ name: 'name', type: 'string', required: true }, { name: 'default', type: 'boolean' }] },
   { name: 'Range', attributes: [{ name: 'name', type: 'string', required: true }, { name: 'min', type: 'number', required: true }, { name: 'max', type: 'number', required: true }, { name: 'step', type: 'number' }, { name: 'default', type: 'number' }] },
   { name: 'DateRange', attributes: [{ name: 'name', type: 'string', required: true }, { name: 'default', type: 'string' }] },
+
+  // ── Reflection components (AUTHORS_VIEW_SPEC §2) — the document describing itself.
+  // Enumerate-everything defaults with narrowly-typed filters; author's-view-only at
+  // render (the reflection port is withheld elsewhere — spec §6) and flagged by a
+  // load-time diagnostic when placed in a consumer template. Additive-forever applies:
+  // this vocabulary is deliberately minimal.
+  { name: 'FormulaIndex', attributes: [{ name: 'worksheet', type: 'string', doc: 'Limit to one worksheet; absent = every worksheet.' }] },
+  {
+    name: 'TestIndex',
+    attributes: [
+      { name: 'worksheet', type: 'string', doc: 'Limit to tests declared in one worksheet.' },
+      { name: 'subject', type: 'string', doc: 'Limit to tests targeting one cell (`worksheet.cell`).' },
+    ],
+  },
+  { name: 'DataInventory', attributes: [{ name: 'kind', type: 'enum', values: ['fixtures', 'feeds'], doc: 'Limit to one data kind; absent = both.' }] },
+  { name: 'SuiteSummary', attributes: [] },
 ];
 
 /** The widget components a `<Params>` block may contain. */
 export const WIDGETS: ReadonlySet<string> = new Set(['Select', 'Toggle', 'Range', 'DateRange']);
+
+/**
+ * The reflection components (AUTHORS_VIEW_SPEC §2/§6): rendered only in the author's
+ * view — the reflection port is withheld everywhere else, and a consumer template using
+ * one gets a load-time diagnostic.
+ */
+export const REFLECTION: ReadonlySet<string> = new Set(['FormulaIndex', 'TestIndex', 'DataInventory', 'SuiteSummary']);
 
 /** The catalog, keyed by component name. */
 export const catalog: Record<string, ComponentSchema> = Object.freeze(

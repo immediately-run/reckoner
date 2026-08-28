@@ -12,3 +12,4 @@ export { default as ReportView } from './Renderer.tsx';
 export type { Bindings, BoundValue, BindingStatus } from './bindings.ts';
 export { missing } from './bindings.ts';
 export { componentMap } from './componentMap.ts';
+export type { ReflectionPort, FixtureSummary, FeedSummary } from './reflectionContext.ts';
