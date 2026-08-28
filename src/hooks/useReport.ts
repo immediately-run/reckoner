@@ -9,6 +9,7 @@ import { buildReportSession, sessionBindings } from '../app/reportSession.ts';
 import type { ReportSession, SeedDocument } from '../app/reportSession.ts';
 import type { SandboxMount } from '@immediately-run/sdk';
 import { demoLiveConnector, DEMO_FEED_NAME } from '../app/demoFeed.ts';
+import { usageFeedSpecs } from '../app/usageFeeds.ts';
 import { FeedRuntime } from '../feed/index.ts';
 import type { Bindings } from '../report/render/bindings.ts';
 import { resolveWorkbookMount } from '../app/dispatch.ts';
@@ -63,6 +64,21 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
         onSettled: () => setTick((t) => t + 1),
       },
     );
+    runtime.start();
+    return () => runtime.stop();
+  }, [session, seed, dispatchKey]);
+
+  // The usage workbook's rollup feeds (R3-349): five polled rollups + the meta feed,
+  // fetched browser-direct from the first-party analysis endpoint via the host's
+  // `net:fetch`. Same lifecycle as the demo feed; a failed poll keeps the last snapshot
+  // and refreshes the meta feed's status row instead of erroring the report.
+  useEffect(() => {
+    if (session === null || seed.usageFeeds !== true || dispatchKey !== '') return;
+    const runtime = new FeedRuntime(usageFeedSpecs(), {
+      engine: session.engine,
+      scheduleFlush,
+      onSettled: () => setTick((t) => t + 1),
+    });
     runtime.start();
     return () => runtime.stop();
   }, [session, seed, dispatchKey]);

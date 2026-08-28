@@ -5,8 +5,11 @@
 // the resolution latches on the first content mount, matching Grove's boot rule).
 
 import { useEffect, useState } from 'react';
-import { getMounts, onMountsChange } from '@immediately-run/sdk';
-import type { SandboxMount } from '@immediately-run/sdk';
+// The per-module subpath, deliberately: the SDK root pulls in `tasks.ts`, which
+// registers a host listener at module load and throws in plain vite dev (no host
+// transport). `mounts` is documented side-effect-clean for exactly this reason.
+import { getMounts, onMountsChange } from '@immediately-run/sdk/mounts';
+import type { SandboxMount } from '@immediately-run/sdk/mounts';
 
 /** A snapshot of the mount set that re-renders on change; empty under vite dev. */
 export function useMounts(): readonly SandboxMount[] {

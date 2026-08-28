@@ -36,6 +36,7 @@ import { resolveWorkbookMount } from './dispatch.ts';
 import type { SandboxMount } from '@immediately-run/sdk';
 import { MERIDIAN_SEED, type SeedDocument } from '../seed/seeds.ts';
 import { DEMO_FEED_NAME } from './demoFeed.ts';
+import { USAGE_FEED_NAMES } from './usageFeeds.ts';
 
 // Re-exported for existing import sites (the seeds themselves live in src/seed/seeds.ts).
 export { CALDERA_SEED, MERIDIAN_SEED } from '../seed/seeds.ts';
@@ -240,7 +241,15 @@ export async function buildReportSession(
   // feed, so it counts as available here (and only here — a document-internal check, like
   // fixture provenance, would rightly not see it) — but only for the seed document that
   // reads it; a dispatched workbook never does.
-  const runtimeFeeds = !dispatch.ok && seed.demoFeed === true ? [DEMO_FEED_NAME] : [];
+  // The app-supplied runtime feeds this seed reads (absent on a dispatched mount:
+  // a mounted workbook's feeds are its own, never the bundled seed's).
+  const runtimeFeeds = dispatch.ok
+    ? []
+    : seed.demoFeed === true
+      ? [DEMO_FEED_NAME]
+      : seed.usageFeeds === true
+        ? [...USAGE_FEED_NAMES]
+        : [];
   const diagnostics = [
     ...loaded.diagnostics,
     ...templateDiagnostics,

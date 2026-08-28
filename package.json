@@ -10,7 +10,15 @@
         "task": "open-workbook",
         "version": "1.0"
       }
-    ]
+    ],
+    "requests": {
+      "net:fetch": {
+        "hosts": [
+          "https://ir-analytics-tv5se4cxdq-ew.a.run.app",
+          "https://ir-analytics-zae4car5uq-ew.a.run.app"
+        ]
+      }
+    }
   },
   "scripts": {
     "dev": "vite",
@@ -21,7 +29,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@immediately-run/sdk": "^0.13.0",
+    "@immediately-run/sdk": "^0.57.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "ses": "^1.15.0"
