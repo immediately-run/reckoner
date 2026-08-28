@@ -57,6 +57,12 @@ export interface ReckonerManifest {
    */
   paramRefs?: Record<string, ParamRef>;
   title?: string;
+  /**
+   * The author's-view template name (AUTHORS_VIEW_SPEC §4). Optional — the reserved
+   * template name `authors_view` applies when absent. The named template is excluded
+   * from consumer-report selection.
+   */
+  authorsView?: string;
 }
 
 // --- feeds/*.feed.json (trusted connector config, §3.4) --------------------------

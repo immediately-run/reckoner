@@ -22,9 +22,11 @@ import { validateExternalReferences } from '../document/xref.ts';
 import type { ExternalReference } from '../document/xref.ts';
 import type { DocumentDiagnostic, LoadedDocument, ParamRef } from '../document/types.ts';
 import { resolveParamRefs, paramShadow } from '../document/paramRefs.ts';
-import { WIDGETS } from '../report/catalog.ts';
+import { REFLECTION, WIDGETS } from '../report/catalog.ts';
 import { parseTemplate } from '../report/parse/mdx.ts';
+import { validateTemplate } from '../report/validate.ts';
 import type { TemplateNode } from '../report/nodes.ts';
+import { AUTHORS_VIEW_SCAFFOLD, authorsViewName, consumerTemplate } from './authorsView.ts';
 import { missing } from '../report/render/bindings.ts';
 import type { Bindings, BoundValue } from '../report/render/bindings.ts';
 import type { Value } from '../stdlib/types.ts';
@@ -60,6 +62,14 @@ export interface ReportSession {
   sources: Record<string, string>;
   loaded: LoadedDocument;
   runtimeFeeds: string[];
+  /**
+   * The author's-view node tree (AUTHORS_VIEW_SPEC §3.5): the document's own
+   * author's-view template when it carries one, else the built-in scaffold — never
+   * served as the consumer report (§4).
+   */
+  authorsNodes: TemplateNode[];
+  /** True when `authorsNodes` came from a document file (an author took ownership). */
+  authorsFromDocument: boolean;
 }
 
 function normTier(tag: string | undefined): Tier {
@@ -131,6 +141,21 @@ function widgetParamNames(nodes: readonly TemplateNode[]): Set<string> {
   return names;
 }
 
+/** Reflection component names used in a node tree (AUTHORS_VIEW_SPEC §6's consumer-template diagnostic). */
+function reflectionComponentNames(nodes: readonly TemplateNode[]): string[] {
+  const found = new Set<string>();
+  const walk = (list: readonly TemplateNode[]): void => {
+    for (const n of list) {
+      if (n.type === 'component') {
+        if (REFLECTION.has(n.name)) found.add(n.name);
+        walk(n.children);
+      }
+    }
+  };
+  walk(nodes);
+  return [...found];
+}
+
 /**
  * Cross-reference diagnostics for a loaded document + the workbook the engine built from
  * it: every worksheet external checked against what the document (and the running app)
@@ -179,8 +204,37 @@ export async function buildReportSession(
   const { externals, paramRefs } = assembleExternals(loaded);
   await engine.run(externals);
 
-  const template = loaded.templates.find((t) => t.name === 'weekly') ?? loaded.templates[0];
+  // Template roles (AUTHORS_VIEW_SPEC §4): the author's-view template — manifest-named
+  // or the reserved `authors_view` — is excluded from consumer-report selection; the
+  // consumer pick otherwise keeps the existing `weekly` guess. Absent an author's-view
+  // file, the built-in scaffold is the default view (§1.1).
+  const authorsName = authorsViewName(loaded);
+  const template = consumerTemplate(loaded.templates, authorsName);
   const nodes = template === undefined ? [] : parseTemplate(template.source);
+  const authorsFile = loaded.templates.find((t) => t.name === authorsName);
+  const authorsNodes = parseTemplate(authorsFile?.source ?? AUTHORS_VIEW_SCAFFOLD);
+
+  // Both trees validate against the catalog, diagnostics attributed per file (§3.5) —
+  // and a reflection component in a CONSUMER template is flagged (§6): the port is
+  // withheld there, so it would render the author's-view-only tile.
+  const templateDiagnostics: DocumentDiagnostic[] = [];
+  if (template !== undefined) {
+    for (const d of validateTemplate(nodes).diagnostics) {
+      templateDiagnostics.push({ severity: d.severity, file: template.path, message: `${d.component}: ${d.message}` });
+    }
+    for (const name of reflectionComponentNames(nodes)) {
+      templateDiagnostics.push({
+        severity: 'warning',
+        file: template.path,
+        message: `<${name}> is an author's-view component; in the report it renders as unavailable.`,
+      });
+    }
+  }
+  if (authorsFile !== undefined) {
+    for (const d of validateTemplate(authorsNodes).diagnostics) {
+      templateDiagnostics.push({ severity: d.severity, file: authorsFile.path, message: `${d.component}: ${d.message}` });
+    }
+  }
 
   // Cross-reference validation: the demo feed is app-supplied runtime infra, not a document
   // feed, so it counts as available here (and only here — a document-internal check, like
@@ -189,7 +243,10 @@ export async function buildReportSession(
   const runtimeFeeds = !dispatch.ok && seed.demoFeed === true ? [DEMO_FEED_NAME] : [];
   const diagnostics = [
     ...loaded.diagnostics,
-    ...xrefDiagnostics(loaded, engine.externalReferences(), nodes, runtimeFeeds),
+    ...templateDiagnostics,
+    // The params universe spans BOTH trees (§3.5): a widget an author places in a
+    // custom author's view resolves rather than false-flagging.
+    ...xrefDiagnostics(loaded, engine.externalReferences(), [...nodes, ...authorsNodes], runtimeFeeds),
   ];
 
   return {
@@ -201,7 +258,9 @@ export async function buildReportSession(
     diagnostics,
     sources: worksheetSources,
     loaded,
-    runtimeFeeds: [DEMO_FEED_NAME],
+    runtimeFeeds,
+    authorsNodes,
+    authorsFromDocument: authorsFile !== undefined,
   };
 }
 

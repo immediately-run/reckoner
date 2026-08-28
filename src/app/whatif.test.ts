@@ -84,6 +84,8 @@ async function makeSession(): Promise<ReportSession> {
     sources,
     loaded,
     runtimeFeeds: [],
+    authorsNodes: [],
+    authorsFromDocument: false,
   };
 }
 

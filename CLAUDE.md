@@ -162,12 +162,14 @@ there is already a good, forkable, mobile-capable, agent-readable editor — use
    file the platform editor can edit (freehand drawing, a node graph,
    direct-manipulation geometry), or a measured UX need the platform editor can't
    meet. Write the reason down; convenience is not a reason.
-6. **Known gaps (don't paper over them with a `<textarea>`):** an app running in
-   *present* mode can't yet summon the edit experience on its **own source**, and
-   opening a specific mounted file in the *main* editor (vs. the `edit-file`
-   overlay) from a standalone app isn't supported yet. Both are specified as
-   proposed deltas in `EDITOR_FIRST_EDITING_SPEC.md` §6; until they land, rely on
-   the `edit-file` task and the host's edit experience rather than rolling your own.
+6. **Known gap (don't paper over it with a `<textarea>`):** opening a specific
+   mounted file in the *main* editor (vs. the `edit-file` overlay) from a
+   standalone app isn't supported yet — `EDITOR_FIRST_EDITING_SPEC.md` §6
+   Delta B; the `edit-file` overlay covers mounted files meanwhile. (The other
+   half of the old gap list is CLOSED: since Delta A landed 2026-06-13, a
+   present-mode app CAN summon the edit experience on its own source via the
+   SDK `requestEdit()` — own-source edits land in the CoW overlay, and the
+   capability owner confirmed baseline-when-self-scoped on 2026-08-28.)
 
 ## Verify before you're done
 

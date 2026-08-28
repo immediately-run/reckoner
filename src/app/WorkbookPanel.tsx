@@ -10,7 +10,7 @@
 // The scratch pad (WHATIF_SHADOW_EVALUATION_SPEC §1.2) rides at the bottom: an unsaved
 // worksheet evaluated through the shadow session, sharing this panel's suite results as
 // the verdict-diff base. Its buffer text is App-owned (§1.4 — survives panel close).
-import { useVerdicts } from '../hooks/useVerdicts.ts';
+import type { SubjectResult } from '../engine/worker/protocol.ts';
 import { summarizeSuite } from '../engine/suiteReport.ts';
 import type { ReportSession } from './reportSession.ts';
 import WorkbookPanelBody from './WorkbookPanelBody.tsx';
@@ -19,19 +19,31 @@ import './workbook-panel.css';
 
 interface WorkbookPanelProps {
   session: ReportSession;
-  /** The report's re-render tick — suites re-run when the workbook recomputes. */
-  tick: number;
+  /**
+   * The app-level suite state (AUTHORS_VIEW_SPEC §3.4, G-AV-10): ONE `useVerdicts`
+   * owned by App drives this panel, the inspector, and the author's view — the hook's
+   * own "must not be computed twice" contract, previously violated by a second
+   * instantiation here.
+   */
+  verdicts: {
+    results: Map<string, SubjectResult> | null;
+    error: string | null;
+    running: boolean;
+    rerun: () => void;
+  };
   /** Open the value inspector on a cell (card click). */
   onInspect: (cellId: string) => void;
   onClose: () => void;
+  /** Open the author's view (AUTHORS_VIEW_SPEC §1.2 — this panel is its door). */
+  onOpenAuthors: () => void;
   /** The scratch pad's session-scoped buffer text (App owns it; spec §1.4). */
   scratchText: string;
   onScratchChange: (text: string) => void;
 }
 
-function WorkbookPanel({ session, tick, onInspect, onClose, scratchText, onScratchChange }: WorkbookPanelProps) {
+function WorkbookPanel({ session, verdicts, onInspect, onClose, onOpenAuthors, scratchText, onScratchChange }: WorkbookPanelProps) {
   const engine = session.engine;
-  const { results, error, running, rerun } = useVerdicts(engine, tick);
+  const { results, error, running, rerun } = verdicts;
   const cells = engine.cells();
   // S4a (R3-231): the workbook-level answer in one line, from the SAME verdicts the cards
   // below render — the in-platform equivalent of a test-runner summary, no terminal.
@@ -44,6 +56,9 @@ function WorkbookPanel({ session, tick, onInspect, onClose, scratchText, onScrat
         <div className="rk-wb-actions">
           <button type="button" className="rk-wb-run" onClick={rerun} disabled={running}>
             {running ? 'Running…' : 'Run suite'}
+          </button>
+          <button type="button" className="rk-wb-close" onClick={onOpenAuthors}>
+            Author's view
           </button>
           <button type="button" className="rk-wb-close" onClick={onClose}>
             Close
