@@ -294,3 +294,97 @@ describe('runShadow — verdict flips (G-WIF-6)', () => {
     expect(after.get('model.scaled')?.verdict).toBe(baseScaled);
   });
 });
+
+describe('runShadow — span splice through the real build (R3-427)', () => {
+  const TWINS_SHEET = `import { cell } from "@reckoner/stdlib";
+
+export const one = cell({
+  doc: "the first twin",
+  inputs: {},
+  formula: () => 1,
+});
+
+export const two = cell({
+  doc: "the second twin — identical formula text",
+  inputs: {},
+  formula: () => 1,
+});
+
+export const short_sub = cell({
+  doc: "a formula that is a substring of longer_sub's",
+  inputs: {},
+  formula: () => 5 + 1,
+});
+
+export const longer_sub = cell({
+  doc: "contains short_sub's text as a substring",
+  inputs: {},
+  formula: () => 5 + 12,
+});
+`;
+
+  async function twinsSession(): Promise<ReportSession> {
+    const files = {
+      '/doc/reckoner.json': JSON.stringify({
+        format: 1,
+        compat: { stdlib: '>=0.1.0', catalog: '>=0.1.0' },
+        worksheets: ['twins.sheet.js'],
+        params: {},
+        title: 'Twins',
+      }),
+      '/doc/worksheets/twins.sheet.js': TWINS_SHEET,
+    };
+    const loaded = await loadDocument(reader(files), '/doc');
+    const sources = Object.fromEntries(loaded.worksheets.map((w) => [w.name, w.source]));
+    const engine = await AsyncEngine.fromSources(sources, { transport: inMemoryTransport() });
+    const { externals, paramRefs } = assembleExternals(loaded);
+    await engine.run(externals);
+    return {
+      engine, externals, paramRefs, nodes: [], title: 'Twins', diagnostics: [],
+      sources, loaded, runtimeFeeds: [], authorsNodes: [], authorsFromDocument: false,
+    };
+  }
+
+  it('descriptors carry structured-clone-safe spans from the build', async () => {
+    const session = await twinsSession();
+    const one = session.engine.cells().find((c) => c.id === 'twins.one');
+    expect(one?.span).toBeDefined();
+    expect(one?.span?.line).toBe(3);
+    const cloned = structuredClone(one);
+    expect(cloned?.span).toEqual(one?.span);
+    expect(session.engine.tests().every((t) => t.subject !== undefined)).toBe(true);
+  });
+
+  it('identical formula text in two cells: each splices its OWN block — no formula-ambiguous', async () => {
+    const session = await twinsSession();
+    const out = await runShadow(session, { variants: { 'twins.two': '() => 22' } }, inMemoryTransport(), null);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.valueOf('twins.two')).toBe(22);
+    expect(out.valueOf('twins.one')).toBe(1); // the other twin untouched
+    expect(out.deltas.map((d) => d.id)).toEqual(['twins.two']);
+  });
+
+  it('a formula that is a substring of another cell splices without refusal', async () => {
+    const session = await twinsSession();
+    const out = await runShadow(session, { variants: { 'twins.short_sub': '() => 5 + 100' } }, inMemoryTransport(), null);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.valueOf('twins.short_sub')).toBe(105);
+    expect(out.valueOf('twins.longer_sub')).toBe(17); // untouched
+  });
+
+  it('both variants at once, same worksheet — descending-block application keeps every span valid', async () => {
+    const session = await twinsSession();
+    const out = await runShadow(
+      session,
+      { variants: { 'twins.one': '() => 11', 'twins.two': '() => 22' } },
+      inMemoryTransport(),
+      null,
+    );
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.valueOf('twins.one')).toBe(11);
+    expect(out.valueOf('twins.two')).toBe(22);
+  });
+});

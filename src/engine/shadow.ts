@@ -57,13 +57,38 @@ function occurrences(haystack: string, needle: string): number {
 /**
  * Replace a cell's formula text with a variant, iff the text occurs exactly once in the
  * worksheet source (G-WIF-1). Ambiguity covers both identical formulas AND a short
- * formula occurring as a substring of a longer one — refused, not guessed.
+ * formula occurring as a substring of a longer one — refused, not guessed. This is the
+ * FALLBACK for descriptors without a span; span-carrying descriptors splice within their
+ * own declaration block (R3-427), where cross-cell duplicates cannot collide.
  */
 export function spliceFormula(sheetSource: string, formulaSource: string, variant: string): SpliceResult {
   const n = occurrences(sheetSource, formulaSource);
   if (n === 0) return { ok: false, code: 'formula-not-found' };
   if (n > 1) return { ok: false, code: 'formula-ambiguous' };
   const at = sheetSource.indexOf(formulaSource);
+  return {
+    ok: true,
+    source: sheetSource.slice(0, at) + variant + sheetSource.slice(at + formulaSource.length),
+  };
+}
+
+/**
+ * The span splice (R3-427): locate the formula text within the cell's OWN declaration
+ * block, so identical or substring formulas in other cells cannot make it ambiguous.
+ * The typed refusals remain for the degenerate within-block cases — never a silent
+ * wrong patch.
+ */
+export function spliceFormulaInSpan(
+  sheetSource: string,
+  span: { start: number; end: number },
+  formulaSource: string,
+  variant: string,
+): SpliceResult {
+  const block = sheetSource.slice(span.start, span.end);
+  const n = occurrences(block, formulaSource);
+  if (n === 0) return { ok: false, code: 'formula-not-found' };
+  if (n > 1) return { ok: false, code: 'formula-ambiguous' };
+  const at = span.start + block.indexOf(formulaSource);
   return {
     ok: true,
     source: sheetSource.slice(0, at) + variant + sheetSource.slice(at + formulaSource.length),
@@ -86,21 +111,41 @@ export function patchSources(
 ): PatchResult {
   const out: Record<string, string> = { ...sources };
 
+  // Resolve every variant's cell first, then apply span-carrying splices in DESCENDING
+  // block order per worksheet (an edit at a higher offset never moves a lower block, so
+  // spans computed on the original source stay valid), with span-less fallbacks last.
+  const resolved: { cellId: string; variant: string; cell: CellDescriptor }[] = [];
   for (const [cellId, variant] of Object.entries(patch.variants ?? {})) {
     const cell = cells.find((c) => c.id === cellId);
     if (cell === undefined) {
       return { ok: false, error: { code: 'unknown-cell', cellId, message: `unknown cell "${cellId}".` } };
     }
+    resolved.push({ cellId, variant, cell });
+  }
+  resolved.sort((a, b) => {
+    if (a.cell.worksheet !== b.cell.worksheet) return a.cell.worksheet < b.cell.worksheet ? -1 : 1;
+    if (a.cell.span === undefined) return 1;
+    if (b.cell.span === undefined) return -1;
+    return b.cell.span.start - a.cell.span.start;
+  });
+
+  for (const { cellId, variant, cell } of resolved) {
     const sheet = out[cell.worksheet];
     if (sheet === undefined) {
       return { ok: false, error: { code: 'unknown-cell', cellId, message: `no source for worksheet "${cell.worksheet}".` } };
     }
-    const spliced = spliceFormula(sheet, cell.formulaSource, variant);
+    // Span-carrying descriptors splice within their own block (R3-427); span-less ones
+    // (older engines, hand-built descriptors) keep the unique-occurrence fallback.
+    const spliced =
+      cell.span !== undefined
+        ? spliceFormulaInSpan(sheet, cell.span, cell.formulaSource, variant)
+        : spliceFormula(sheet, cell.formulaSource, variant);
     if (!spliced.ok) {
+      const where = cell.span !== undefined ? `the declaration block of "${cellId}"` : `worksheet "${cell.worksheet}"`;
       const message =
         spliced.code === 'formula-not-found'
-          ? `the formula text of "${cellId}" was not found in worksheet "${cell.worksheet}" — cannot splice safely.`
-          : `the formula text of "${cellId}" occurs more than once in worksheet "${cell.worksheet}" — cannot splice unambiguously.`;
+          ? `the formula text of "${cellId}" was not found in ${where} — cannot splice safely.`
+          : `the formula text of "${cellId}" occurs more than once in ${where} — cannot splice unambiguously.`;
       return { ok: false, error: { code: spliced.code, cellId, message } };
     }
     out[cell.worksheet] = spliced.source;

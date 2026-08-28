@@ -120,6 +120,7 @@ function App() {
                 onNavigate={setInspected}
                 onClose={() => setInspected(null)}
                 onWhatIf={() => setWhatIfOpenFor(inspectedCell.id)}
+                worksheetPaths={Object.fromEntries(report.session.loaded.worksheets.map((w) => [w.name, w.path]))}
               />
               {(whatIfOpenFor === inspectedCell.id ||
                 (variants[inspectedCell.id] !== undefined &&

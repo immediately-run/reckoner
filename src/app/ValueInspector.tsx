@@ -52,9 +52,21 @@ interface ValueInspectorProps {
    * on the formula row is its door — absent, no what-if chrome renders at all.
    */
   onWhatIf?: () => void;
+  /**
+   * Worksheet name → document-relative file path (R3-427): with the descriptor spans,
+   * the formula row and each test row name their exact `file:line`, so correcting a
+   * faulty formula or test by hand starts from a location, not a search. Plain data for
+   * now; the clickable open-at-line ride the navigator work + the editor line-hint.
+   */
+  worksheetPaths?: Record<string, string>;
 }
 
-function ValueInspector({ cell, cells, tests, outcome, result, onNavigate, onClose, onWhatIf }: ValueInspectorProps) {
+function ValueInspector({ cell, cells, tests, outcome, result, onNavigate, onClose, onWhatIf, worksheetPaths }: ValueInspectorProps) {
+  const fileLine = (worksheet: string, span?: { line: number }): string | null => {
+    const path = worksheetPaths?.[worksheet];
+    return path !== undefined && span !== undefined ? `${path}:${span.line}` : null;
+  };
+  const cellAt = fileLine(cell.worksheet, cell.span);
   const verdict: CellVerdict = outcome?.verdict ?? 'untested';
   return (
     <div className="rk-ins" aria-label={`Inspector for ${cell.id}`}>
@@ -121,6 +133,7 @@ function ValueInspector({ cell, cells, tests, outcome, result, onNavigate, onClo
               what if →
             </button>
           )}
+          {cellAt !== null && <span className="rk-ins-fileline">{cellAt}</span>}
         </span>
         <pre className="rk-ins-formula">{cell.formulaSource}</pre>
       </div>
@@ -138,11 +151,13 @@ function ValueInspector({ cell, cells, tests, outcome, result, onNavigate, onClo
           <div className="rk-ins-tests">
             {tests.map((t) => {
               const o = outcome?.outcomes.find((x) => x.id === t.id);
+              const testAt = fileLine(t.worksheet, t.span);
               return (
                 <div key={t.id} className={`rk-wb-test ${o?.pass === false ? 'rk-wb-test--fail' : 'rk-wb-test--pass'}`}>
                   <span className="rk-wb-kind">{t.kind}</span>
                   <span className="rk-wb-test-name">{t.name}</span>
                   <span className="rk-wb-outcome">{o === undefined ? '' : o.pass ? 'pass' : 'fail'}</span>
+                  {testAt !== null && <span className="rk-ins-fileline">{testAt}</span>}
                   {o !== undefined && !o.pass && o.message !== '' && <div className="rk-wb-test-msg">{o.message}</div>}
                 </div>
               );

@@ -152,3 +152,22 @@ describe('the what-if door (spec §1.1, amended 2026-08-28)', () => {
     expect(render()).not.toContain('what if →');
   });
 });
+
+describe('file:line anchors from spans (R3-427)', () => {
+  it('the formula row and test rows name their exact location when spans + paths exist', () => {
+    const withSpan = { ...cell, span: { start: 0, end: 10, line: 12 } };
+    const testsWithSpan = tests.map((t) => ({ ...t, span: { start: 0, end: 5, line: 31 } }));
+    const html = render({
+      cell: withSpan,
+      tests: testsWithSpan,
+      worksheetPaths: { revenue: 'worksheets/revenue.sheet.js' },
+    });
+    expect(html).toContain('worksheets/revenue.sheet.js:12');
+    expect(html).toContain('worksheets/revenue.sheet.js:31');
+  });
+
+  it('renders no anchor without spans or paths — never a wrong location', () => {
+    expect(render()).not.toContain('.sheet.js:');
+    expect(render({ worksheetPaths: { revenue: 'worksheets/revenue.sheet.js' } })).not.toContain('.sheet.js:');
+  });
+});

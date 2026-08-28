@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as stdlib from '../stdlib/index.ts';
-import { evaluateWorksheet, evaluateConfined } from './compartment.ts';
+import { evaluateWorksheet, evaluateConfined, exportSpans } from './compartment.ts';
 import type { CellDef } from '../stdlib/cell.ts';
 import type { Row } from '../stdlib/types.ts';
 
@@ -83,5 +83,35 @@ export const label = cell({
     // which is what the what-if splice's fidelity assumption rests on.
     expect(def.formula.toString()).toContain('"export const x = 1"');
     expect(def.formula({})).toBe('export const x = 1');
+  });
+});
+
+describe('exportSpans — declaration blocks on the raw source (R3-427)', () => {
+  const lines = [
+    'import { cell } from "@reckoner/stdlib";',
+    '',
+    'export const a = cell({',
+    '  doc: "first",',
+    '  formula: () => 1,',
+    '});',
+    '',
+    'export const b = cell({',
+    '  doc: "second — its formula RETURNS the token text",',
+    '  formula: () => "export const x = 1",',
+    '});',
+    '',
+  ];
+  const sheet = lines.join('\n');
+
+  it('spans every export, contiguous blocks, keyword-anchored lines — and no phantom span from a string literal', () => {
+    const spans = exportSpans(sheet);
+    expect(Object.keys(spans).sort()).toEqual(['a', 'b']); // no phantom `x` from the string
+    expect(spans.a.line).toBe(3);
+    expect(spans.b.line).toBe(8);
+    expect(spans.a.end).toBeLessThanOrEqual(spans.b.start);
+    expect(spans.b.end).toBe(sheet.length);
+    // Each block really contains its own declaration — including the token-bearing string.
+    expect(sheet.slice(spans.a.start, spans.a.end)).toContain('doc: "first"');
+    expect(sheet.slice(spans.b.start, spans.b.end)).toContain('export const x = 1');
   });
 });

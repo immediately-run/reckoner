@@ -14,7 +14,8 @@ export type { Evaluator } from './scheduler.ts';
 export { runTest, runSuite, classifyCell } from './testrunner.ts';
 export type { CellVerdict, SuiteResult, TestOutcome, TestRunContext } from './testrunner.ts';
 export { Engine } from './engine.ts';
-export { evaluateWorksheet, evaluateConfined } from './compartment.ts';
+export { evaluateWorksheet, evaluateConfined, exportSpans } from './compartment.ts';
+export type { ExportSpan } from './compartment.ts';
 export { resolveInputs, shortName } from './resolve.ts';
 export type { ResolveState } from './resolve.ts';
 export { AsyncEngine, TimeoutError } from './asyncEngine.ts';
@@ -32,6 +33,7 @@ export { contentKey } from './hash.ts';
 export {
   SCRATCH_WORKSHEET,
   spliceFormula,
+  spliceFormulaInSpan,
   patchSources,
   dependentsClosure,
   diffPasses,
