@@ -32,6 +32,12 @@ function App() {
   // scratch pad's buffer live here, above the panels' mount/unmount lifecycle.
   const [variants, setVariants] = useState<Record<string, string>>({});
   const [scratchText, setScratchText] = useState('');
+  // The what-if section is collapsed by default (spec §1.1, amended 2026-08-28): the
+  // formula row's "what if →" affordance opens it, and it stays open on its own whenever
+  // the cell's variant text differs from the document formula — typed source never hides.
+  // Keyed by cell id rather than reset in an effect: navigating to another cell makes
+  // the door closed again by derivation (react-hooks/set-state-in-effect stays happy).
+  const [whatIfOpenFor, setWhatIfOpenFor] = useState<string | null>(null);
   const title = report.status === 'ready' ? report.session.title : undefined;
   useEffect(() => {
     if (title !== undefined) document.title = title;
@@ -95,14 +101,19 @@ function App() {
                 result={report.session.engine.result(inspectedCell.id)}
                 onNavigate={setInspected}
                 onClose={() => setInspected(null)}
+                onWhatIf={() => setWhatIfOpenFor(inspectedCell.id)}
               />
-              <WhatIfPanel
-                session={report.session}
-                cell={inspectedCell}
-                baseVerdicts={verdicts.results}
-                text={variants[inspectedCell.id] ?? inspectedCell.formulaSource}
-                onTextChange={(cellId, text) => setVariants((v) => ({ ...v, [cellId]: text }))}
-              />
+              {(whatIfOpenFor === inspectedCell.id ||
+                (variants[inspectedCell.id] !== undefined &&
+                  variants[inspectedCell.id] !== inspectedCell.formulaSource)) && (
+                <WhatIfPanel
+                  session={report.session}
+                  cell={inspectedCell}
+                  baseVerdicts={verdicts.results}
+                  text={variants[inspectedCell.id] ?? inspectedCell.formulaSource}
+                  onTextChange={(cellId, text) => setVariants((v) => ({ ...v, [cellId]: text }))}
+                />
+              )}
             </div>
           )}
         </>

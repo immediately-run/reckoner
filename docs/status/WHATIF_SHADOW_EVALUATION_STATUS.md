@@ -1,6 +1,10 @@
 # WHATIF_SHADOW_EVALUATION — implementation status
 
-**Status:** implemented at the deliverable level (R3-395, R3-396, R3-397) · **Updated:** 2026-08-27
+**Status:** implemented at the deliverable level (R3-395, R3-396, R3-397) · **Updated:** 2026-08-28
+
+> *2026-08-28 — what-if panel collapsed by default (spec §1.1 amendment): the formula
+> row gained the `what if →` door, the section auto-reopens while a variant differs from
+> the document formula, and the duplicate formula rendering user feedback flagged is gone.*
 
 This document is the single implementation-status source for
 `docs/specs/WHATIF_SHADOW_EVALUATION_SPEC.md`; where they disagree, this document governs.
