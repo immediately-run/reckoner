@@ -46,9 +46,15 @@ interface ValueInspectorProps {
   /** Navigate to another cell (an input chip) — the hop-by-hop V3 walk. */
   onNavigate: (cellId: string) => void;
   onClose: () => void;
+  /**
+   * Open the what-if editor for this cell (WHATIF_SHADOW_EVALUATION_SPEC §1.1, amended
+   * 2026-08-28): the counterfactual section is collapsed by default, and this affordance
+   * on the formula row is its door — absent, no what-if chrome renders at all.
+   */
+  onWhatIf?: () => void;
 }
 
-function ValueInspector({ cell, cells, tests, outcome, result, onNavigate, onClose }: ValueInspectorProps) {
+function ValueInspector({ cell, cells, tests, outcome, result, onNavigate, onClose, onWhatIf }: ValueInspectorProps) {
   const verdict: CellVerdict = outcome?.verdict ?? 'untested';
   return (
     <div className="rk-ins" aria-label={`Inspector for ${cell.id}`}>
@@ -108,7 +114,14 @@ function ValueInspector({ cell, cells, tests, outcome, result, onNavigate, onClo
       </div>
 
       <div className="rk-ins-row">
-        <span className="rk-ins-label">formula</span>
+        <span className="rk-ins-label">
+          formula
+          {onWhatIf !== undefined && (
+            <button type="button" className="rk-chip rk-chip--nav rk-chip--whatif" onClick={onWhatIf}>
+              what if →
+            </button>
+          )}
+        </span>
         <pre className="rk-ins-formula">{cell.formulaSource}</pre>
       </div>
 

@@ -145,3 +145,10 @@ describe('ValueInspector — the precedent neighborhood (UX-4)', () => {
     expect(html).not.toContain('rk-prec');
   });
 });
+
+describe('the what-if door (spec §1.1, amended 2026-08-28)', () => {
+  it('renders the formula row affordance when a handler is provided, and none otherwise', () => {
+    expect(render({ onWhatIf: () => {} })).toContain('what if →');
+    expect(render()).not.toContain('what if →');
+  });
+});

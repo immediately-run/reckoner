@@ -70,6 +70,17 @@ inspected cell:
 - a **Discard** action: shadow results are dropped. Variant *text* is session-scoped
   state (§1.4), so closing the inspector does not silently destroy an edited variant.
 
+*(Amendment, 2026-08-28 — collapsed by default. The v1 always-open panel rendered the
+same formula twice in adjacent boxes — the inspector's read-only FORMULA row (provenance)
+and the pre-filled variant editor — a visual redundancy user feedback flagged on first
+contact. The section now starts collapsed; the FORMULA row carries a `what if →`
+affordance that opens it (pre-filled at that moment, as before), and it re-opens on its
+own whenever the cell's variant text differs from the document formula, so typed source
+never hides itself. The pre-fill decision and everything else in this section stand; the
+read-only FORMULA row deliberately stays — letting the editor double as the display would
+make the document's formula look editable, blurring the real-vs-counterfactual line this
+design keeps sharp.)*
+
 The panel is explicit-run (no evaluate-on-keystroke): a run is a full shadow build + pass
 + suite, its browser-side cost is unmeasured, and on the platform today it shares the
 main thread (§6) — an explicit action keeps that cost legible and interruptible-by-choice.
