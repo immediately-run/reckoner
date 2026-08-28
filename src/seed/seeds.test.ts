@@ -2,7 +2,7 @@
 // bare search), the default, and unparseable input failing closed to the default.
 
 import { describe, it, expect } from 'vitest';
-import { seedFromBootLocation, MERIDIAN_SEED, CALDERA_SEED } from './seeds.ts';
+import { seedFromBootLocation, MERIDIAN_SEED, CALDERA_SEED, USAGE_SEED } from './seeds.ts';
 
 describe('seedFromBootLocation', () => {
   it('the platform shape: the doc param rides inside the encoded boot href', () => {
@@ -27,10 +27,19 @@ describe('seedFromBootLocation', () => {
     expect(seedFromBootLocation({ search: '?href=%zz' })).toBe(MERIDIAN_SEED);
   });
 
-  it('the two seeds are distinct documents with the feed flag set correctly', () => {
+  it('the usage workbook rides the same picker: ?doc=usage in both boot shapes', () => {
+    expect(seedFromBootLocation({ search: '?doc=usage' })).toBe(USAGE_SEED);
+    const outer = 'https://immediately.run/present/github/immediately-run/reckoner/main/files/src/App.tsx?doc=usage';
+    expect(seedFromBootLocation({ search: '?href=' + encodeURIComponent(outer) })).toBe(USAGE_SEED);
+  });
+
+  it('the seeds are distinct documents with the feed flags set correctly', () => {
     expect(MERIDIAN_SEED.demoFeed).toBe(true);
     expect(CALDERA_SEED.demoFeed).toBe(false);
     expect(CALDERA_SEED.root).toBe('caldera');
     expect(Object.keys(CALDERA_SEED.files).length).toBeGreaterThan(5);
+    expect(USAGE_SEED.usageFeeds).toBe(true);
+    expect(USAGE_SEED.demoFeed).toBeUndefined();
+    expect(USAGE_SEED.root).toBe('usage');
   });
 });
