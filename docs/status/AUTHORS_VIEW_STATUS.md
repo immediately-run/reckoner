@@ -1,13 +1,13 @@
 # AUTHORS_VIEW — implementation status
 
-**Status:** implemented at the deliverable level (R3-433, R3-434) · **Updated:** 2026-08-28
+**Status:** implemented at the deliverable level (R3-435, R3-434) · **Updated:** 2026-08-28
 
 This document is the single implementation-status source for
 `docs/specs/AUTHORS_VIEW_SPEC.md`; where they disagree, this document governs.
 
 ## Shipped (2026-08-28)
 
-- **R3-433 — core.** The four reflection components (`FormulaIndex`, `TestIndex`,
+- **R3-435 — core.** *(renumbered from R3-433 — id collision with a parallel main allocation; the docs items carry the note)* The four reflection components (`FormulaIndex`, `TestIndex`,
   `DataInventory`, `SuiteSummary`) in the catalog + `componentMap` + render layer
   (`src/report/render/reflectionContext.ts`, `verdictChip.ts`,
   `components/{FormulaIndex,TestIndex,DataInventory,SuiteSummary}.tsx`); the
