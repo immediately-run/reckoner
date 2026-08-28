@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { buildReportSession, sessionBindings } from '../app/reportSession.ts';
-import type { ReportSession } from '../app/reportSession.ts';
+import type { ReportSession, SeedDocument } from '../app/reportSession.ts';
 import { demoLiveConnector, DEMO_FEED_NAME } from '../app/demoFeed.ts';
 import { FeedRuntime } from '../feed/index.ts';
 import type { Bindings } from '../report/render/bindings.ts';
@@ -21,14 +21,14 @@ const scheduleFlush = (fn: () => void): void => {
   else setTimeout(fn, 16);
 };
 
-export function useReport(): ReportState {
+export function useReport(seed: SeedDocument): ReportState {
   const [session, setSession] = useState<ReportSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    buildReportSession()
+    buildReportSession(undefined, seed)
       .then((s) => {
         if (alive) setSession(s);
       })
@@ -38,12 +38,13 @@ export function useReport(): ReportState {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [seed]);
 
-  // Start the demo live feed once the session is ready; stop it on unmount. Retention covers
-  // the demo's 30s windowed input with margin (buffer ≥ longest dependent window, §5.3).
+  // Start the demo live feed once the session is ready; stop it on unmount — but only
+  // for documents that read it (Meridian). Retention covers the demo's 30s windowed
+  // input with margin (buffer ≥ longest dependent window, §5.3).
   useEffect(() => {
-    if (session === null) return;
+    if (session === null || seed.demoFeed !== true) return;
     const runtime = new FeedRuntime(
       [{ name: DEMO_FEED_NAME, connector: demoLiveConnector(), tier: 'live', retention: { keepFor: '2m' } }],
       {
@@ -54,7 +55,7 @@ export function useReport(): ReportState {
     );
     runtime.start();
     return () => runtime.stop();
-  }, [session]);
+  }, [session, seed]);
 
   const bindings = useMemo(
     () => (session === null ? null : sessionBindings(session, () => setTick((t) => t + 1))),

@@ -29,8 +29,12 @@ import { missing } from '../report/render/bindings.ts';
 import type { Bindings, BoundValue } from '../report/render/bindings.ts';
 import type { Value } from '../stdlib/types.ts';
 import { memoryReader } from './memoryReader.ts';
-import { SEED_FILES, SEED_ROOT } from '../seed/document.ts';
+import { MERIDIAN_SEED, type SeedDocument } from '../seed/seeds.ts';
 import { DEMO_FEED_NAME } from './demoFeed.ts';
+
+// Re-exported for existing import sites (the seeds themselves live in src/seed/seeds.ts).
+export { CALDERA_SEED, MERIDIAN_SEED } from '../seed/seeds.ts';
+export type { SeedDocument } from '../seed/seeds.ts';
 
 const EXTERNAL_NAMESPACES = ['feeds.', 'fixtures.', 'static.', 'params.'];
 const TIERS: ReadonlySet<string> = new Set(['static', 'pulled', 'live']);
@@ -147,10 +151,13 @@ export function xrefDiagnostics(
   });
 }
 
-/** Load the bundled demo document and run the full cold pipeline through the worker engine. */
-export async function buildReportSession(transport?: WorkerTransport): Promise<ReportSession> {
+/** Load a bundled document and run the full cold pipeline through the worker engine. */
+export async function buildReportSession(
+  transport?: WorkerTransport,
+  seed: SeedDocument = MERIDIAN_SEED,
+): Promise<ReportSession> {
   const t = transport ?? (await makeTransport());
-  const loaded = await loadDocument(memoryReader(SEED_FILES), SEED_ROOT);
+  const loaded = await loadDocument(memoryReader(seed.files), seed.root);
 
   const worksheetSources: Record<string, string> = {};
   for (const w of loaded.worksheets) worksheetSources[w.name] = w.source;
@@ -164,10 +171,11 @@ export async function buildReportSession(transport?: WorkerTransport): Promise<R
 
   // Cross-reference validation: the demo feed is app-supplied runtime infra, not a document
   // feed, so it counts as available here (and only here — a document-internal check, like
-  // fixture provenance, would rightly not see it).
+  // fixture provenance, would rightly not see it) — but only for documents that read it.
+  const runtimeFeeds = seed.demoFeed === true ? [DEMO_FEED_NAME] : [];
   const diagnostics = [
     ...loaded.diagnostics,
-    ...xrefDiagnostics(loaded, engine.externalReferences(), nodes, [DEMO_FEED_NAME]),
+    ...xrefDiagnostics(loaded, engine.externalReferences(), nodes, runtimeFeeds),
   ];
 
   return {

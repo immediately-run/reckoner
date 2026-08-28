@@ -11,6 +11,7 @@ import './index.css';
 import './app/report-page.css';
 import { useEffect, useMemo, useState } from 'react';
 import { useReport } from './hooks/useReport.ts';
+import { seedFromBootLocation } from './seed/seeds.ts';
 import { ReportView } from './report/index.ts';
 import WorkbookPanel from './app/WorkbookPanel.tsx';
 import ValueInspector from './app/ValueInspector.tsx';
@@ -18,7 +19,10 @@ import WhatIfPanel from './app/WhatIfPanel.tsx';
 import { useVerdicts } from './hooks/useVerdicts.ts';
 
 function App() {
-  const report = useReport();
+  // The boot href's `doc` param picks the bundled document (?doc=caldera for the LBO
+  // demo; the default is the Meridian monthly review). The picked seed is a module
+  // constant, so the reference is stable across renders.
+  const report = useReport(seedFromBootLocation(window.location));
   const [reviewOpen, setReviewOpen] = useState(false);
   const [inspected, setInspected] = useState<string | null>(null);
   // What-if buffer text is SESSION-SCOPED app state (WHATIF_SHADOW_EVALUATION_SPEC §1.4):
