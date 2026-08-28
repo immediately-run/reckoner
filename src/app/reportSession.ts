@@ -29,6 +29,9 @@ import { missing } from '../report/render/bindings.ts';
 import type { Bindings, BoundValue } from '../report/render/bindings.ts';
 import type { Value } from '../stdlib/types.ts';
 import { memoryReader } from './memoryReader.ts';
+import { fsReader } from '../document/fsReader.ts';
+import { resolveWorkbookMount } from './dispatch.ts';
+import type { SandboxMount } from '@immediately-run/sdk';
 import { MERIDIAN_SEED, type SeedDocument } from '../seed/seeds.ts';
 import { DEMO_FEED_NAME } from './demoFeed.ts';
 
@@ -155,9 +158,19 @@ export function xrefDiagnostics(
 export async function buildReportSession(
   transport?: WorkerTransport,
   seed: SeedDocument = MERIDIAN_SEED,
+  mounts: readonly SandboxMount[] = [],
 ): Promise<ReportSession> {
   const t = transport ?? (await makeTransport());
-  const loaded = await loadDocument(memoryReader(seed.files), seed.root);
+
+  // The dispatched flow first: a workbook repo that arrived as a content mount
+  // (R3-172 repo-load dispatch) is read from the filesystem — plain files, the same
+  // `loadDocument` pipeline as the seed, no copy embedded in this app. Absent a
+  // dispatched mount, the bundled seed document (optionally `?doc=`-selected).
+  const dispatch = resolveWorkbookMount(mounts);
+  const loaded =
+    dispatch.ok
+      ? await loadDocument(fsReader(), dispatch.root)
+      : await loadDocument(memoryReader(seed.files), seed.root);
 
   const worksheetSources: Record<string, string> = {};
   for (const w of loaded.worksheets) worksheetSources[w.name] = w.source;
@@ -171,8 +184,9 @@ export async function buildReportSession(
 
   // Cross-reference validation: the demo feed is app-supplied runtime infra, not a document
   // feed, so it counts as available here (and only here — a document-internal check, like
-  // fixture provenance, would rightly not see it) — but only for documents that read it.
-  const runtimeFeeds = seed.demoFeed === true ? [DEMO_FEED_NAME] : [];
+  // fixture provenance, would rightly not see it) — but only for the seed document that
+  // reads it; a dispatched workbook never does.
+  const runtimeFeeds = !dispatch.ok && seed.demoFeed === true ? [DEMO_FEED_NAME] : [];
   const diagnostics = [
     ...loaded.diagnostics,
     ...xrefDiagnostics(loaded, engine.externalReferences(), nodes, runtimeFeeds),

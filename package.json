@@ -4,7 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "immediately.run": {
-    "$schema": "https://immediately.run/immediately-run-config.schema.json"
+    "$schema": "https://immediately.run/immediately-run-config.schema.json",
+    "provides": [
+      {
+        "task": "open-workbook",
+        "version": "1.0"
+      }
+    ]
   },
   "scripts": {
     "dev": "vite",

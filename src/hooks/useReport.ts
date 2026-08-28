@@ -7,9 +7,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { buildReportSession, sessionBindings } from '../app/reportSession.ts';
 import type { ReportSession, SeedDocument } from '../app/reportSession.ts';
+import type { SandboxMount } from '@immediately-run/sdk';
 import { demoLiveConnector, DEMO_FEED_NAME } from '../app/demoFeed.ts';
 import { FeedRuntime } from '../feed/index.ts';
 import type { Bindings } from '../report/render/bindings.ts';
+import { resolveWorkbookMount } from '../app/dispatch.ts';
 
 export type ReportState =
   | { status: 'loading' }
@@ -21,14 +23,22 @@ const scheduleFlush = (fn: () => void): void => {
   else setTimeout(fn, 16);
 };
 
-export function useReport(seed: SeedDocument): ReportState {
+export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = []): ReportState {
   const [session, setSession] = useState<ReportSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
+  // The resolution the current mount set implies ('' when not dispatched) — the effect
+  // key that rebuilds the session ONLY when the workbook appears/changes, never on an
+  // unrelated mount update mid-document.
+  const dispatchKey = useMemo(() => {
+    const r = resolveWorkbookMount(mounts);
+    return r.ok ? r.root : '';
+  }, [mounts]);
+
   useEffect(() => {
     let alive = true;
-    buildReportSession(undefined, seed)
+    buildReportSession(undefined, seed, mounts)
       .then((s) => {
         if (alive) setSession(s);
       })
@@ -38,13 +48,13 @@ export function useReport(seed: SeedDocument): ReportState {
     return () => {
       alive = false;
     };
-  }, [seed]);
+  }, [seed, mounts, dispatchKey]);
 
   // Start the demo live feed once the session is ready; stop it on unmount — but only
   // for documents that read it (Meridian). Retention covers the demo's 30s windowed
   // input with margin (buffer ≥ longest dependent window, §5.3).
   useEffect(() => {
-    if (session === null || seed.demoFeed !== true) return;
+    if (session === null || seed.demoFeed !== true || dispatchKey !== '') return;
     const runtime = new FeedRuntime(
       [{ name: DEMO_FEED_NAME, connector: demoLiveConnector(), tier: 'live', retention: { keepFor: '2m' } }],
       {
@@ -55,7 +65,7 @@ export function useReport(seed: SeedDocument): ReportState {
     );
     runtime.start();
     return () => runtime.stop();
-  }, [session, seed]);
+  }, [session, seed, dispatchKey]);
 
   const bindings = useMemo(
     () => (session === null ? null : sessionBindings(session, () => setTick((t) => t + 1))),
