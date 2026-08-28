@@ -1,6 +1,6 @@
 # AUTHORS_VIEW — implementation status
 
-**Status:** implemented at the deliverable level (R3-435, R3-434) · **Updated:** 2026-08-28
+**Status:** implemented at the deliverable level (R3-435, R3-436) · **Updated:** 2026-08-28
 
 This document is the single implementation-status source for
 `docs/specs/AUTHORS_VIEW_SPEC.md`; where they disagree, this document governs.
@@ -16,7 +16,7 @@ This document is the single implementation-status source for
   the new optional manifest `authorsView` key), the consumer pick excluding the
   author's view, per-template catalog validation, and the §6 consumer-template
   diagnostic (`src/app/reportSession.ts`).
-- **R3-434 — surface.** The built-in scaffold with the `## Decisions.` convention
+- **R3-436 — surface.** *(renumbered from R3-434 — the same parallel-allocation collision as its sibling)* The built-in scaffold with the `## Decisions.` convention
   (`src/app/authorsView.ts`), the rendered view with its header and Back
   (`src/app/AuthorsView.tsx`), the door in the workbook panel, the verdicts hoist —
   one app-level `useVerdicts` now drives the panel, the inspector, and the reflection
