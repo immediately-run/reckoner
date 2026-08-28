@@ -1,6 +1,6 @@
 # Reckoner Author's View — the document describing itself, as a template the author owns
 
-**Status:** implemented at the deliverable level — R3-435/R3-434; one adversarial pass
+**Status:** implemented at the deliverable level — R3-435/R3-436; one adversarial pass
 folded (§11, AV-R1…R14); residuals live in the status doc. · **Updated:** 2026-08-28
 
 *(Implementation note, 2026-08-28 — authored, adversarially reviewed, and built in the
