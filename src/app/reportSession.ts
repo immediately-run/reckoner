@@ -29,23 +29,12 @@ import { missing } from '../report/render/bindings.ts';
 import type { Bindings, BoundValue } from '../report/render/bindings.ts';
 import type { Value } from '../stdlib/types.ts';
 import { memoryReader } from './memoryReader.ts';
-import { SEED_FILES, SEED_ROOT } from '../seed/document.ts';
-import { CALDERA_FILES, CALDERA_ROOT } from '../seed/caldera.ts';
+import { MERIDIAN_SEED, type SeedDocument } from '../seed/seeds.ts';
 import { DEMO_FEED_NAME } from './demoFeed.ts';
 
-/**
- * A bundled document the app can open with zero prompts. `demoFeed` marks the document
- * as reading the app-supplied live demo feed (Meridian does; Caldera does not, so its
- * session skips the feed runtime and the feed's xref allowance).
- */
-export interface SeedDocument {
-  root: string;
-  files: Record<string, string>;
-  demoFeed?: boolean;
-}
-
-export const MERIDIAN_SEED: SeedDocument = { root: SEED_ROOT, files: SEED_FILES, demoFeed: true };
-export const CALDERA_SEED: SeedDocument = { root: CALDERA_ROOT, files: CALDERA_FILES, demoFeed: false };
+// Re-exported for existing import sites (the seeds themselves live in src/seed/seeds.ts).
+export { CALDERA_SEED, MERIDIAN_SEED } from '../seed/seeds.ts';
+export type { SeedDocument } from '../seed/seeds.ts';
 
 const EXTERNAL_NAMESPACES = ['feeds.', 'fixtures.', 'static.', 'params.'];
 const TIERS: ReadonlySet<string> = new Set(['static', 'pulled', 'live']);
