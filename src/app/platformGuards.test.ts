@@ -41,4 +41,26 @@ describe('the immediately.run compatibility guards', () => {
     // 2026-08-24 when the reckoner demo first ran on production.
     expect(offenders).toEqual([]);
   });
+
+  it('no module STATICALLY value-imports the SDK task surface (DOCUMENT_NAVIGATOR_SPEC §4.1)', () => {
+    const offenders: string[] = [];
+    for (const path of tsFiles(join(process.cwd(), 'src'))) {
+      const relFromSrc = `src/${path.split(/[/\\]src[/\\]/)[1]?.replace(/\\/g, '/') ?? ''}`;
+      const source = withoutComments(readFileSync(path, 'utf8'));
+      // `import type … from '@immediately-run/sdk[/tasks]'` is erased at compile time and
+      // is fine; a VALUE import of the task surface is not. `await import(...)` is not a
+      // static import statement and so never matches.
+      const statics = source.match(/^\s*import\s+(?!type\b)[^;]*from\s*['"]@immediately-run\/sdk(?:\/tasks)?['"]/gm) ?? [];
+      for (const stmt of statics) {
+        // Only the task surface carries the load-time listener; the root barrel re-exports it.
+        if (/@immediately-run\/sdk(\/tasks)?['"]$/.test(stmt.trim())) offenders.push(relFromSrc);
+      }
+    }
+    // Rationale: `@immediately-run/sdk/tasks` calls addListener('task-input', …) at module
+    // load, which throws with no host transport — a white screen in plain `vite dev` and in
+    // any host-less render. The delegation must reach it via `await import()` inside its
+    // handler (the pattern makeTransport already uses for workerUrl). `mounts` is
+    // side-effect-clean and is imported normally in useMounts.ts.
+    expect(offenders).toEqual([]);
+  });
 });

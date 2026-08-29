@@ -605,3 +605,25 @@
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* ── The vocabulary section (DOCUMENT_NAVIGATOR_SPEC Part A) ── */
+.rk-vocab {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 16px;
+}
+
+.rk-vocab-entry {
+  margin-top: 8px;
+}
+
+.rk-vocab-attrs {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0;
+}
+
+.rk-vocab-filter--on {
+  color: var(--ink);
+  border-color: var(--accent-violet);
+}
