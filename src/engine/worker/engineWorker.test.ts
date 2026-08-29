@@ -67,7 +67,12 @@ export const other = cell({ doc: "untested", inputs: { b: "sheet.base" }, formul
     const w = createEngineWorker();
     const d = w.build(SOURCES_WITH_TESTS);
     expect(d.cells.find((c) => c.id === 'sheet.base')?.doc).toBe('base cell');
-    expect(d.tests.map(({ span: _span, ...t }) => t)).toEqual([
+    // Project explicitly rather than destructuring `span` away: an unused binding is a
+    // lint error, and `_`-prefixing is not exempt under this repo's config.
+    const cards = d.tests.map((t) => ({
+      id: t.id, worksheet: t.worksheet, name: t.name, kind: t.kind, subject: t.subject, inputs: t.inputs,
+    }));
+    expect(cards).toEqual([
       { id: 'sheet.base_check', worksheet: 'sheet', name: 'base_check', kind: 'specification', subject: 'sheet.base', inputs: {} },
       { id: 'sheet.base_sane', worksheet: 'sheet', name: 'base_sane', kind: 'property', subject: 'sheet.base', inputs: {} },
     ]);

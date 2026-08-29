@@ -7,6 +7,10 @@
 // from the report header, closed by default, run-mode report untouched. Card clicks open
 // the value inspector (App owns the inspected cell, shared with the on-pixel affordance).
 //
+// The vocabulary section (DOCUMENT_NAVIGATOR_SPEC Part A) rides at the bottom too —
+// panel chrome, derived from the closed catalog, so "what can I use as an input knob?"
+// has an answer inside the product.
+//
 // The scratch pad (WHATIF_SHADOW_EVALUATION_SPEC §1.2) rides at the bottom: an unsaved
 // worksheet evaluated through the shadow session, sharing this panel's suite results as
 // the verdict-diff base. Its buffer text is App-owned (§1.4 — survives panel close).
@@ -15,6 +19,7 @@ import { summarizeSuite } from '../engine/suiteReport.ts';
 import type { ReportSession } from './reportSession.ts';
 import WorkbookPanelBody from './WorkbookPanelBody.tsx';
 import ScratchPad from './ScratchPad.tsx';
+import VocabularySection from './VocabularySection.tsx';
 import './workbook-panel.css';
 
 interface WorkbookPanelProps {
@@ -80,6 +85,7 @@ function WorkbookPanel({ session, verdicts, onInspect, onClose, onOpenAuthors, s
         onInspect={onInspect}
       />
       <ScratchPad session={session} baseVerdicts={results} text={scratchText} onTextChange={onScratchChange} />
+      <VocabularySection />
     </aside>
   );
 }

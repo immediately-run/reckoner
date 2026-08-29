@@ -82,7 +82,7 @@ function App() {
           <header className="rk-page-head">
             <h1 className="grad-text">{report.session.title}</h1>
             <button type="button" className="rk-review-toggle" onClick={() => setReviewOpen((v) => !v)}>
-              {reviewOpen ? 'Close review' : 'Review'}
+              {reviewOpen ? 'Close workbook' : 'Workbook'}
             </button>
           </header>
           {authorsOpen ? (
