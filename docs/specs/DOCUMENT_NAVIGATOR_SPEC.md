@@ -3,7 +3,7 @@
 **Status:** **split** after one adversarial pass (§10, DN-R1…R18) — **Part A (the
 vocabulary, §1–§2) is normative and shipped**; **Part B (the edit affordance, §3–§5) is
 a *blocked* design: it does not ship until §5's four host-contract preconditions are
-established.** · **Updated:** 2026-08-28
+established.** · **Updated:** 2026-08-29
 
 > **The single implementation-status source for this spec is
 > `docs/status/DOCUMENT_NAVIGATOR_STATUS.md`** — where this document and that one
@@ -216,7 +216,12 @@ this document is the design and R3-447 is the item that establishes the contract
   **`edit-table`** task contract (a sibling of `edit-file`: any app holding a grant on a
   CSV/JSON-rows file delegates it, the host opens a table surface) — not a grid inside
   Reckoner, which would need an editor-first §2 justification it does not have, and
-  which every other tabular app would then need too. Booked for a docs-repo spec.
+  which every other tabular app would then need too. **Written 2026-08-29:
+  `docs/content/specs/EDIT_TABLE_TASK_SPEC.mdx` (proposal rev 2, post-review).** It is
+  blocked on the same P1–P5 this spec's §5 lists, plus two of its own (delegation mounts
+  announce no `mode`; Reckoner has no fs watch) — so R3-447's host spike unblocks both.
+  Its review also found the seed-vs-mount wall applies to fixtures exactly as it does
+  here: on the bundled-seed path there is no file to delegate.
 - **Open-at-line.** The spans exist (R3-427); `edit-file` carries no position hint.
   A small SDK/editor delta, booked against `EDITOR_FIRST_EDITING_SPEC` §6.
 - **Opening a mounted file in the *main* editor** rather than the overlay — Delta B.
@@ -379,7 +384,10 @@ document is split rather than revised:**
 ## 11. Open questions
 
 - **Q1** — `edit-table`: who owns the platform spec, and does it subsume the fixture
-  case or want a Reckoner-side shape first?
+  case or want a Reckoner-side shape first? *(Answered 2026-08-29 on the first half —
+  the spec is written and lives in the docs repo, `EDIT_TABLE_TASK_SPEC.mdx`. It
+  subsumes the fixture case and needs **no** Reckoner-side shape first; what it needs
+  from Reckoner is the D7 fs watch and a `task:invoke` binding, both booked there.)*
 - **Q2** — The `edit-file` position hint (open-at-line): SDK param vs. task-contract
   version bump.
 - **Q3** — After an edit lands: an explicit reload affordance, or a change-watch on the

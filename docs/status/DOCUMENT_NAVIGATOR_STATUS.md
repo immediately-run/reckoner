@@ -1,7 +1,7 @@
 # DOCUMENT_NAVIGATOR — implementation status
 
 **Status:** **Part A implemented (R3-446); Part B blocked, not started (R3-447)** ·
-**Updated:** 2026-08-28
+**Updated:** 2026-08-29
 
 This document is the single implementation-status source for
 `docs/specs/DOCUMENT_NAVIGATOR_SPEC.md`; where they disagree, this document governs.
@@ -65,6 +65,15 @@ per this repo's debugging guidance — an injected port cannot falsify a questio
 the host), and P5 answered, before any Part B code lands. R3-447 owns that.
 
 ## Open residuals
+
+**`edit-table` is now specified** (2026-08-29) — `EDIT_TABLE_TASK_SPEC.mdx` in the docs
+repo, proposal rev 2 after an adversarial pass. It is **blocked on P1–P5 above plus two
+of its own** (P6: task-delegation mounts are announced with no `mode`, so the read-only
+rule is unimplementable; P7: Reckoner has no fs watch, so the autosave safety argument
+has no consumer). R3-447's host spike therefore unblocks both surfaces, not just Part B —
+worth knowing before scoping it. The review also confirmed the seed-vs-mount wall applies
+to fixtures exactly as it does to worksheets: on the bundled-seed path there is no file
+to delegate, only a string in `src/seed/`.
 
 Spec §6 (`edit-table`, open-at-line, Delta B, click-to-insert, own-source editing) and
 §11 Q1–Q7 — including the two the review surfaced as real decisions rather than
