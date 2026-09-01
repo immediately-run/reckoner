@@ -98,7 +98,15 @@ export { dependencies, normalizeInputs, parseInput } from './inputs.ts';
 export type { InputSpec, Namespace, WindowedFeed } from './inputs.ts';
 
 // Test assertions.
-export { deepEqual, expectClose, expectEqual } from './testing.ts';
+export {
+  deepEqual,
+  expectAtLeast,
+  expectAtMost,
+  expectClose,
+  expectEqual,
+  expectGreaterThan,
+  expectLessThan,
+} from './testing.ts';
 export type { CloseTolerance, TestResult } from './testing.ts';
 
 // Metamorphic / property relations (the load-bearing, oracle-free correctness signal).
