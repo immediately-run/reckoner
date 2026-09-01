@@ -608,6 +608,50 @@ const entries: SelfDescription[] = [
     returns: 'TestResult.',
     examples: ['expect: ({ result }) => expectClose(result.revenue, 48_120, { rel: 0.01 })'],
   },
+  {
+    name: 'expectLessThan',
+    kind: 'testing',
+    summary: 'Assert actual < bound — the most common shape of a real assertion (a ratio that must not exceed a threshold).',
+    params: [
+      { name: 'actual', type: 'Value', doc: 'Computed number.' },
+      { name: 'bound', type: 'Value', doc: 'Upper bound (exclusive).' },
+    ],
+    returns: 'TestResult naming the actual, the bound and the direction.',
+    examples: ['expect: ({ result }) => expectLessThan(result.churnPct, 0.05)'],
+  },
+  {
+    name: 'expectAtMost',
+    kind: 'testing',
+    summary: 'Assert actual <= bound (inclusive upper bound).',
+    params: [
+      { name: 'actual', type: 'Value', doc: 'Computed number.' },
+      { name: 'bound', type: 'Value', doc: 'Upper bound (inclusive).' },
+    ],
+    returns: 'TestResult naming the actual, the bound and the direction.',
+    examples: ['expect: ({ result }) => expectAtMost(result.leverage, 4)'],
+  },
+  {
+    name: 'expectGreaterThan',
+    kind: 'testing',
+    summary: 'Assert actual > bound (exclusive lower bound).',
+    params: [
+      { name: 'actual', type: 'Value', doc: 'Computed number.' },
+      { name: 'bound', type: 'Value', doc: 'Lower bound (exclusive).' },
+    ],
+    returns: 'TestResult naming the actual, the bound and the direction.',
+    examples: ['expect: ({ result }) => expectGreaterThan(result.reserve, 0)'],
+  },
+  {
+    name: 'expectAtLeast',
+    kind: 'testing',
+    summary: 'Assert actual >= bound (inclusive lower bound).',
+    params: [
+      { name: 'actual', type: 'Value', doc: 'Computed number.' },
+      { name: 'bound', type: 'Value', doc: 'Lower bound (inclusive).' },
+    ],
+    returns: 'TestResult naming the actual, the bound and the direction.',
+    examples: ['expect: ({ result }) => expectAtLeast(result.coverage, 1.5)'],
+  },
 
   // --- relations -----------------------------------------------------------------
   {
