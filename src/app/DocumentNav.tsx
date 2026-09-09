@@ -7,22 +7,15 @@
 // for the in-app path. Plain clicks only: a modified click is the browser's to handle.
 import type { MouseEvent } from 'react';
 import { hrefFor, navigateTo, type HostLocation } from '../lib/navigation.ts';
-import { CALDERA_SEED, MERIDIAN_SEED, USAGE_SEED, type SeedDocument } from '../seed/seeds.ts';
-
-/** The document's own root IS its slug — one vocabulary, not two kept in step. */
-const DOCUMENTS: { seed: SeedDocument; label: string }[] = [
-  { seed: MERIDIAN_SEED, label: 'Meridian' },
-  { seed: CALDERA_SEED, label: 'Caldera' },
-  { seed: USAGE_SEED, label: 'Usage' },
-];
-
-/** Meridian is the default document, so it lives at the root rather than at `/meridian`. */
-const pathFor = (seed: SeedDocument): string => (seed === MERIDIAN_SEED ? '/' : `/${seed.root}`);
+import { DOCUMENTS, type SeedDocument } from '../seed/seeds.ts';
 
 const DocumentNav = ({ loc, current }: { loc: HostLocation; current: SeedDocument }) => (
   <nav className="rk-doc-nav" aria-label="Documents">
     {DOCUMENTS.map(({ seed, label }) => {
-      const appPath = pathFor(seed);
+      // Every document links to its OWN slug, the default included. `/` still resolves to the
+      // default, but it does so by naming no document — so a link to `/` would let a legacy
+      // `?doc=` override it, which is precisely the bug this nav's Meridian entry had.
+      const appPath = `/${seed.root}`;
       const isCurrent = seed === current;
       return (
         <a

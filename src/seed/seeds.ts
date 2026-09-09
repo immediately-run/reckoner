@@ -48,35 +48,58 @@ export function appPathFromSandboxPath(sandboxPath: string | undefined | null): 
 }
 
 /**
- * Pick the bundled document from the app's own path (R3-553).
+ * Every bundled document, in the order a reader should meet them — the ONE home for the
+ * document set (R3-553).
  *
- * The slugs ARE the seed roots — `USAGE_ROOT`, `CALDERA_ROOT` — rather than a second
- * vocabulary that has to be kept in step with them. An unknown slug is the default document,
- * not an error: this app has no not-found surface, and a stale link should open something.
+ * The slug IS the seed root, so there is no second vocabulary to keep in step: a renamed root
+ * changes its URL, its nav entry and its tests together. Adding a document here is the whole
+ * change; nothing else enumerates them.
+ */
+export const DOCUMENTS: readonly { seed: SeedDocument; label: string }[] = [
+  { seed: MERIDIAN_SEED, label: 'Meridian' },
+  { seed: CALDERA_SEED, label: 'Caldera' },
+  { seed: USAGE_SEED, label: 'Usage' },
+];
+
+/**
+ * The document a path NAMES, or `null` when it names none (R3-553).
  *
- * Note what is deliberately NOT here: a rule for `files/src/App.tsx`. Normalisation strips
- * the `files/` prefix, leaving `/src/App.tsx`, which is an unknown slug and therefore
- * Meridian — the same answer the old `?doc=`-less link gave. The legacy URL keeps working
- * because it falls through, not because it is special-cased.
+ * Three-valued on purpose, and the reason is a bug this had before review caught it.
+ * Collapsing "names no document" into "names the default document" makes the two
+ * indistinguishable, and the query fallback below then overrides an explicit `/meridian` — so
+ * from any published `?doc=` link (which is all of them), the nav's Meridian entry moved the
+ * URL and left the wrong document on screen.
+ *
+ * `null` covers `/` (the bare app root) and any unknown slug — including `/src/App.tsx`, which
+ * is what `…/files/src/App.tsx` normalises to. That is how every legacy URL keeps working
+ * without a special case: it names no document, so the `?doc=` it carries decides, exactly as
+ * it always did.
+ */
+export function documentAtPath(appPath: string | undefined | null): SeedDocument | null {
+  const slug = appPathFromSandboxPath(appPath).split('/').filter(Boolean)[0];
+  return DOCUMENTS.find((d) => d.seed.root === slug)?.seed ?? null;
+}
+
+/**
+ * The document a path selects, defaulting when it names none.
+ *
+ * The forgiving wrapper: this app has no not-found surface, and a stale link should open
+ * something rather than nothing. A caller that must distinguish "no document named" — which is
+ * every caller deciding whether a query may override — wants {@link documentAtPath}.
  */
 export function seedFromAppPath(appPath: string): SeedDocument {
-  const slug = appPathFromSandboxPath(appPath).split('/').filter(Boolean)[0];
-  if (slug === CALDERA_ROOT) return CALDERA_SEED;
-  if (slug === USAGE_ROOT) return USAGE_SEED;
-  return MERIDIAN_SEED;
+  return documentAtPath(appPath) ?? MERIDIAN_SEED;
 }
 
 /**
  * The document for one boot: PATH first, then `?doc=`, then the default.
  *
- * The order matters and only shows up on a legacy link once the app starts emitting paths,
- * because such a link carries both — `/usage` in the path and `?doc=usage` in the query. Path
- * wins because it is the one the user can navigate to and Back out of; the query is the
- * compatibility surface.
+ * The precedence only shows up on a legacy link once the app emits paths, because such a link
+ * carries both. The path wins when it NAMES a document — it is the one a user can navigate to
+ * and Back out of — and only a path that names none defers to the query.
  */
 export function seedForBoot(appPath: string | undefined | null, loc: { search: string }): SeedDocument {
-  const fromPath = seedFromAppPath(appPathFromSandboxPath(appPath));
-  return fromPath === MERIDIAN_SEED ? seedFromBootLocation(loc) : fromPath;
+  return documentAtPath(appPath) ?? seedFromBootLocation(loc);
 }
 
 /** Pick the bundled document from a boot location (see the module comment for both shapes). */

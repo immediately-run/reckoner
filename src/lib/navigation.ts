@@ -31,7 +31,12 @@ export function hasHost(loc: HostLocation): loc is Required<HostLocation> {
  */
 export function hrefFor(loc: HostLocation, appPath: string): string {
   if (!hasHost(loc)) return appPath;
-  return constructOuterUrl(loc.outerHref, appPath, loc.navigationState, false);
+  // The QUERY IS DROPPED, deliberately. `constructOuterUrl` carries `navigationState.search`
+  // through verbatim, and this app boots from links that carry `?doc=` — so every link the nav
+  // emitted would inherit the document selector of whatever page the reader arrived on, and
+  // hand the next reader a URL whose path and query name different documents. The path is the
+  // selector now; the query survives only as the compatibility surface for links already out.
+  return constructOuterUrl(loc.outerHref, appPath, { ...loc.navigationState, search: '' }, false);
 }
 
 /**

@@ -6,7 +6,9 @@ import {
   seedFromBootLocation,
   seedFromAppPath,
   seedForBoot,
+  documentAtPath,
   appPathFromSandboxPath,
+  DOCUMENTS,
   MERIDIAN_SEED,
   CALDERA_SEED,
   USAGE_SEED,
@@ -50,6 +52,16 @@ describe('seedFromBootLocation', () => {
     expect(USAGE_SEED.demoFeed).toBeUndefined();
     expect(USAGE_SEED.root).toBe('usage');
   });
+
+  it('the slugs are LITERAL, because they are the published URL contract (R3-553)', () => {
+    // Since the root is also the URL segment, renaming one silently breaks every link anyone
+    // has shared — `…/reckoner/main/usage` and the README's. Pinning the strings here makes a
+    // rename a deliberate act with a failing test in front of it. Nothing else can: every
+    // other assertion in this file reads `seed.root`, so it is true whatever the root says.
+    expect(MERIDIAN_SEED.root).toBe('meridian');
+    expect(CALDERA_SEED.root).toBe('caldera');
+    expect(USAGE_SEED.root).toBe('usage');
+  });
 });
 
 // R3-553 — the app owns a path space now, so the document comes from the PATH first.
@@ -62,12 +74,30 @@ describe('seedFromAppPath', () => {
   });
 
   it('round-trips: every document is reachable at its own root, with and without a trailing slash', () => {
-    // The property, not five hand-written pairs — a new bundled document is covered the day
-    // it is added, without touching this test.
-    for (const seed of [MERIDIAN_SEED, CALDERA_SEED, USAGE_SEED]) {
+    // Driven from DOCUMENTS — the single list the app itself routes and renders from — so a
+    // new document is covered the day it is added.
+    //
+    // What this does NOT prove is that a root was not RENAMED: every assertion here reads
+    // `seed.root`, so it stays true whatever the root says. The first version claimed
+    // otherwise in a comment, and renaming `SEED_ROOT` really did leave every test green.
+    // A rename is caught by the literal slugs pinned in the first describe — the published
+    // URL contract — and this case proves the other property: that each document is reachable
+    // at whatever its root currently is. `documentAtPath` rather than `seedFromAppPath`
+    // because the latter's unknown-slug fallback would make even that vacuous.
+    expect(DOCUMENTS.length).toBeGreaterThan(1);
+    for (const { seed } of DOCUMENTS) {
+      expect(documentAtPath(`/${seed.root}`)).toBe(seed);
+      expect(documentAtPath(`/${seed.root}/`)).toBe(seed);
       expect(seedFromAppPath(`/${seed.root}`)).toBe(seed);
-      expect(seedFromAppPath(`/${seed.root}/`)).toBe(seed);
     }
+  });
+
+  it('the default document is selected EXPLICITLY at its own root, not through the fallback', () => {
+    // The distinction the blocking bug turned on: `/meridian` names a document, `/` does not.
+    expect(documentAtPath(`/${MERIDIAN_SEED.root}`)).toBe(MERIDIAN_SEED);
+    expect(documentAtPath('/')).toBeNull();
+    expect(documentAtPath('/ghost')).toBeNull();
+    expect(documentAtPath('/files/src/App.tsx')).toBeNull();
   });
 
   it('the root path is the default document', () => {
@@ -95,9 +125,17 @@ describe('seedFromAppPath', () => {
   it('no slug may collide with a host-intercepted segment', () => {
     // `files`, `bundle` and `corpus` are taken by the host's own URL grammar; a document
     // named for one of them would be unreachable.
-    for (const seed of [MERIDIAN_SEED, CALDERA_SEED, USAGE_SEED]) {
+    for (const { seed } of DOCUMENTS) {
       expect(['files', 'bundle', 'corpus']).not.toContain(seed.root);
     }
+  });
+
+  it('DOCUMENTS is the only enumeration — every seed the module exports appears in it', () => {
+    // The nav renders DOCUMENTS and the router resolves through it, so a document added to the
+    // module but not to the list would be routable-but-invisible, or the reverse.
+    const listed = new Set(DOCUMENTS.map((d) => d.seed));
+    for (const seed of [MERIDIAN_SEED, CALDERA_SEED, USAGE_SEED]) expect(listed.has(seed)).toBe(true);
+    expect(DOCUMENTS.length).toBe(3);
   });
 });
 
@@ -119,6 +157,15 @@ describe('seedForBoot — precedence', () => {
     // `?doc=caldera` in the query. The path is the one the user can navigate to and Back
     // out of, so it decides.
     expect(seedForBoot('/usage', { search: '?doc=caldera' })).toBe(USAGE_SEED);
+  });
+
+  it('the DEFAULT document wins over the query at its own root — the blocking regression', () => {
+    // This returned CALDERA before the fix: `seedForBoot` read "resolved to the default" as
+    // "named nothing" and handed the decision to the query. From any published link — all of
+    // which carry `?doc=` — clicking Meridian in the nav moved the URL and left the other
+    // document on screen.
+    expect(seedForBoot(`/${MERIDIAN_SEED.root}`, { search: '?doc=caldera' })).toBe(MERIDIAN_SEED);
+    expect(seedForBoot(`/${MERIDIAN_SEED.root}`, { search: '?doc=usage' })).toBe(MERIDIAN_SEED);
   });
 
   it('the query still decides when the path names no document (every published link today)', () => {

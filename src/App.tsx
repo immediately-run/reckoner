@@ -1,5 +1,7 @@
-// Root component — immediately.run renders the default export of THIS file (ARCHITECTURE_PLAN
-// §2.1, §7). Reckoner opens a document and renders it as a static report with zero prompts:
+// Root component — the default export of THIS file is what renders. immediately.run reaches it
+// through `src/platform.tsx` (`package.json` → `main`), which exists only to call
+// `boot({ children: <App /> })` so the app owns a path space (R3-553); `src/main.tsx` is the
+// `vite dev` entry and is ignored at runtime (ARCHITECTURE_PLAN §2.1, §7). Reckoner opens a document and renders it as a static report with zero prompts:
 // the hook loads the bundled demo document, runs the SES-confined engine, and hands the render
 // surface a Bindings port over the results. Global CSS is imported here (not main.tsx), which
 // immediately.run's runtime ignores.
