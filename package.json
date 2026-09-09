@@ -16,8 +16,7 @@
         "hosts": [
           "https://ir-analytics-tv5se4cxdq-ew.a.run.app",
           "https://ir-analytics-zae4car5uq-ew.a.run.app"
-        ],
-        "required": true
+        ]
       }
     }
   },
