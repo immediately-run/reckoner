@@ -9,9 +9,13 @@ the brand design system, with the project layout immediately.run expects.
 Try this template on [immediately.run](https://immediately.run/present/github/immediately-run/new-project-template/main/files/src/App.tsx)
 
 The Reckoner demo documents also run from this repo's main (zip-cached, no GitHub API
-dependency): the [Meridian monthly review](https://immediately.run/present/github/immediately-run/reckoner/main/files/src/App.tsx)
-(default) and the [Caldera LBO workbook](https://immediately.run/present/github/immediately-run/reckoner/main/files/src/App.tsx?doc=caldera)
-(`?doc=caldera`).
+dependency): the [Meridian monthly review](https://immediately.run/present/github/immediately-run/reckoner/main/)
+(default), the [Caldera LBO workbook](https://immediately.run/present/github/immediately-run/reckoner/main/caldera)
+and the [usage workbook](https://immediately.run/present/github/immediately-run/reckoner/main/usage).
+
+Each document has its own path, and the switcher above the title moves between them —
+the outer address bar follows, so Back works and a link is worth copying. The older
+`…/files/src/App.tsx?doc=caldera` form still resolves; the path form is the one to share.
 
 > Using this as a starting point for your own app? After you push to your repo,
 > update the link above to

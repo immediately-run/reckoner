@@ -21,6 +21,7 @@
       }
     }
   },
+  "main": "src/platform.tsx",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

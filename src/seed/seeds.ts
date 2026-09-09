@@ -30,6 +30,55 @@ export const MERIDIAN_SEED: SeedDocument = { root: SEED_ROOT, files: SEED_FILES,
 export const CALDERA_SEED: SeedDocument = { root: CALDERA_ROOT, files: CALDERA_FILES, demoFeed: false };
 export const USAGE_SEED: SeedDocument = { root: USAGE_ROOT, files: USAGE_FILES, usageFeeds: true };
 
+/**
+ * Where the app's own route space begins inside the path the host gave it (R3-553).
+ *
+ * `files/` and `corpus/` are accepted and STRIPPED rather than treated as unknown routes: the
+ * SDK's link builder prefixes `files/` unless a caller opts out, and every URL this app has
+ * ever published is of that shape (`…/main/files/src/App.tsx?doc=usage`). They are a
+ * filesystem-space spelling of the same route, not a second space — 404ing on the difference
+ * would break the links in `README.md`. Mirrors `landing-page/src/lib/routeSpace.ts`, which
+ * hit and documented this first.
+ */
+export function appPathFromSandboxPath(sandboxPath: string | undefined | null): string {
+  if (!sandboxPath) return '/';
+  const segs = sandboxPath.split('/').filter(Boolean);
+  if (segs[0] === 'files' || segs[0] === 'corpus') segs.shift();
+  return segs.length === 0 ? '/' : `/${segs.join('/')}`;
+}
+
+/**
+ * Pick the bundled document from the app's own path (R3-553).
+ *
+ * The slugs ARE the seed roots — `USAGE_ROOT`, `CALDERA_ROOT` — rather than a second
+ * vocabulary that has to be kept in step with them. An unknown slug is the default document,
+ * not an error: this app has no not-found surface, and a stale link should open something.
+ *
+ * Note what is deliberately NOT here: a rule for `files/src/App.tsx`. Normalisation strips
+ * the `files/` prefix, leaving `/src/App.tsx`, which is an unknown slug and therefore
+ * Meridian — the same answer the old `?doc=`-less link gave. The legacy URL keeps working
+ * because it falls through, not because it is special-cased.
+ */
+export function seedFromAppPath(appPath: string): SeedDocument {
+  const slug = appPathFromSandboxPath(appPath).split('/').filter(Boolean)[0];
+  if (slug === CALDERA_ROOT) return CALDERA_SEED;
+  if (slug === USAGE_ROOT) return USAGE_SEED;
+  return MERIDIAN_SEED;
+}
+
+/**
+ * The document for one boot: PATH first, then `?doc=`, then the default.
+ *
+ * The order matters and only shows up on a legacy link once the app starts emitting paths,
+ * because such a link carries both — `/usage` in the path and `?doc=usage` in the query. Path
+ * wins because it is the one the user can navigate to and Back out of; the query is the
+ * compatibility surface.
+ */
+export function seedForBoot(appPath: string | undefined | null, loc: { search: string }): SeedDocument {
+  const fromPath = seedFromAppPath(appPathFromSandboxPath(appPath));
+  return fromPath === MERIDIAN_SEED ? seedFromBootLocation(loc) : fromPath;
+}
+
 /** Pick the bundled document from a boot location (see the module comment for both shapes). */
 export function seedFromBootLocation(loc: { search: string }): SeedDocument {
   const direct = new URLSearchParams(loc.search);
