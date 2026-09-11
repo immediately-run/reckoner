@@ -26,16 +26,28 @@ function attrLine(a: VocabAttribute): string {
 function VocabularySection() {
   const [filter, setFilter] = useState<VocabFilter>(undefined);
   const [copied, setCopied] = useState<string | null>(null);
+  const [copyFailed, setCopyFailed] = useState<string | null>(null);
   const entries = vocabulary(filter);
 
+  // A refused clipboard write must not be silent (WCAG 3.3.1 / R-IX-3's named-failure
+  // face): the rejection renders a visible line by the entry's control naming the
+  // manual fallback — the snippet stays selectable text either way. Keyed by entry so
+  // the line lands next to the control that failed, nowhere else.
   const copy = (name: string, snippet: string): void => {
+    setCopyFailed(null);
     try {
-      void navigator.clipboard?.writeText(snippet).then(() => {
-        setCopied(name);
-        setTimeout(() => setCopied(null), 1500);
-      });
+      void navigator.clipboard
+        ?.writeText(snippet)
+        .then(() => {
+          setCopied(name);
+          setTimeout(() => setCopied(null), 1500);
+        })
+        .catch(() => {
+          setCopyFailed(name);
+        });
     } catch {
-      /* clipboard can be absent in the sandboxed iframe — the snippet is selectable text */
+      /* clipboard can be absent in the sandboxed iframe — name it, don't swallow it */
+      setCopyFailed(name);
     }
   };
 
@@ -82,6 +94,11 @@ function VocabularySection() {
                 <button type="button" className="rk-wb-close" onClick={() => copy(entry.name, entry.snippet!)}>
                   {copied === entry.name ? 'Copied' : 'Copy'}
                 </button>
+                {copyFailed === entry.name && (
+                  <span className="rk-copy-failed" role="status">
+                    Copy failed — select the text and copy manually
+                  </span>
+                )}
               </div>
             </>
           ) : (

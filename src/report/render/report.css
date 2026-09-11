@@ -114,7 +114,23 @@
   white-space: nowrap;
 }
 .rk-table th { color: var(--ink-2, #9b97b3); font-weight: 600; }
-.rk-table[data-sortable] th { cursor: pointer; user-select: none; }
+/* The sort control is a real button (keyboard path, WCAG 2.1.1) that spans the header
+   cell — the th keeps aria-sort; the button carries the padding so the hit target is
+   the whole cell (min 24px, WCAG 2.5.8). */
+.rk-table[data-sortable] th { padding: 0; }
+.rk-table .rk-th-sort {
+  display: block;
+  width: 100%;
+  min-height: 24px;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
 .rk-table td[data-numeric] { font-family: var(--mono, monospace); text-align: right; }
 
 /* Facets --------------------------------------------------------------------------- */

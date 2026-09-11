@@ -11,19 +11,12 @@
 // this slice opens from the workbook panel's cards. Edit / ask-assistant affordances wait
 // for a writable mount (none in the standalone demo).
 import type { CellDescriptor, SubjectResult, TestDescriptor } from '../engine/worker/protocol.ts';
-import type { CellVerdict } from '../engine/testrunner.ts';
 import type { PublishedResult } from '../engine/types.ts';
 import { precedentTree } from '../engine/precedents.ts';
+import { verdictChip } from '../report/render/verdictChip.ts';
 import type { Value } from '../stdlib/types.ts';
 import PrecedentView from './PrecedentView.tsx';
 import './workbook-panel.css';
-
-const VERDICT_CLASS: Record<CellVerdict, string> = {
-  validated: 'rk-verdict--validated',
-  pinned: 'rk-verdict--pinned',
-  untested: 'rk-verdict--untested',
-  failing: 'rk-verdict--failing',
-};
 
 function preview(value: Value | undefined): string {
   if (value === null || value === undefined) return '—';
@@ -39,8 +32,10 @@ interface ValueInspectorProps {
   cells: readonly CellDescriptor[];
   /** Every test targeting this cell (filtered by subject by the caller). */
   tests: readonly TestDescriptor[];
-  /** This cell's suite result, if any — absent renders `untested`. */
-  outcome: SubjectResult | undefined;
+  /** The app-level suite results — `null` while the suites are still computing, which
+   *  renders the distinct `pending` chip (never a premature `untested`); a cell absent
+   *  from the settled map is the computed `untested`. */
+  verdicts: ReadonlyMap<string, SubjectResult> | null;
   /** The published result (value + tier). */
   result: PublishedResult | undefined;
   /** Navigate to another cell (an input chip) — the hop-by-hop V3 walk. */
@@ -61,19 +56,20 @@ interface ValueInspectorProps {
   worksheetPaths?: Record<string, string>;
 }
 
-function ValueInspector({ cell, cells, tests, outcome, result, onNavigate, onClose, onWhatIf, worksheetPaths }: ValueInspectorProps) {
+function ValueInspector({ cell, cells, tests, verdicts, result, onNavigate, onClose, onWhatIf, worksheetPaths }: ValueInspectorProps) {
   const fileLine = (worksheet: string, span?: { line: number }): string | null => {
     const path = worksheetPaths?.[worksheet];
     return path !== undefined && span !== undefined ? `${path}:${span.line}` : null;
   };
   const cellAt = fileLine(cell.worksheet, cell.span);
-  const verdict: CellVerdict = outcome?.verdict ?? 'untested';
+  const outcome = verdicts?.get(cell.id);
+  const chip = verdictChip(cell.id, verdicts);
   return (
     <div className="rk-ins" aria-label={`Inspector for ${cell.id}`}>
       <header className="rk-ins-head">
         <div className="rk-ins-title">
           <span className="rk-wb-name">{cell.id}</span>
-          <span className={`rk-verdict ${VERDICT_CLASS[verdict]}`}>{verdict}</span>
+          <span className={chip.className}>{chip.label}</span>
         </div>
         <button type="button" className="rk-wb-close" onClick={onClose}>
           Close

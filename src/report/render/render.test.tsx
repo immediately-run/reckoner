@@ -69,6 +69,18 @@ describe('ReportView', () => {
     expect(html).toContain('>jan<');
   });
 
+  it('renders a sortable Table header as a real button inside the th (keyboard path, 2.1.1)', () => {
+    const rows = [{ month: 'jan', revenue: 10 }];
+    const html = render('<Table source="t" columns={["month", "revenue"]} sortable />', { t: ok(rows) });
+    // the sort control is a <button type="button"> carrying the visible column label
+    expect(html).toMatch(/<th[^>]*><button type="button" class="rk-th-sort">month<\/button>/);
+    // unsorted columns carry no aria-sort; it lands on the th (not the button) once sorted
+    expect(html).not.toContain('aria-sort');
+    // non-sortable tables keep plain th text — no button, no hit-target chrome
+    const plain = render('<Table source="t" columns={["month"]} />', { t: ok(rows) });
+    expect(plain).not.toContain('rk-th-sort');
+  });
+
   it('renders an inline Value from a params binding', () => {
     const html = render('Region <Value source="params.region" />', { 'params.region': ok('emea') });
     expect(html).toContain('rk-value');

@@ -115,7 +115,7 @@ function App() {
                 cell={inspectedCell}
                 cells={report.session.engine.cells()}
                 tests={report.session.engine.tests().filter((t) => t.subject === inspectedCell.id)}
-                outcome={verdicts.results?.get(inspectedCell.id)}
+                verdicts={verdicts.results}
                 result={report.session.engine.result(inspectedCell.id)}
                 onNavigate={setInspected}
                 onClose={() => setInspected(null)}
