@@ -38,6 +38,8 @@
   border-radius: var(--r-xs);
   padding: 4px 10px;
   cursor: pointer;
+  /* WCAG 2.5.8 target floor — .rk-inspect-btn is the 24×24 exemplar (report.css) */
+  min-height: 24px;
 }
 
 .rk-wb-close:hover {
@@ -137,6 +139,23 @@
 .rk-verdict--failing {
   color: var(--accent-hot);
   border-color: var(--accent-hot);
+}
+
+/* Pending — suite results not yet computed: its own state, deliberately none of the
+   four (a pending render styled as `untested` is the mislabel §6 forbids). Same
+   dashed treatment as the reflection side (report.css .rk-verdict--pending). */
+.rk-verdict--pending {
+  color: var(--ink-2);
+  border-color: var(--line);
+  border-style: dashed;
+}
+
+/* A refused clipboard write, named — never silent (WCAG 3.3.1). Sits in the actions
+   row beside the control that failed. */
+.rk-copy-failed {
+  font-size: 0.78rem;
+  color: var(--accent-hot);
+  align-self: center;
 }
 
 /* Test cards — visually distinct from cell cards (smaller, indented, kind-labeled). */
@@ -288,6 +307,11 @@
   color: var(--ink);
   background: none;
   cursor: pointer;
+  /* WCAG 2.5.8 target floor on the interactive (button) chips only — the inert
+     display chips keep their text density. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
 }
 
 .rk-chip--nav:hover {
@@ -324,6 +348,10 @@
   color: inherit;
   text-decoration: underline dotted var(--line-2);
   text-underline-offset: 3px;
+  /* WCAG 2.5.8 target floor — the inline-text link grows to 24px, centered */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
 }
 
 .rk-wb-name--link:hover {
@@ -369,6 +397,10 @@
   color: var(--ink);
   text-decoration: underline dotted var(--line-2);
   text-underline-offset: 3px;
+  /* WCAG 2.5.8 target floor — the inline-text link grows to 24px, centered */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
 }
 
 .rk-prec-cell:hover {
@@ -409,6 +441,8 @@
   border-radius: var(--r-xs);
   padding: 4px 10px;
   cursor: pointer;
+  /* WCAG 2.5.8 target floor — .rk-inspect-btn is the 24×24 exemplar (report.css) */
+  min-height: 24px;
 }
 
 .rk-wb-run:hover:not(:disabled) {

@@ -41,7 +41,7 @@ function render(over: Partial<Parameters<typeof ValueInspector>[0]> = {}): strin
     cell,
     cells: [cell, ...extraCells],
     tests,
-    outcome,
+    verdicts: new Map([[outcome.subject, outcome]]),
     result: { id: 'revenue.total', value: 48_120, tier: 'live' as const, key: 'k' },
     onNavigate: () => {},
     onClose: () => {},
@@ -109,18 +109,30 @@ describe('ValueInspector', () => {
   });
 
   it('an absent outcome renders untested; a failing test shows its message', () => {
-    const untested = render({ outcome: undefined });
+    const untested = render({ verdicts: new Map() });
     expect(untested).toContain('rk-verdict--untested');
 
     const failing = render({
-      outcome: {
-        subject: 'revenue.total',
-        verdict: 'failing',
-        outcomes: [{ id: 'revenue.total_check', kind: 'specification', pass: false, message: 'expected 30, got 29' }],
-      },
+      verdicts: new Map([
+        [
+          'revenue.total',
+          {
+            subject: 'revenue.total',
+            verdict: 'failing',
+            outcomes: [{ id: 'revenue.total_check', kind: 'specification', pass: false, message: 'expected 30, got 29' }],
+          },
+        ],
+      ]),
     });
     expect(failing).toContain('rk-verdict--failing');
     expect(failing).toContain('expected 30, got 29');
+  });
+
+  it('null results (suites still computing) render the distinct pending chip, never untested', () => {
+    const pending = render({ verdicts: null });
+    expect(pending).toContain('rk-verdict--pending');
+    expect(pending).toContain('>pending<');
+    expect(pending).not.toContain('rk-verdict--untested');
   });
 });
 

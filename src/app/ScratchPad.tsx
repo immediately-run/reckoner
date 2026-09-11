@@ -28,6 +28,7 @@ function ScratchPad({ session, baseVerdicts, text, onTextChange }: ScratchPadPro
   const { outcome, running, run, reset } = useShadowRunner(session);
   const [armedClear, setArmedClear] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   // G-WIF-8: a document that declares its own `scratch` worksheet disables the pad.
   if (SCRATCH_WORKSHEET in session.sources) {
@@ -41,14 +42,24 @@ function ScratchPad({ session, baseVerdicts, text, onTextChange }: ScratchPadPro
     );
   }
 
+  // A refused clipboard write must not be silent (WCAG 3.3.1 / R-IX-3's named-failure
+  // face): the rejection renders a visible line naming the manual fallback — the
+  // textarea below still allows select-and-copy either way.
   const copy = (): void => {
+    setCopyFailed(false);
     try {
-      void navigator.clipboard?.writeText(text).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      });
+      void navigator.clipboard
+        ?.writeText(text)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        })
+        .catch(() => {
+          setCopyFailed(true);
+        });
     } catch {
-      /* clipboard can be absent in the sandboxed iframe — the textarea still selects */
+      /* clipboard can be absent in the sandboxed iframe — name it, don't swallow it */
+      setCopyFailed(true);
     }
   };
 
@@ -92,6 +103,11 @@ function ScratchPad({ session, baseVerdicts, text, onTextChange }: ScratchPadPro
         <button type="button" className="rk-wb-close" onClick={copy} disabled={text === ''}>
           {copied ? 'Copied' : 'Copy'}
         </button>
+        {copyFailed && (
+          <span className="rk-copy-failed" role="status">
+            Copy failed — select the text and copy manually
+          </span>
+        )}
         {!armedClear ? (
           <button type="button" className="rk-wb-close" onClick={() => setArmedClear(true)} disabled={running || text === ''}>
             Clear

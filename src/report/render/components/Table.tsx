@@ -73,13 +73,28 @@ export default function Table({ node }: { node: ComponentNode }) {
         <table className="rk-table" data-sortable={sortable || undefined}>
           <thead>
             <tr>
-              {cols.map((c) => (
-                <th key={c.field} onClick={() => onSort(c.field)} aria-sort={sort?.col === c.field ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
-                  {c.field}
-                  {c.unit ? <span className="rk-col-unit"> ({c.unit})</span> : ''}
-                  {sortable && sort?.col === c.field ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
-                </th>
-              ))}
+              {cols.map((c) => {
+                const sorted = sort?.col === c.field;
+                return (
+                  <th
+                    key={c.field}
+                    aria-sort={sorted ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}
+                  >
+                    {sortable ? (
+                      <button type="button" className="rk-th-sort" onClick={() => onSort(c.field)}>
+                        {c.field}
+                        {c.unit ? <span className="rk-col-unit"> ({c.unit})</span> : ''}
+                        {sorted ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
+                      </button>
+                    ) : (
+                      <>
+                        {c.field}
+                        {c.unit ? <span className="rk-col-unit"> ({c.unit})</span> : ''}
+                      </>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
