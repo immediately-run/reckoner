@@ -7,9 +7,19 @@ local `vite dev` — the most common silent failure.
 
 ## Hard rules (these break immediately.run if violated)
 
-1. **`src/App.tsx` is the entry point.** immediately.run renders its **default
-   export**. `src/main.tsx` is for local dev/build only and is **ignored** at
-   runtime — never put CSS imports, providers, or app logic there.
+1. **`src/platform.tsx` is the entry point immediately.run runs** (`package.json` →
+   `main`); it does nothing but `boot({ children: <App /> })`, so **`src/App.tsx` is
+   still where the app begins** and its default export is what renders. `src/main.tsx`
+   is for local dev/build only and is **ignored** at runtime — never put CSS imports,
+   providers, or app logic in it.
+
+   The two entries stay APART on purpose: importing the SDK's `boot` reaches for the
+   host transport at module load, which throws under `vite dev` where there is no host.
+   So `main.tsx` must never import from `@immediately-run/sdk` at all, and code that
+   needs the SDK imports the narrow subpaths (`/boot`, `/routing`, `/urlUtils`,
+   `/TinkerableContext`) rather than the package root. Without `main`, the host serves
+   its own read-only boot default and the app owns no path space — every deep link
+   404s (R3-553).
 2. **Import global CSS from `App.tsx`**, not from `main.tsx`. Anything the
    rendered tree needs (CSS, context providers) must be reachable from
    `App.tsx`.

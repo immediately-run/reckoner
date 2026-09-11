@@ -1,5 +1,7 @@
-// Root component — immediately.run renders the default export of THIS file (ARCHITECTURE_PLAN
-// §2.1, §7). Reckoner opens a document and renders it as a static report with zero prompts:
+// Root component — the default export of THIS file is what renders. immediately.run reaches it
+// through `src/platform.tsx` (`package.json` → `main`), which exists only to call
+// `boot({ children: <App /> })` so the app owns a path space (R3-553); `src/main.tsx` is the
+// `vite dev` entry and is ignored at runtime (ARCHITECTURE_PLAN §2.1, §7). Reckoner opens a document and renders it as a static report with zero prompts:
 // the hook loads the bundled demo document, runs the SES-confined engine, and hands the render
 // surface a Bindings port over the results. Global CSS is imported here (not main.tsx), which
 // immediately.run's runtime ignores.
@@ -11,7 +13,9 @@ import './index.css';
 import './app/report-page.css';
 import { useEffect, useMemo, useState } from 'react';
 import { useReport } from './hooks/useReport.ts';
-import { seedFromBootLocation } from './seed/seeds.ts';
+import { seedForBoot } from './seed/seeds.ts';
+import { useAppPath, useHostLocation } from './hooks/useAppPath.ts';
+import DocumentNav from './app/DocumentNav.tsx';
 import { useMounts } from './hooks/useMounts.ts';
 import { ReportView } from './report/index.ts';
 import WorkbookPanel from './app/WorkbookPanel.tsx';
@@ -21,11 +25,15 @@ import AuthorsView from './app/AuthorsView.tsx';
 import { useVerdicts } from './hooks/useVerdicts.ts';
 
 function App() {
-  // The boot href's `doc` param picks the bundled document (?doc=caldera for the LBO
-  // demo; the default is the Meridian monthly review). The picked seed is a module
-  // constant, so the reference is stable across renders.
+  // The app-space PATH picks the bundled document (`/usage`, `/caldera`; `/` is the Meridian
+  // monthly review), falling back to the legacy `?doc=` query — which the host forwards only
+  // at boot, so it cannot survive navigation and is compatibility only (R3-553). The picked
+  // seed is a module constant, so the reference is stable across renders.
+  const appPath = useAppPath();
+  const hostLoc = useHostLocation();
   const mounts = useMounts();
-  const report = useReport(seedFromBootLocation(window.location), mounts);
+  const seed = seedForBoot(appPath, window.location);
+  const report = useReport(seed, mounts);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [inspected, setInspected] = useState<string | null>(null);
   // What-if buffer text is SESSION-SCOPED app state (WHATIF_SHADOW_EVALUATION_SPEC §1.4):
@@ -80,6 +88,7 @@ function App() {
       {report.status === 'ready' && (
         <>
           <header className="rk-page-head">
+            <DocumentNav loc={hostLoc} current={seed} />
             <h1 className="grad-text">{report.session.title}</h1>
             <button type="button" className="rk-review-toggle" onClick={() => setReviewOpen((v) => !v)}>
               {reviewOpen ? 'Close workbook' : 'Workbook'}
