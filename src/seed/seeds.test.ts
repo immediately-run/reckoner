@@ -179,11 +179,3 @@ describe('seedForBoot — precedence', () => {
     expect(seedForBoot('/ghost', { search: '?doc=ghost' })).toBe(MERIDIAN_SEED);
   });
 });
-
-// R3-648 fault injection — this commit is REVERTED by the next one. It exists so this
-// PR's own check history shows the new gate going red, per the item's rule that a gate
-// nobody has seen fail is a gate nobody should trust.
-import { it as __faultIt, expect as __faultExpect } from 'vitest';
-__faultIt('R3-648 fault injection: the CI gate must fail on a failing test', () =>
-  __faultExpect(1).toBe(2),
-);
