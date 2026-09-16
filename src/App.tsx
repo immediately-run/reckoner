@@ -54,7 +54,7 @@ function App() {
   const title = report.status === 'ready' ? report.session.title : undefined;
   useEffect(() => {
     if (title !== undefined) document.title = title;
-  }, [title]);
+  }, []);
 
   const inspectedCell =
     report.status === 'ready' && inspected !== null
