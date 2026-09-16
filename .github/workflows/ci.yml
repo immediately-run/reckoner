@@ -22,12 +22,16 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same ref supersedes an in-flight run — on a PR branch only. On
-# `main` a cancel would leave the superseded commit with a CANCELLED verdict rather than a
-# green one, which matters the moment a check is required or someone bisects main by check
-# status. Two merges inside the run window is all it takes.
+# A newer push to the same ref supersedes an in-flight run — on a PR branch only. A push
+# run gets its OWN group (the SHA), so it can never be cancelled by a later merge.
+#
+# `cancel-in-progress: false` alone was not enough, and the first version of this comment
+# overstated it: the group was still keyed on `github.ref`, and GitHub keeps at most one
+# PENDING run per group, so a third merge inside the window still cancelled the middle
+# commit's queued run. That moved the threshold from two merges to three rather than
+# removing it. Keying push runs by SHA is what actually removes it.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
