@@ -57,8 +57,8 @@ jobs:
       # `npm run lint` is the gate: `--max-warnings 0` lives in the script, so the string a
       # contributor runs and the string CI runs are the same one. R3-648 put the flag here
       # on the command line instead, which left `npm run lint` lax and made the difference
-      # something you had to know — R3-656 moved it, after R3-653's review made the same
-      # point about `file-explorer` and `editor`.
+      # something you had to know. R3-653's review made the point about `file-explorer` and
+      # `editor`; R3-656 is moving the rest, and this commit is this repo's half of it.
       #
       # This step was copied from file-explorer/editor carrying an `env: CI: true` block
       # and the comment "ESLint and tooling treat warnings as errors under CI, matching
