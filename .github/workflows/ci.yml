@@ -1,0 +1,56 @@
+# Continuous integration for the reckoner app: lint, unit tests (Vitest), and a production build on every push and pull request.
+# Catches type/build breakage before the cache-zip workflow ships from main.
+#
+# R3-648 — until this landed, this repo's workflows were `cache.yml` alone: the Pages
+# cache-zip publisher, which runs on push to main and runs no checks. So nothing ran on a
+# pull request, and a PR here merged on the author's word that they had run the suite
+# locally. R3-641 is the evidence against trusting that: a symbol nothing imported reached
+# site-main's `main` while its PR reported success, because the leg that would have caught
+# it was not a CI step.
+#
+# Modelled on `file-explorer`/`editor`'s ci.yml deliberately — one shape across the app
+# repos, not a fourth.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same ref supersedes an in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # ESLint and tooling treat warnings as errors under CI, matching the
+      # deploy-time build gate.
+      CI: true
+    steps:
+      # Third-party actions are pinned by commit SHA (see cache.yml rationale).
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
