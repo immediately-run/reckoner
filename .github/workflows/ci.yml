@@ -1,4 +1,4 @@
-# Continuous integration for the reckoner app: lint, unit tests (Vitest), and a production build on every push and pull request.
+# Continuous integration for the reckoner app: lint, unit tests (Vitest), and a production build on every pull request and on push to `main`.
 # Catches type/build breakage before the cache-zip workflow ships from main.
 #
 # R3-648 — until this landed, this repo's workflows were `cache.yml` alone: the Pages
@@ -22,18 +22,17 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same ref supersedes an in-flight run.
+# A newer push to the same ref supersedes an in-flight run — on a PR branch only. On
+# `main` a cancel would leave the superseded commit with a CANCELLED verdict rather than a
+# green one, which matters the moment a check is required or someone bisects main by check
+# status. Two merges inside the run window is all it takes.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      # ESLint and tooling treat warnings as errors under CI, matching the
-      # deploy-time build gate.
-      CI: true
     steps:
       # Third-party actions are pinned by commit SHA (see cache.yml rationale).
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -46,8 +45,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `--max-warnings 0`, because a warning here is a defect that merges otherwise.
+      #
+      # This step was copied from file-explorer/editor carrying an `env: CI: true` block
+      # and the comment "ESLint and tooling treat warnings as errors under CI, matching
+      # the deploy-time build gate". BOTH HALVES WERE FALSE and the review gate caught it
+      # by measuring: `CI=true npx eslint --rule '{"max-lines":["warn",1]}'` exits 0 and
+      # prints "0 errors, 1 warning"; ESLint reads no `CI` env var at all; Actions already
+      # sets `CI=true` in every job, so the block was a no-op; and `cache.yml` — the only
+      # other workflow here — runs no lint or build, so there is no deploy-time gate to
+      # match. Meanwhile `react-hooks/exhaustive-deps` is warn-level in this repo, so an
+      # exhaustive-deps violation would have merged with this step green.
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
 
       - name: Test
         run: npm test
