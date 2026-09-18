@@ -61,7 +61,7 @@ function WorkbookPanel({ session, verdicts, onInspect, onClose, onOpenAuthors, s
   const report = summarizeSuite(cells, results);
 
   return (
-    <aside className="rk-wb-panel" aria-label="Workbook review" aria-modal="true" ref={panelRef}>
+    <aside className="rk-wb-panel" role="dialog" aria-modal="true" aria-label="Workbook review" ref={panelRef}>
       <header className="rk-wb-head">
         <h2>Workbook</h2>
         <div className="rk-wb-actions">

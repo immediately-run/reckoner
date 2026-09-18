@@ -1,6 +1,6 @@
 // The workbook panel's body — pure presentation of (cells, tests, verdicts), separated from
 // the effect-owning shell (`WorkbookPanel.tsx`) so the card/verdict rendering is testable
-// with `react-dom/server` (no DOM environment in this repo's suite).
+// with `react-dom/server` — this file needs no DOM environment, static rendering suffices.
 import type { CellDescriptor, SubjectResult, TestDescriptor } from '../engine/worker/protocol.ts';
 import type { Value } from '../stdlib/types.ts';
 import { verdictChip } from '../report/render/verdictChip.ts';
