@@ -81,6 +81,24 @@ function PanelBody({ onClose }: { onClose: () => void }) {
   return createElement('aside', { id: 'overlay', ref }, createElement('button', { type: 'button', id: 'first' }, 'Close'));
 }
 
+// — The vocabulary shape: <details><summary> toggles with focusable content hidden while
+// closed — the round-2 trap defect: summary is implicitly tabbable, the closed content is
+// not, and the trap must read the REAL tab order, not the querySelectorAll hit list. —
+function DetailsHarness({ detailsOpen, onClose }: { detailsOpen: boolean; onClose: () => void }) {
+  const ref = useOverlayDialog<HTMLDivElement>(onClose);
+  return createElement(
+    'div',
+    { id: 'overlay', ref },
+    createElement('button', { type: 'button', id: 'first' }, 'First'),
+    createElement(
+      'details',
+      { id: 'entry', open: detailsOpen },
+      createElement('summary', { id: 'sum' }, 'entry'),
+      createElement('button', { type: 'button', id: 'copy' }, 'Copy'),
+    ),
+  );
+}
+
 describe('useOverlayDialog — the overlay contract (R3-610)', () => {
   it('moves focus to the first focusable inside on enable, and restores the invoker on disable', () => {
     const onClose = vi.fn();
@@ -191,5 +209,35 @@ describe('useOverlayDialog — the overlay contract (R3-610)', () => {
     h.rerender(createElement(PanelHarness, { open: true, onClose }));
     expect(() => h.rerender(createElement(PanelHarness, { open: true, onClose, invokerPresent: false }))).not.toThrow();
     expect(() => h.unmount()).not.toThrow();
+  });
+
+  it('a closed details entry: Tab from its summary wraps (the hidden Copy button is not the tail)', () => {
+    const onClose = vi.fn();
+    const h = mount(createElement(DetailsHarness, { detailsOpen: false, onClose }));
+    // The summary is the last VISIBLE focusable; the Copy button inside the closed
+    // details is not tabbable and must not be counted as the wrap target.
+    byId('sum').focus();
+    const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    byId('sum').dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(byId('first'));
+    // Backward wrap from the head lands on the visible summary, never the hidden button.
+    const back = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, shiftKey: true });
+    byId('first').dispatchEvent(back);
+    expect(back.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(byId('sum'));
+    h.unmount();
+  });
+
+  it('opening the details entry joins the trap: Tab from the Copy button wraps', () => {
+    const onClose = vi.fn();
+    const h = mount(createElement(DetailsHarness, { detailsOpen: false, onClose }));
+    h.rerender(createElement(DetailsHarness, { detailsOpen: true, onClose }));
+    byId('copy').focus();
+    const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    byId('copy').dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(byId('first'));
+    h.unmount();
   });
 });

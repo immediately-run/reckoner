@@ -39,12 +39,22 @@ export function useOverlayDialog<T extends HTMLElement>(
     const invoker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     // Anything the keyboard can stop on, disabled controls excluded, read fresh every time.
+    // `summary` is implicitly tabbable (the vocabulary section's entry toggles), and a
+    // closed `<details>` hides its content — everything but its own summary — so those
+    // matches are dropped: a hidden Copy button is not in the tab order, and counting it
+    // as the tail would let Tab escape the trap at the last visible focusable (R3-610 r2).
+    const SELECTOR =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
+    const rendered = (el: HTMLElement): boolean => {
+      for (let n: Node | null = el.parentElement; n !== null && n !== root; n = n.parentElement) {
+        if (n instanceof HTMLDetailsElement && !n.open && !(el.tagName === 'SUMMARY' && el.parentElement === n)) {
+          return false;
+        }
+      }
+      return true;
+    };
     const focusables = () =>
-      Array.from(
-        root.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      );
+      Array.from(root.querySelectorAll<HTMLElement>(SELECTOR)).filter((el) => rendered(el));
 
     const first = focusables()[0] ?? null;
     if (first) first.focus();
