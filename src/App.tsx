@@ -22,6 +22,7 @@ import WorkbookPanel from './app/WorkbookPanel.tsx';
 import ValueInspector from './app/ValueInspector.tsx';
 import WhatIfPanel from './app/WhatIfPanel.tsx';
 import AuthorsView from './app/AuthorsView.tsx';
+import { useOverlayDialog } from './app/useOverlayDialog.ts';
 import { useVerdicts } from './hooks/useVerdicts.ts';
 
 function App() {
@@ -79,6 +80,14 @@ function App() {
     report.status === 'ready' ? report.tick : 0,
   );
 
+  // The inspector dock's dialog contract (R3-610) — focus in on open, Tab wrap, keyed
+  // close, focus back to the card or report affordance that opened it — lives in one
+  // hook; `enabled` flips with the dock's own conditional mount, so the effect and the
+  // element appear together.
+  const inspectorRef = useOverlayDialog<HTMLDivElement>(() => setInspected(null), {
+    enabled: inspectedCell !== null,
+  });
+
   return (
     <main className="rk-page">
       {report.status === 'loading' && <div className="rk-page-note">Loading report…</div>}
@@ -119,7 +128,7 @@ function App() {
             />
           )}
           {inspectedCell !== null && (
-            <div className="rk-inspector-dock" role="dialog" aria-label="Value inspector">
+            <div className="rk-inspector-dock" role="dialog" aria-modal="true" aria-label="Value inspector" ref={inspectorRef}>
               <ValueInspector
                 cell={inspectedCell}
                 cells={report.session.engine.cells()}

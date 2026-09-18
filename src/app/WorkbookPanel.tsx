@@ -17,6 +17,7 @@
 import type { SubjectResult } from '../engine/worker/protocol.ts';
 import { summarizeSuite } from '../engine/suiteReport.ts';
 import type { ReportSession } from './reportSession.ts';
+import { useOverlayDialog } from './useOverlayDialog.ts';
 import WorkbookPanelBody from './WorkbookPanelBody.tsx';
 import ScratchPad from './ScratchPad.tsx';
 import VocabularySection from './VocabularySection.tsx';
@@ -47,6 +48,11 @@ interface WorkbookPanelProps {
 }
 
 function WorkbookPanel({ session, verdicts, onInspect, onClose, onOpenAuthors, scratchText, onScratchChange }: WorkbookPanelProps) {
+  // The panel's dialog contract (R3-610): this component mounts with the open panel, so
+  // the hook's effect runs at mount — focus in (Run suite, the first focusable), Tab wrap,
+  // keyed close → the same onClose as the header's Close, focus back to the
+  // `rk-review-toggle` captured at open. No `enabled` flag: mount/unmount IS the gate.
+  const panelRef = useOverlayDialog<HTMLElement>(onClose);
   const engine = session.engine;
   const { results, error, running, rerun } = verdicts;
   const cells = engine.cells();
@@ -55,7 +61,7 @@ function WorkbookPanel({ session, verdicts, onInspect, onClose, onOpenAuthors, s
   const report = summarizeSuite(cells, results);
 
   return (
-    <aside className="rk-wb-panel" aria-label="Workbook review">
+    <aside className="rk-wb-panel" aria-label="Workbook review" aria-modal="true" ref={panelRef}>
       <header className="rk-wb-head">
         <h2>Workbook</h2>
         <div className="rk-wb-actions">

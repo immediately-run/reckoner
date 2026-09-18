@@ -2,16 +2,9 @@
 // the effect-owning shell (`WorkbookPanel.tsx`) so the card/verdict rendering is testable
 // with `react-dom/server` (no DOM environment in this repo's suite).
 import type { CellDescriptor, SubjectResult, TestDescriptor } from '../engine/worker/protocol.ts';
-import type { CellVerdict } from '../engine/testrunner.ts';
 import type { Value } from '../stdlib/types.ts';
+import { verdictChip } from '../report/render/verdictChip.ts';
 import './workbook-panel.css';
-
-const VERDICT_CLASS: Record<CellVerdict, string> = {
-  validated: 'rk-verdict--validated',
-  pinned: 'rk-verdict--pinned',
-  untested: 'rk-verdict--untested',
-  failing: 'rk-verdict--failing',
-};
 
 /** A one-line value preview: scalars as-is, structures JSON-truncated. */
 function preview(value: Value | undefined): string {
@@ -25,7 +18,7 @@ function preview(value: Value | undefined): string {
 interface WorkbookPanelBodyProps {
   cells: readonly CellDescriptor[];
   tests: readonly TestDescriptor[];
-  /** Per-subject suite results; a subject absent from the map renders `untested`. */
+  /** Per-subject suite results; a subject absent from the map renders `untested`, a null map `pending` (verdictChip). */
   results: ReadonlyMap<string, SubjectResult> | null;
   /** Current value lookup for the preview line. */
   valueOf: (id: string) => Value | undefined;
@@ -47,7 +40,9 @@ function WorkbookPanelBody({ cells, tests, results, valueOf, onInspect }: Workbo
             .filter((c) => c.worksheet === ws)
             .map((cell) => {
               const subject = results?.get(cell.id);
-              const verdict: CellVerdict = subject?.verdict ?? 'untested';
+              // One spelling for the chip, shared with the value inspector (R3-610): the
+              // pending state while suites run is its own presentation, never *untested*.
+              const chip = verdictChip(cell.id, results);
               return (
                 <div key={cell.id} className="rk-wb-card">
                   <div className="rk-wb-card-top">
@@ -58,7 +53,7 @@ function WorkbookPanelBody({ cells, tests, results, valueOf, onInspect }: Workbo
                     ) : (
                       <span className="rk-wb-name">{cell.cell}</span>
                     )}
-                    <span className={`rk-verdict ${VERDICT_CLASS[verdict]}`}>{verdict}</span>
+                    <span className={chip.className}>{chip.label}</span>
                   </div>
                   {cell.doc !== '' && <div className="rk-wb-doc">{cell.doc}</div>}
                   <div className="rk-wb-value">{preview(valueOf(cell.id))}</div>

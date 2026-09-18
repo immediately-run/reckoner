@@ -41,7 +41,7 @@ const results = new Map<string, SubjectResult>([
   ],
 ]);
 
-function render(): string {
+function renderWith(results: Map<string, SubjectResult> | null): string {
   return renderToStaticMarkup(
     createElement(WorkbookPanelBody, {
       cells,
@@ -50,6 +50,10 @@ function render(): string {
       valueOf: (id) => (id === 'rev.nrr' ? 1.12 : id === 'rev.total' ? 29 : null),
     }),
   );
+}
+
+function render(): string {
+  return renderWith(results);
 }
 
 describe('WorkbookPanelBody — the review surface cards', () => {
@@ -83,5 +87,19 @@ describe('WorkbookPanelBody — the review surface cards', () => {
     const raw = html.split('rk-wb-card').find((chunk) => chunk.includes('>raw<'));
     expect(raw).toBeDefined();
     expect(raw).not.toContain('rk-wb-test');
+  });
+
+  it('while suites run (results null) every card renders the pending chip, never untested (R3-610)', () => {
+    const pending = renderWith(null);
+    expect(pending).toContain('rk-verdict--pending');
+    expect(pending.match(/rk-verdict rk-verdict--pending/g)).toHaveLength(3); // one per card
+    expect(pending).not.toContain('untested');
+  });
+
+  it('with results present, a subject absent from the map still renders the computed untested', () => {
+    // rev.raw has no tests and no result row — the computed `untested`, not pending.
+    const done = renderWith(results);
+    expect(done).toContain('rk-verdict--untested');
+    expect(done).not.toContain('pending');
   });
 });
