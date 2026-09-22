@@ -20,7 +20,7 @@ export const OPEN_WORKBOOK_TASK = 'open-workbook';
 export const CONTENT_MOUNT_TYPE = 'content';
 
 export type WorkbookResolution =
-  | { ok: true; root: string; via: 'repo-load' }
+  | { ok: true; root: string; via: 'repo-load'; mount: SandboxMount }
   | { ok: false; reason: 'not-dispatched' | 'ambiguous' };
 
 /**
@@ -29,10 +29,17 @@ export type WorkbookResolution =
  * `type: 'content'` (keyed on the mark, NOT on "the only foreign mount" — that guess
  * reads wrong the moment the viewer also holds a space or a worktree). Two marked
  * mounts is a host bug we refuse rather than paper over.
+ *
+ * The ok variant carries the MOUNT itself (not just its path) since R3-447: Part B's
+ * edit affordance derives writability from `mode` (the positive `rw` check R-EFE-1
+ * prescribes — never "absent ⇒ writable") and addresses its `capFile` delegation with
+ * the descriptor's `id`, which the live host contract established as the universal
+ * `scheme:locator` form (`content:owner/repo`) — `SandboxMount.id` with the `path`
+ * fallback the SDK documents.
  */
 export function resolveWorkbookMount(mounts: readonly SandboxMount[]): WorkbookResolution {
   const marked = mounts.filter((m) => m.type === CONTENT_MOUNT_TYPE);
-  if (marked.length === 1) return { ok: true, root: marked[0].path, via: 'repo-load' };
+  if (marked.length === 1) return { ok: true, root: marked[0].path, via: 'repo-load', mount: marked[0] };
   if (marked.length > 1) return { ok: false, reason: 'ambiguous' };
   return { ok: false, reason: 'not-dispatched' };
 }

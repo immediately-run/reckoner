@@ -11,12 +11,19 @@ const mount = (over: Partial<SandboxMount>): SandboxMount =>
   ({ id: 'm', path: '/x', type: 'app', ...over }) as SandboxMount;
 
 describe('resolveWorkbookMount', () => {
-  it('the repo-load mark: the one mount typed "content" is the workbook root', () => {
-    const mounts = [
-      mount({ id: 'app', path: '/app', type: 'app' }),
-      mount({ id: 'wb', path: '/task/7/dir', type: 'content', mode: 'ro' }),
-    ];
-    expect(resolveWorkbookMount(mounts)).toEqual({ ok: true, root: '/task/7/dir', via: 'repo-load' });
+  it('the repo-load mark: the one mount typed "content" is the workbook root, and the ok variant carries the mount itself (Part B, R3-447)', () => {
+    const wb = mount({ id: 'content:o/r', path: '/task/7/dir', type: 'content', mode: 'ro' });
+    const mounts = [mount({ id: 'app', path: '/app', type: 'app' }), wb];
+    expect(resolveWorkbookMount(mounts)).toEqual({ ok: true, root: '/task/7/dir', via: 'repo-load', mount: wb });
+  });
+
+  it('the carried mount is what the edit door addresses: id and mode come from the live descriptor (G-DN-B1)', () => {
+    const r = resolveWorkbookMount([
+      mount({ id: 'content:owner/repo', path: '/mnt/h', type: 'content', mode: 'rw' }),
+    ]);
+    if (!r.ok) throw new Error('expected ok');
+    expect(r.mount.id).toBe('content:owner/repo');
+    expect(r.mount.mode).toBe('rw');
   });
 
   it('foreign mounts WITHOUT the mark are not guessed at (a space, a worktree)', () => {

@@ -19,7 +19,13 @@
         ],
         "required": true
       }
-    }
+    },
+    "invokes": [
+      {
+        "task": "edit-file",
+        "version": "1.0"
+      }
+    ]
   },
   "main": "src/platform.tsx",
   "scripts": {
