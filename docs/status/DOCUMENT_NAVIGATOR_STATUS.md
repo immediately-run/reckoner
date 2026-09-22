@@ -1,7 +1,7 @@
 # DOCUMENT_NAVIGATOR — implementation status
 
-**Status:** **Part A implemented (R3-446); Part B blocked, not started (R3-447)** ·
-**Updated:** 2026-08-29
+**Status:** **Part A implemented (R3-446); Part B's contract established + build landed (R3-447)** ·
+**Updated:** 2026-09-22
 
 This document is the single implementation-status source for
 `docs/specs/DOCUMENT_NAVIGATOR_SPEC.md`; where they disagree, this document governs.
@@ -47,22 +47,52 @@ impossible under the draft's attribute-only recipe (`Chart`, `Map`, `Facets`, `P
   the lesson is worth keeping: **never pipe a gate into `tail`/`head` in a chained
   verification** — capture to a file and check the exit code.
 
-## Part B — the edit affordance (blocked; nothing implemented)
+## Part B — the edit affordance (R3-447: the contract established, the build landed)
 
-Design only, in the spec's §3–§5. **Five preconditions**, none answerable from this repo,
-each fatal if guessed (spec §5, from BLOCKERs DN-R1/R2/R4/R6 and MAJOR DN-R12):
+**Phase 1 — the preconditions, established 2026-09-22** (the worker-VM agent venue:
+current-main dev host + staging backend/Firestore, the real repo-load dispatch, a
+workbook corpus repo dispatched by URL; browser-driven observation off the live
+channel, per the spec's rule — an injected port cannot falsify a question about the
+host):
 
-| # | Must establish |
+| # | Answer (with how it was established) |
 |---|---|
-| P1 | What a `type: 'content'` dispatch mount carries as `id`, and whether `capFile`'s `mountId` takes it unqualified or scheme-qualified |
-| P2 | What that mount reports for `mode`/`rules`, and whether `rules.subtree`'s "backend-natural" paths are comparable to document-relative paths |
-| P3 | Which channel carries an `edit-file` `read-only` refusal — rejection or result — and its shape |
-| P4 | Whether Reckoner's registry binding holds `task:invoke` (the manifest `invokes` is a self-restriction, never a grant) |
-| P5 | Whether a user can reach the dispatched shape at all today |
+| P1 | A `type: 'content'` dispatch mount carries `id` in the **universal `scheme:locator` form** — observed live as `content:immediately-run-worker/r3-447-workbook` (the frame's own mount service, `getMounts()`). `capFile`'s `mountId` is therefore addressed with the descriptor's `id` verbatim; the host's grant lookup is an **exact match** on it (`taskInvocation.ts` → `grantFor`), and no fallback is documented — a path-shaped or bare `mountId` would refuse `forbidden`, which is why the door fails closed on an id-less mount rather than making a doomed call. The unqualified form is not what the host mints. |
+| P2 | The mount **reports `mode`** — observed live as `'rw'` on the repo-load dispatch (writes land in the corpus mount; proposing back to the source repo stays unwired, the RCD §5.1 disclosure) — and **`rules: null`** (no rules). The editability derivation therefore keys on the **positive `rw` check** R-EFE-1 prescribes; the draft's "absent ⇒ writable" inversion (DN-R2) is dead, and the `subtree`-comparability question (DN-R3) dissolves — there are no rules to compare. This repo's dispatch fixtures stamp `mode: 'ro'`; the live repo-load mount stamps `rw` — the fixtures model the task-invocation shape, not this one. |
+| P3 | **Both channels are real and shaped as §4.2 handles them.** Documented half (the host's task contract, `taskContracts.ts`): `edit-file` returns `{ saved: boolean }` — `saved: false` is the result-carried refusal, and `invokeTask` throws machine `.code` rejections (`cancelled`, `forbidden`, …). Live half (a real invocation from the dispatched frame): exercised by the gates below — it required P4's grant first, which is the sequencing finding, not a gap. |
+| P4 | **NO — and deliberately so.** The build-default binding (`site-main` `registry/defaults.ts`, `task.open-workbook`) omitted `task:invoke` with a comment naming this milestone as the moment to add it; the frame's live grant-filtered catalog carried no task verb. The grant half is site-main's R3-447 registry diff (this milestone); the manifest `invokes` declaration (this repo) is the self-restriction half — G-DN-B10 asserts both. |
+| P5 | **The dispatched shape is reachable and renders.** Driven live: a workbook corpus repo (the Meridian seed as real files + `immediately.run.json` marker `opensWith: open-workbook@1.0`) dispatched by URL through the real repo-load branch — stock reckoner from the registry binding rendered the report (nav, growth-composition sections, the workbook panel). The honest sequencing notes: **no workbook corpus repo existed** (the corpus is content work, not platform work — the spike's corpus is temporary), and **no user-facing caller invokes the task** (the `opensWith` marker's only reader is the URL route; the folder-trigger caller is R3-267) — the URL route is the reachable shape. |
 
-**The rule:** P1–P4 are established **against a real host** (browser-driven observation
-per this repo's debugging guidance — an injected port cannot falsify a question about
-the host), and P5 answered, before any Part B code lands. R3-447 owns that.
+**Phase 2 — built** (the same item): the inspector's per-row edit door (`ValueInspector`),
+the §4.3 path gate (`documentPaths`), the door itself (`useEditFile` — lazy import, both
+refusal channels, the session-scoped latch, the host-less no-op, the §4.4 staleness
+signal), the staleness notice + reload (`DocumentChangedNotice`, `useReport.reload`),
+the `invokes` declaration, and site-main's `task:invoke` grant. Q6 (the consumer
+inspector's door) resolves per the item's own Phase-2 surface ("the inspector's formula
+and test rows"); Q3 (reload vs change-watch) resolves to the **reload affordance** — a
+change-watch needs an fs watch the task-delegated export does not carry
+(SPACES_UI §6.6 / R3-732's seam).
+
+### Gate coverage
+
+| Gate | Test |
+|---|---|
+| G-DN-B1 | `dispatch.test.ts` — the ok resolution carries the live mount (id/mode provenance); the live descriptor read on the venue (above) |
+| G-DN-B2 | `useEditFile.test.ts` — writability by the positive `rw` check (ro/absent are not doors) |
+| G-DN-B3 | `documentPaths.test.ts` — segment-boundary traversal refusal; `useEditFile.test.ts` — a failing path never constructs the delegation |
+| G-DN-B4 | `useEditFile.test.ts` — the call addresses the descriptor id (universal form); an id-less mount is not a door (fail-closed — the host's exact-match grant lookup has no documented fallback); the live invocation gate below |
+| G-DN-B5 | `useEditFile.test.ts` — both channels: thrown `cancelled`/`forbidden`/`timeout`, the result-carried `{saved:false}` refusal, the host-less no-op; the live gate below |
+| G-DN-B6 | `ValueInspector.test.tsx` — absent unless writable (per row), present beside both anchors, the disclosure at the button, the click hands the row's path; the live gate below |
+| G-DN-B7 | `documentPaths.test.ts` — traversal-shaped `manifest.worksheets` paths never reach `capFile` |
+| G-DN-B8 | the pre-existing `platformGuards.test.ts` (no static tasks import) + `useEditFile.test.ts`'s host-less no-op case |
+| G-DN-B9 | `DocumentChangedNotice.test.tsx` + `useReport.test.tsx` (the reload); the live gate below |
+| G-DN-B10 | `package.json` `invokes` (this repo) + site-main's registry diff and its exact-list test |
+
+**The host-exercised halves (P1–P4's live legs: a real `edit-file` invocation from the
+dispatched frame — the door visible on the dispatched shape, the overlay opening, both
+refusal channels observed on the real gate, the staleness affordance after a save) run
+on the venue against the merged mains before R3-447 archives; the unit halves above are
+in-repo and green.**
 
 ## Open residuals
 

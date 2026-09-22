@@ -16,7 +16,10 @@ import { useReport } from './hooks/useReport.ts';
 import { seedForBoot } from './seed/seeds.ts';
 import { useAppPath, useHostLocation } from './hooks/useAppPath.ts';
 import DocumentNav from './app/DocumentNav.tsx';
+import DocumentChangedNotice from './app/DocumentChangedNotice.tsx';
 import { useMounts } from './hooks/useMounts.ts';
+import { resolveWorkbookMount } from './app/dispatch.ts';
+import { useEditFile } from './hooks/useEditFile.ts';
 import { ReportView } from './report/index.ts';
 import WorkbookPanel from './app/WorkbookPanel.tsx';
 import ValueInspector from './app/ValueInspector.tsx';
@@ -35,6 +38,12 @@ function App() {
   const mounts = useMounts();
   const seed = seedForBoot(appPath, window.location);
   const report = useReport(seed, mounts);
+  // Part B (R3-447): the dispatched workbook's edit door. The mount the resolution
+  // carries is the whole contract — writability by the positive `rw` check, and the
+  // `capFile` address from the descriptor's universal id. Absent (never disabled) in
+  // the seed flow and on any non-`rw` mount.
+  const dispatch = resolveWorkbookMount(mounts);
+  const editFile = useEditFile(dispatch.ok ? dispatch.mount : null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [inspected, setInspected] = useState<string | null>(null);
   // What-if buffer text is SESSION-SCOPED app state (WHATIF_SHADOW_EVALUATION_SPEC §1.4):
@@ -103,6 +112,15 @@ function App() {
               {reviewOpen ? 'Close workbook' : 'Workbook'}
             </button>
           </header>
+          {editFile.edited && (
+            <DocumentChangedNotice
+              onReload={() => {
+                report.reload();
+                editFile.clearStale();
+              }}
+            />
+          )}
+          {editFile.notice !== null && <div className="rk-stale rk-stale--note" role="status">{editFile.notice}</div>}
           {authorsOpen ? (
             <AuthorsView
               session={report.session}
@@ -139,6 +157,8 @@ function App() {
                 onClose={() => setInspected(null)}
                 onWhatIf={() => setWhatIfOpenFor(inspectedCell.id)}
                 worksheetPaths={Object.fromEntries(report.session.loaded.worksheets.map((w) => [w.name, w.path]))}
+                canEditPath={editFile.canEditPath}
+                onEdit={editFile.onEdit}
               />
               {(whatIfOpenFor === inspectedCell.id ||
                 (variants[inspectedCell.id] !== undefined &&

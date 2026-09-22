@@ -64,3 +64,18 @@ describe('the immediately.run compatibility guards', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// G-DN-B10's reckoner half (R3-447): the manifest `invokes` declaration is the
+// self-restriction that admits the edit-file task — an artifact no test read before,
+// so deleting it left every suite green (the "ships dark, permanently" failure mode
+// DN-R6 records). Pinned here, beside the other source-level platform contracts.
+describe('the manifest declares what it invokes (DOCUMENT_NAVIGATOR_SPEC G-DN-B10)', () => {
+  it('package.json declares invokes: edit-file at the contract version 1.0', () => {
+    const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as {
+      'immediately.run'?: { invokes?: { task: string; version: string }[] };
+    };
+    const invokes = pkg['immediately.run']?.invokes ?? [];
+    const editFile = invokes.find((i) => i.task === 'edit-file');
+    expect(editFile).toMatchObject({ task: 'edit-file', version: '1.0' });
+  });
+});
