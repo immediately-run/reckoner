@@ -110,3 +110,29 @@ Spec §6 (`edit-table`, open-at-line, Delta B, click-to-insert, own-source editi
 deferrals: whether the consumer-visible inspector carries an authoring door (Q6), and
 the template-file edit row without which "copy the snippet, open the template" has no
 door (Q7).
+
+### The live gates (2026-09-22, the venue run against BOTH merged mains) — two pass, one is a FINDING
+
+Driven on the worker-VM venue with site-main at 60ddd0a and reckoner@main at 2925fa4
+(both PRs merged), the corpus dispatched by URL:
+
+- **G-DN-B6 live: PASS.** The door renders beside both `file:line` anchors
+  (`worksheets/review.sheet.js:3` and `:107`) on the dispatched shape, with the RCD
+  §5.1 disclosure on the button title AND the visible note line.
+- **G-DN-B5 live (the forbidden channel): PASS.** A refused invocation draws exactly
+  one plain message ("This document can't be edited here.") and latches the door off —
+  observed live, matching §4.2 to the letter.
+- **G-DN-B4 live (the successful invocation): BLOCKED BY A FINDING, not a bug in this
+  repo's half.** The invocation refuses `forbidden — 'protocol-task.invoke' requires
+  the 'task:invoke' capability; this app's grant does not hold it` — **despite
+  site-main#584 being merged and the venue serving it**. Root cause (code + live):
+  the URL repo-load dispatch resolves the *viewer's repo* from the `task.open-workbook`
+  binding, but the frame's **grant** is the preview/stage grant — the registry row's
+  capabilities never flow to the repo-load-dispatched frame. The task-invocation shape
+  (where the binding's grant does apply) is unreachable twice over: no user-facing
+  caller exists (R3-267), and this repo's `dispatch.ts` v1 deliberately resolves only
+  the repo-load shape. **The affordance is therefore unreachable on both dispatch
+  shapes — DN-R12's failure mode reborn at the invocation layer.** The fix is a
+  design decision the owner owns (the repo-load dispatch minting the viewer's grant
+  from the task binding; or the preview grant widening; or shipping the task-shape
+  caller); recorded in R3-447's roadmap status, which stays **in-progress, unarchived**.
