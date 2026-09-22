@@ -83,14 +83,17 @@ describe('useEditFile', () => {
     unmount();
   });
 
-  it('the call addresses the descriptor id (the universal scheme:locator form) with the path fallback', async () => {
-    renderHook(mount({ id: 'content:owner/repo', path: '/mnt/fallback' }));
+  it('the call addresses the descriptor id (the universal scheme:locator form); a mount with no id is not a door', async () => {
+    renderHook(mount({ id: 'content:owner/repo' }));
     await edit();
     expect(capFile).toHaveBeenCalledWith({ mountId: 'content:owner/repo', relPath: 'worksheets/review.sheet.js' }, { mode: 'rw' });
     unmount();
+    // fail-closed: the host's grant lookup is an exact match on the mountId and no
+    // fallback is documented, so an id-less mount never gets a doomed call
     renderHook(mount({ id: undefined, path: '/mnt/fallback' }));
+    expect(probe!.canEditPath('worksheets/x.sheet.js')).toBe(false);
     await edit();
-    expect(capFile).toHaveBeenLastCalledWith({ mountId: '/mnt/fallback', relPath: 'worksheets/review.sheet.js' }, { mode: 'rw' });
+    expect(invokeTask).toHaveBeenCalledTimes(1); // only the earlier addressed call — no doomed one
     unmount();
   });
 

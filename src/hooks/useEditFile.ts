@@ -61,7 +61,13 @@ export function useEditFile(mount: SandboxMount | null): EditFilePort {
 
   const mountState = mount !== null ? `${mount.id ?? mount.path}|${mount.mode ?? ''}` : null;
   const latchActive = latchedFor !== null && latchedFor === mountState;
-  const writable = mount !== null && mount.mode === 'rw' && !latchActive;
+  // The door needs BOTH the positive `rw` check AND an addressable mount: the
+  // descriptor's `id` is the universal `scheme:locator` form (established live,
+  // R3-447), and the host's grant lookup is an EXACT match on it — there is no
+  // documented fallback, so a mount without an id is not a door rather than a
+  // doomed call (fail-closed, belt and braces against a shape the live contract
+  // has not produced).
+  const writable = mount !== null && mount.id !== undefined && mount.mode === 'rw' && !latchActive;
 
   const canEditPath = useCallback(
     (relPath: string) => writable && validDocumentRelPath(relPath),
@@ -79,10 +85,10 @@ export function useEditFile(mount: SandboxMount | null): EditFilePort {
           // §4.1/DN-R5 — the lazy import, inside the handler, never at module load.
           const { invokeTask, capFile } = await import('@immediately-run/sdk/tasks');
           // The host contract (R3-447, established live): the mount's `id` IS the
-          // universal `scheme:locator` form — pass the descriptor's id, with the
-          // `path` fallback the SDK documents for mounts that carry none.
+          // universal `scheme:locator` form, and the host's grant lookup matches it
+          // exactly — the descriptor's id, verbatim.
           const result = await invokeTask<{ saved?: boolean }>('edit-file', {
-            file: capFile({ mountId: mount.id ?? mount.path, relPath }, { mode: 'rw' }),
+            file: capFile({ mountId: mount.id!, relPath }, { mode: 'rw' }),
           });
           if (result?.saved === true) {
             setEdited(true); // §4.4 — the rendered report is now stale

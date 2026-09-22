@@ -67,9 +67,10 @@ interface ValueInspectorProps {
 
 /** The RCD §5.1 disclosure, at the button (Grove's dispatch wording): edits land in
  *  the mounted content, and proposing them back to the source repository is not
- *  wired. Rendered once, under the first row that carries a door. */
+ *  wired. Rendered once when ANY row carries a door (the tooltip rides every button;
+ *  this line makes the disclosure visible even in a row-set where only a test row
+ *  is editable), directly after the formula row. */
 const EDIT_DISCLOSURE = 'Edits save to the mounted content. Proposing a change back to its repository is not wired yet.';
-
 function ValueInspector({ cell, cells, tests, verdicts, result, onNavigate, onClose, onWhatIf, worksheetPaths, canEditPath, onEdit }: ValueInspectorProps) {
   const fileLine = (worksheet: string, span?: { line: number }): string | null => {
     const path = worksheetPaths?.[worksheet];
@@ -86,6 +87,8 @@ function ValueInspector({ cell, cells, tests, verdicts, result, onNavigate, onCl
     return canEditPath !== undefined && onEdit !== undefined && canEditPath(path) ? path : null;
   };
   const cellDoor = rowDoor(cell.worksheet);
+  // Any door in the row-set renders the disclosure line (see EDIT_DISCLOSURE above).
+  const anyDoor = cellDoor !== null || tests.some((t) => rowDoor(t.worksheet) !== null);
   return (
     <div className="rk-ins" aria-label={`Inspector for ${cell.id}`}>
       <header className="rk-ins-head">
@@ -166,7 +169,7 @@ function ValueInspector({ cell, cells, tests, verdicts, result, onNavigate, onCl
         <pre className="rk-ins-formula">{cell.formulaSource}</pre>
       </div>
 
-      {cellDoor !== null && <p className="rk-ins-edit-note">{EDIT_DISCLOSURE}</p>}
+      {anyDoor && <p className="rk-ins-edit-note">{EDIT_DISCLOSURE}</p>}
 
       {cell.resolvers.some((r) => r.kind === 'cell' || r.kind === 'wildcard') && (
         <div className="rk-ins-row">
