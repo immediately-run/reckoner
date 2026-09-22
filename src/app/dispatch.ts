@@ -34,8 +34,8 @@ export type WorkbookResolution =
  * edit affordance derives writability from `mode` (the positive `rw` check R-EFE-1
  * prescribes — never "absent ⇒ writable") and addresses its `capFile` delegation with
  * the descriptor's `id`, which the live host contract established as the universal
- * `scheme:locator` form (`content:owner/repo`) — `SandboxMount.id` with the `path`
- * fallback the SDK documents.
+ * `scheme:locator` form (`content:owner/repo`). The host's grant lookup matches that
+ * id exactly; there is no fallback, so the door fails closed on a mount without one.
  */
 export function resolveWorkbookMount(mounts: readonly SandboxMount[]): WorkbookResolution {
   const marked = mounts.filter((m) => m.type === CONTENT_MOUNT_TYPE);

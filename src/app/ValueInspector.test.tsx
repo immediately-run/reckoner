@@ -228,11 +228,12 @@ describe('the edit door (R3-447, DOCUMENT_NAVIGATOR_SPEC §3/§4)', () => {
       onEdit: () => {},
     });
     expect((html.match(/>edit</g) ?? []).length).toBe(2);
+    expect(html).toContain('rk-ins-edit-note'); // the visible disclosure line, not just the tooltip
     expect(html).toContain(DISCLOSURE);
     expect(html).toContain(`title="${DISCLOSURE}"`);
   });
 
-  it('the disclosure renders when ONLY a test row carries a door (the note follows the first door)', () => {
+  it('the disclosure note renders when ONLY a test row carries a door (pinned on the note element, not the tooltip string)', () => {
     const html = render({
       cell: spanned,
       tests: spannedTests,
@@ -241,6 +242,10 @@ describe('the edit door (R3-447, DOCUMENT_NAVIGATOR_SPEC §3/§4)', () => {
       onEdit: () => {},
     });
     expect((html.match(/>edit</g) ?? []).length).toBe(1);
+    // the note ELEMENT is the assertion: the tooltip carries the same string, so a
+    // bare toContain(DISCLOSURE) would pass even with the note gated on the formula
+    // row's door alone (round 1's bug) — this is the line that fails without anyDoor
+    expect(html).toContain('rk-ins-edit-note');
     expect(html).toContain(DISCLOSURE);
   });
 
