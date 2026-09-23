@@ -26,6 +26,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { SandboxMount } from '@immediately-run/sdk';
 import { validDocumentRelPath } from '../app/documentPaths.ts';
+import { isNoHostTransport } from '../app/sdkTransportError.ts';
 
 /** The plain refusal copy — one line, no code, no `EROFS` prose, no stack (§4.2). */
 const REFUSED_MESSAGE = 'This document can’t be edited here.';
@@ -106,7 +107,7 @@ export function useEditFile(mount: SandboxMount | null): EditFilePort {
           } else if (err?.code === 'forbidden') {
             setNotice(REFUSED_MESSAGE);
             setLatchedFor(`${mount.id ?? mount.path}|${mount.mode ?? ''}`);
-          } else if (typeof err?.message === 'string' && /no host transport/i.test(err.message)) {
+          } else if (isNoHostTransport(err)) {
             setNotice(null); // host-less (plain vite dev) — a no-op (§4.1)
           } else {
             setNotice(`Couldn’t open the editor${err?.code !== undefined ? ` (${err.code})` : ''}.`);

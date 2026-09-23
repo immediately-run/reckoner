@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from 'react';
 import type { TaskInput } from '@immediately-run/sdk/tasks';
+import { isNoHostTransport } from '../app/sdkTransportError.ts';
 
 const POLL_INTERVAL_MS = 500;
 const POLL_MAX_TRIES = 60; // 30s — well past the host's 4s re-send ladder.
@@ -43,12 +44,9 @@ export function useTaskInputLazy(): TaskInput | null {
           // (an on-host module-eval failure, a half-torn-down frame) is a real
           // fault in a dispatched task frame — surface it rather than let the
           // frame render the demo document with no signal while the caller's
-          // overlay waits on a completeTask that never comes (the same §4.1
-          // discrimination useEditFile applies to this import).
-          const msg = (e as { message?: unknown } | null)?.message;
-          if (!(typeof msg === 'string' && /no host transport/i.test(msg))) {
-            console.warn('[reckoner] task-input read failed:', e);
-          }
+          // overlay waits on a completeTask that never comes. The discrimination
+          // lives in ONE home (sdkTransportError.ts) shared with useEditFile §4.1.
+          if (!isNoHostTransport(e)) console.warn('[reckoner] task-input read failed:', e);
         });
     };
     const iv = window.setInterval(() => {
