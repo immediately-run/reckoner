@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildReportSession, sessionBindings } from '../app/reportSession.ts';
 import type { ReportSession, SeedDocument } from '../app/reportSession.ts';
 import type { SandboxMount } from '@immediately-run/sdk';
+import type { TaskInput } from '@immediately-run/sdk/tasks';
 import { demoLiveConnector, DEMO_FEED_NAME } from '../app/demoFeed.ts';
 import { usageFeedSpecs } from '../app/usageFeeds.ts';
 import { FeedRuntime } from '../feed/index.ts';
@@ -32,7 +33,11 @@ const scheduleFlush = (fn: () => void): void => {
   else setTimeout(fn, 16);
 };
 
-export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = []): ReportState & ReportReload {
+export function useReport(
+  seed: SeedDocument,
+  mounts: readonly SandboxMount[] = [],
+  taskInput?: TaskInput | null,
+): ReportState & ReportReload {
   const [session, setSession] = useState<ReportSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -44,15 +49,18 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
 
   // The resolution the current mount set implies ('' when not dispatched) — the effect
   // key that rebuilds the session ONLY when the workbook appears/changes, never on an
-  // unrelated mount update mid-document.
+  // unrelated mount update mid-document. The task input is part of the key: the
+  // task-invocation shape (R3-754) resolves through it, and it arrives AFTER the
+  // delegation mount (the host's `task-input` delivery is a bounded re-send ladder),
+  // so the arrival itself must trigger the rebuild.
   const dispatchKey = useMemo(() => {
-    const r = resolveWorkbookMount(mounts);
-    return r.ok ? r.root : '';
-  }, [mounts]);
+    const r = resolveWorkbookMount(mounts, taskInput);
+    return r.ok ? `${r.via}:${r.root}` : '';
+  }, [mounts, taskInput]);
 
   useEffect(() => {
     let alive = true;
-    buildReportSession(undefined, seed, mounts)
+    buildReportSession(undefined, seed, mounts, taskInput)
       .then((s) => {
         if (alive) setSession(s);
       })
@@ -62,7 +70,7 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
     return () => {
       alive = false;
     };
-  }, [seed, mounts, dispatchKey, reloadToken]);
+  }, [seed, mounts, taskInput, dispatchKey, reloadToken]);
 
   // Start the demo live feed once the session is ready; stop it on unmount — but only
   // for documents that read it (Meridian). Retention covers the demo's 30s windowed

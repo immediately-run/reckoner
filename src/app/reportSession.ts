@@ -34,6 +34,7 @@ import { memoryReader } from './memoryReader.ts';
 import { fsReader } from '../document/fsReader.ts';
 import { resolveWorkbookMount } from './dispatch.ts';
 import type { SandboxMount } from '@immediately-run/sdk';
+import type { TaskInput } from '@immediately-run/sdk/tasks';
 import { MERIDIAN_SEED, type SeedDocument } from '../seed/seeds.ts';
 import { DEMO_FEED_NAME } from './demoFeed.ts';
 import { USAGE_FEED_NAMES } from './usageFeeds.ts';
@@ -185,14 +186,17 @@ export async function buildReportSession(
   transport?: WorkerTransport,
   seed: SeedDocument = MERIDIAN_SEED,
   mounts: readonly SandboxMount[] = [],
+  taskInput?: TaskInput | null,
 ): Promise<ReportSession> {
   const t = transport ?? (await makeTransport());
 
   // The dispatched flow first: a workbook repo that arrived as a content mount
-  // (R3-172 repo-load dispatch) is read from the filesystem — plain files, the same
-  // `loadDocument` pipeline as the seed, no copy embedded in this app. Absent a
-  // dispatched mount, the bundled seed document (optionally `?doc=`-selected).
-  const dispatch = resolveWorkbookMount(mounts);
+  // (R3-172 repo-load dispatch) or as a task-delegated chroot (R3-754
+  // task-invocation shape, keyed on the task input) is read from the filesystem —
+  // plain files, the same `loadDocument` pipeline as the seed, no copy embedded in
+  // this app. Absent a dispatched mount, the bundled seed document (optionally
+  // `?doc=`-selected).
+  const dispatch = resolveWorkbookMount(mounts, taskInput);
   const loaded =
     dispatch.ok
       ? await loadDocument(fsReader(), dispatch.root)
