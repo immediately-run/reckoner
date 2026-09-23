@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildReportSession, sessionBindings } from '../app/reportSession.ts';
 import type { ReportSession, SeedDocument } from '../app/reportSession.ts';
 import type { SandboxMount } from '@immediately-run/sdk';
+import type { TaskInput } from '@immediately-run/sdk/tasks';
 import type { Bindings } from '../report/render/bindings.ts';
 import { resolveWorkbookMount } from '../app/dispatch.ts';
 
@@ -25,7 +26,11 @@ export interface ReportReload {
   reload: () => void;
 }
 
-export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = []): ReportState & ReportReload {
+export function useReport(
+  seed: SeedDocument,
+  mounts: readonly SandboxMount[] = [],
+  taskInput?: TaskInput | null,
+): ReportState & ReportReload {
   const [session, setSession] = useState<ReportSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -35,17 +40,22 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
   const [reloadToken, setReloadToken] = useState(0);
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
-  // The resolution the current mount set implies ('' when not dispatched) — the effect
-  // key that rebuilds the session ONLY when the workbook appears/changes, never on an
-  // unrelated mount update mid-document.
+  // The resolution the current mount set + task input implies ('' when not dispatched).
+  // Honest trigger story: the effect below re-runs on ANY dep identity change, and
+  // `mounts` is a fresh array on every host mount event (useMounts copies the set), so
+  // an unrelated mount update does rebuild the session. dispatchKey is the SEMANTIC
+  // key — it changes only when the workbook appears/changes shape or root — and it
+  // carries the task input's arrival: the input lands AFTER the delegation mount (the
+  // host's `task-input` delivery is a bounded re-send ladder, site-main R3-754), so
+  // the arrival itself must flip the key and trigger the rebuild.
   const dispatchKey = useMemo(() => {
-    const r = resolveWorkbookMount(mounts);
-    return r.ok ? r.root : '';
-  }, [mounts]);
+    const r = resolveWorkbookMount(mounts, taskInput);
+    return r.ok ? `${r.via}:${r.root}` : '';
+  }, [mounts, taskInput]);
 
   useEffect(() => {
     let alive = true;
-    buildReportSession(undefined, seed, mounts)
+    buildReportSession(undefined, seed, mounts, taskInput)
       .then((s) => {
         if (alive) setSession(s);
       })
@@ -55,7 +65,7 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
     return () => {
       alive = false;
     };
-  }, [seed, mounts, dispatchKey, reloadToken]);
+  }, [seed, mounts, taskInput, dispatchKey, reloadToken]);
 
   const bindings = useMemo(
     () => (session === null ? null : sessionBindings(session, () => setTick((t) => t + 1))),

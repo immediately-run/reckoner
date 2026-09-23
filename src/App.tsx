@@ -18,6 +18,7 @@ import { useAppPath, useHostLocation } from './hooks/useAppPath.ts';
 import DocumentNav from './app/DocumentNav.tsx';
 import DocumentChangedNotice from './app/DocumentChangedNotice.tsx';
 import { useMounts } from './hooks/useMounts.ts';
+import { useTaskInputLazy } from './hooks/useTaskInputLazy.ts';
 import { resolveWorkbookMount } from './app/dispatch.ts';
 import { useEditFile } from './hooks/useEditFile.ts';
 import { ReportView } from './report/index.ts';
@@ -36,13 +37,18 @@ function App() {
   const appPath = useAppPath();
   const hostLoc = useHostLocation();
   const mounts = useMounts();
+  // The task-invocation shape (R3-754): when this frame is an `open-workbook`
+  // callee, the host's rewritten `dir` param + the minted `task-delegation` mount
+  // are the dispatch — the input read lazily (the SDK task surface stays behind
+  // dynamic imports, platformGuards.test.ts).
+  const taskInput = useTaskInputLazy();
   const seed = seedForBoot(appPath, window.location);
-  const report = useReport(seed, mounts);
+  const report = useReport(seed, mounts, taskInput);
   // Part B (R3-447): the dispatched workbook's edit door. The mount the resolution
   // carries is the whole contract — writability by the positive `rw` check, and the
   // `capFile` address from the descriptor's universal id. Absent (never disabled) in
   // the seed flow and on any non-`rw` mount.
-  const dispatch = resolveWorkbookMount(mounts);
+  const dispatch = resolveWorkbookMount(mounts, taskInput);
   const editFile = useEditFile(dispatch.ok ? dispatch.mount : null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [inspected, setInspected] = useState<string | null>(null);
