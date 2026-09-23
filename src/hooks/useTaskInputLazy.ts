@@ -35,8 +35,20 @@ export function useTaskInputLazy(): TaskInput | null {
             window.clearInterval(iv);
           }
         })
-        .catch(() => {
-          /* off-host or a torn-down frame — the input stays null */
+        .catch((e: unknown) => {
+          if (!alive) return;
+          // Off-host (plain `vite dev`, vitest) the module load itself throws the
+          // SDK's discriminated no-host-transport error — the benign case: the
+          // input stays null and the poll expires silently. Any OTHER rejection
+          // (an on-host module-eval failure, a half-torn-down frame) is a real
+          // fault in a dispatched task frame — surface it rather than let the
+          // frame render the demo document with no signal while the caller's
+          // overlay waits on a completeTask that never comes (the same §4.1
+          // discrimination useEditFile applies to this import).
+          const msg = (e as { message?: unknown } | null)?.message;
+          if (!(typeof msg === 'string' && /no host transport/i.test(msg))) {
+            console.warn('[reckoner] task-input read failed:', e);
+          }
         });
     };
     const iv = window.setInterval(() => {

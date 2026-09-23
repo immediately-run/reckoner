@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { buildReportSession } from './reportSession.ts';
 import { inMemoryTransport } from '../engine/workerTransport.ts';
 import type { SandboxMount } from '@immediately-run/sdk';
+import type { TaskInput } from '@immediately-run/sdk/tasks';
 
 const MANIFEST = JSON.stringify({
   format: 1,
@@ -57,6 +58,46 @@ describe('buildReportSession over a dispatched content mount', () => {
 
   it('without a content mount, the seed document loads exactly as before', async () => {
     const session = await buildReportSession(inMemoryTransport(), undefined, []);
+    expect(session.title).toBe('Meridian — monthly review');
+  });
+});
+
+// The R3-754 join: the task-invocation shape reaches buildReportSession through the
+// task INPUT — the delegation mount alone is not a dispatch (its mark is keyed on the
+// input, never guessed). `dir` here is the temp root itself: the resolution matches
+// `params.dir` against the delegation's path exactly as the host's rewritten chroot
+// path matched it live (`/task/<slot>/dir` — the probed spelling is pinned in
+// dispatch.test.ts); what this file proves is the plumbing: taskInput flows through
+// the session builder and the workbook at that path loads through the same pipeline.
+const taskDelegation = (dir: string): SandboxMount[] =>
+  [{ id: dir, path: dir, type: 'task-delegation', mode: 'ro' }] as unknown as SandboxMount[];
+
+describe('buildReportSession over the task-invocation shape (R3-754)', () => {
+  const input = (task: string, dir: string): TaskInput => ({ task, params: { dir } }) as TaskInput;
+
+  it('the task input + its delegation mount open the mounted workbook — the join the dispatch lives on', async () => {
+    const session = await buildReportSession(
+      inMemoryTransport(),
+      undefined,
+      taskDelegation(root),
+      input('open-workbook', root),
+    );
+    expect(session.title).toBe('Mounted workbook');
+    expect(session.engine.value('model.headline')).toBe(6);
+  });
+
+  it('an input for ANOTHER task is not a dispatch — the seed loads, the delegation is not guessed at', async () => {
+    const session = await buildReportSession(
+      inMemoryTransport(),
+      undefined,
+      taskDelegation(root),
+      input('edit-table', root),
+    );
+    expect(session.title).toBe('Meridian — monthly review');
+  });
+
+  it('without the input, a lone task-delegation mount is not a dispatch either', async () => {
+    const session = await buildReportSession(inMemoryTransport(), undefined, taskDelegation(root));
     expect(session.title).toBe('Meridian — monthly review');
   });
 });
