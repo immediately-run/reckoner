@@ -78,4 +78,18 @@ describe('the manifest declares what it invokes (DOCUMENT_NAVIGATOR_SPEC G-DN-B1
     const editFile = invokes.find((i) => i.task === 'edit-file');
     expect(editFile).toMatchObject({ task: 'edit-file', version: '1.0' });
   });
+
+  // R3-754: `requests.net:fetch.required:false` is load-bearing the same way — the
+  // host's M2 admission computes the REQUIRED-request delta against the binding's
+  // snapshot and refuses the task invoke (consent-required, no overlay) when a
+  // required request is missing from it; this app renders workbooks without
+  // fetching. No test read the `requests` block before, so flipping the flag back
+  // re-broke every task invoke with the suite green — the exact ships-dark failure
+  // mode DN-R6 records, on the admission leg instead of the invokes leg.
+  it('package.json declares net:fetch as NOT required (the M2 admission leg, R3-754)', () => {
+    const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as {
+      'immediately.run'?: { requests?: Record<string, { required?: boolean }> };
+    };
+    expect(pkg['immediately.run']?.requests?.['net:fetch']).toMatchObject({ required: false });
+  });
 });
