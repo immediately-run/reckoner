@@ -55,8 +55,9 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
   // content mount and rebuild on change. One watch per dispatched root; a root change
   // aborts the old watch via this effect's cleanup before the new one starts. The watch
   // calls the existing `reload`, so the rebuild goes through the same session path.
-  // `watching` is DERIVED from the availability signal the watch reports (never set
-  // synchronously) so the Fast-Refresh/lint "set state in effect" rule stays happy.
+  // `watching` is a DERIVATION of `dispatchKey` (a watch is only attempted for a dispatched
+  // root) minus the availability signal the watch reports — so its "on" state needs no
+  // setState, only the (rare) unavailability does.
   const [watchUnavailableFor, setWatchUnavailableFor] = useState<string | null>(null);
   useEffect(() => {
     if (dispatchKey === '') return;

@@ -63,21 +63,37 @@ describe('watchDocument', () => {
   it('stops on abort with no further calls', async () => {
     const ac = controller();
     const onChange = vi.fn();
+    const onUnavailable = vi.fn();
+    // A watch whose second read waits for the abort and then REJECTS — the shape the
+    // real `fs.promises.watch` surfaces an abort as, so the abort path is actually driven.
+    let first = true;
     watchDocument('/root', onChange, {
       signal: ac.signal,
       debounceMs: 5,
-      // One event, then the generator waits for the abort before yielding another.
-      watch: () =>
-        (async function* () {
-          yield { eventType: 'change', filename: 'worksheets/a.sheet.js' };
-          await new Promise<void>((resolve) => ac.signal.addEventListener('abort', () => resolve()));
-          yield { eventType: 'change', filename: 'templates/b.mdx' };
-        })(),
+      onUnavailable,
+      watch: () => ({
+        [Symbol.asyncIterator]() {
+          return {
+            next: () => {
+              if (first) {
+                first = false;
+                return Promise.resolve({ done: false, value: { eventType: 'change', filename: 'worksheets/a.sheet.js' } });
+              }
+              return new Promise((_resolve, reject) => {
+                ac.signal.addEventListener('abort', () =>
+                  reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+                );
+              });
+            },
+          };
+        },
+      }),
     });
     await vi.waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
     ac.abort();
     await settle(30);
-    expect(onChange).toHaveBeenCalledTimes(1); // the second event never landed
+    expect(onChange).toHaveBeenCalledTimes(1); // no further calls after abort
+    expect(onUnavailable).not.toHaveBeenCalled(); // an abort is not a broken watch
   });
 
   it('a synchronously-throwing watch reports onUnavailable and never onChange', async () => {

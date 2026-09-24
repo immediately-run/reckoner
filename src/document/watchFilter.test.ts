@@ -22,7 +22,9 @@ describe('isDocumentPath', () => {
 
   it('rejects a README, a dot-git tree, and a non-template file under templates/', () => {
     expect(isDocumentPath('README.md')).toBe(false);
+    expect(isDocumentPath('README.mdx')).toBe(false);
     expect(isDocumentPath('.git/HEAD')).toBe(false);
     expect(isDocumentPath('templates/notes.txt')).toBe(false);
+    expect(isDocumentPath('feeds/notes.sheet.js')).toBe(false);
   });
 });

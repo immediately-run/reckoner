@@ -11,8 +11,9 @@
 // elements (hover-reveal / long-press) — both open the same docked inspector.
 import './index.css';
 import './app/report-page.css';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useReport } from './hooks/useReport.ts';
+import type { ReportSession } from './app/reportSession.ts';
 import { seedForBoot } from './seed/seeds.ts';
 import { useAppPath, useHostLocation } from './hooks/useAppPath.ts';
 import DocumentNav from './app/DocumentNav.tsx';
@@ -53,9 +54,23 @@ function App() {
   // object (a new one lands on every rebuild), never on `edited` itself.
   const watchedSession = report.status === 'ready' ? report.session : null;
   const { clearStale } = editFile;
+  // A watched rebuild replaces the report in place, so it must announce itself (R-IX-7)
+  // — a short status line, cleared on the next tick, and never focused. `lastWatchedSession`
+  // distinguishes a rebuild from the initial build (which must stay silent).
+  const [refreshNotice, setRefreshNotice] = useState(false);
+  const lastWatchedSession = useRef<ReportSession | null>(null);
   useEffect(() => {
-    if (report.watching && watchedSession !== null) clearStale();
+    const prev = lastWatchedSession.current;
+    lastWatchedSession.current = watchedSession;
+    if (!report.watching || watchedSession === null || prev === null || prev === watchedSession) return;
+    clearStale();
+    setRefreshNotice(true);
   }, [report.watching, watchedSession, clearStale]);
+  useEffect(() => {
+    if (!refreshNotice) return;
+    const id = setTimeout(() => setRefreshNotice(false), 0);
+    return () => clearTimeout(id);
+  }, [refreshNotice]);
   // What-if buffer text is SESSION-SCOPED app state (WHATIF_SHADOW_EVALUATION_SPEC §1.4):
   // closing a panel must never destroy typed source, so the per-cell variants and the
   // scratch pad's buffer live here, above the panels' mount/unmount lifecycle.
@@ -131,6 +146,9 @@ function App() {
             />
           )}
           {editFile.notice !== null && <div className="rk-stale rk-stale--note" role="status">{editFile.notice}</div>}
+          {refreshNotice && (
+            <div className="rk-stale rk-stale--note" role="status">Report updated from the changed document.</div>
+          )}
           {authorsOpen ? (
             <AuthorsView
               session={report.session}
