@@ -21,18 +21,19 @@ import { parseFixtureFrame } from './fixtures.ts';
 import { validateFixtureProvenance } from './xref.ts';
 import { paramRefDiagnostics } from './paramRefs.ts';
 
-const WORKSHEET_SUFFIX = '.sheet.js';
-const TEMPLATE_SUFFIX = '.mdx';
-const FEED_SUFFIX = '.feed.json';
-const FIXTURE_SUFFIX = '.frame.json';
+export const WORKSHEET_SUFFIX = '.sheet.js';
+export const TEMPLATE_SUFFIX = '.mdx';
+export const FEED_SUFFIX = '.feed.json';
+export const FIXTURE_SUFFIX = '.frame.json';
+export const MANIFEST_NAME = 'reckoner.json';
 
 /** Load and validate the document rooted at `root`. */
 export async function loadDocument(reader: DocumentReader, root: string): Promise<LoadedDocument> {
   const diagnostics: DocumentDiagnostic[] = [];
 
-  const manifestPath = join(root, 'reckoner.json');
+  const manifestPath = join(root, MANIFEST_NAME);
   const manifestText = await reader.readFile(manifestPath);
-  const manifest = parseManifest(parseJson(manifestText, 'reckoner.json'));
+  const manifest = parseManifest(parseJson(manifestText, MANIFEST_NAME));
 
   const worksheets = await loadWorksheets(reader, root, manifest.worksheets, diagnostics);
   const templates = await loadTemplates(reader, root, diagnostics);
@@ -40,7 +41,7 @@ export async function loadDocument(reader: DocumentReader, root: string): Promis
   const fixtures = await loadFixtures(reader, root, diagnostics);
 
   if (manifest.worksheets.length === 0) {
-    diagnostics.push({ severity: 'warning', file: 'reckoner.json', message: 'document declares no worksheets.' });
+    diagnostics.push({ severity: 'warning', file: MANIFEST_NAME, message: 'document declares no worksheets.' });
   }
 
   // Cross-reference validation (document-internal half): a fixture's capture provenance

@@ -180,6 +180,12 @@ displayed figures are current. Part B therefore does not ship without either a
 document-changed affordance or an explicit, gated statement that the render is stale.
 "Whatever reload story the dispatch flow has" asserted a mechanism that does not exist.
 
+> **Updated 2026-09-24 (R3-766):** the change-watch lands. R3-732 threaded a server-change
+> relay into `/task` exports in September 2026, so a dispatched workbook now watches its
+> content mount (`fs.promises.watch`) and re-renders on change — the reason Q3 deferred a
+> watch no longer holds. The reload affordance stays as the fallback for hosts without the
+> relay.
+
 Additionally, per `REPO_CONTENT_DISPATCH_SPEC` §5.1 and Grove's precedent, the
 affordance must **disclose at the button** that edits save to the mounted content and
 proposing them back to the source repository is not wired.
