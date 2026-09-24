@@ -21,10 +21,10 @@ import { parseFixtureFrame } from './fixtures.ts';
 import { validateFixtureProvenance } from './xref.ts';
 import { paramRefDiagnostics } from './paramRefs.ts';
 
-const WORKSHEET_SUFFIX = '.sheet.js';
-const TEMPLATE_SUFFIX = '.mdx';
-const FEED_SUFFIX = '.feed.json';
-const FIXTURE_SUFFIX = '.frame.json';
+export const WORKSHEET_SUFFIX = '.sheet.js';
+export const TEMPLATE_SUFFIX = '.mdx';
+export const FEED_SUFFIX = '.feed.json';
+export const FIXTURE_SUFFIX = '.frame.json';
 
 /** Load and validate the document rooted at `root`. */
 export async function loadDocument(reader: DocumentReader, root: string): Promise<LoadedDocument> {

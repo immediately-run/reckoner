@@ -71,7 +71,10 @@ the `invokes` declaration, and site-main's `task:invoke` grant. Q6 (the consumer
 inspector's door) resolves per the item's own Phase-2 surface ("the inspector's formula
 and test rows"); Q3 (reload vs change-watch) resolves to the **reload affordance** — a
 change-watch needs an fs watch the task-delegated export does not carry
-(SPACES_UI §6.6 / R3-732's seam).
+(SPACES_UI §6.6 / R3-732's seam). **Updated 2026-09-24 (R3-766):** R3-732 removed that
+reason — the server-change relay now reaches `/task` exports — so the change-watch lands
+with R3-766 (a dispatched workbook watches its content mount and re-renders on change);
+the reload button stays as the fallback.
 
 ### Gate coverage
 
