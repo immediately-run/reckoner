@@ -55,20 +55,29 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
   // content mount and rebuild on change. One watch per dispatched root; a root change
   // aborts the old watch via this effect's cleanup before the new one starts. The watch
   // calls the existing `reload`, so the rebuild goes through the same session path.
-  // `watching` is a DERIVATION of `dispatchKey` (a watch is only attempted for a dispatched
-  // root) minus the availability signal the watch reports — so its "on" state needs no
-  // setState, only the (rare) unavailability does.
+  // `watching` is only TRUE once the watch has DELIVERED an event (that is what proves the
+  // host relays to this mount) and has not gone unavailable — so a present-but-silent
+  // watch keeps the §4.4 fallback notice rather than suppressing it. Both signals are
+  // keyed by `dispatchKey` and set only from the watch's async callbacks.
   const [watchUnavailableFor, setWatchUnavailableFor] = useState<string | null>(null);
+  const [watchLivenedFor, setWatchLivenedFor] = useState<string | null>(null);
   useEffect(() => {
     if (dispatchKey === '') return;
     const controller = new AbortController();
-    watchDocument(dispatchKey, reload, {
-      signal: controller.signal,
-      onUnavailable: () => setWatchUnavailableFor(dispatchKey),
-    });
+    watchDocument(
+      dispatchKey,
+      () => {
+        setWatchLivenedFor(dispatchKey);
+        reload();
+      },
+      {
+        signal: controller.signal,
+        onUnavailable: () => setWatchUnavailableFor(dispatchKey),
+      },
+    );
     return () => controller.abort();
   }, [dispatchKey, reload]);
-  const watching = dispatchKey !== '' && watchUnavailableFor !== dispatchKey;
+  const watching = dispatchKey !== '' && watchLivenedFor === dispatchKey && watchUnavailableFor !== dispatchKey;
 
   useEffect(() => {
     let alive = true;

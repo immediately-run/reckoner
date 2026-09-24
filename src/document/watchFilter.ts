@@ -6,9 +6,7 @@
 // — plus the root manifest. A document-suffixed file anywhere else (a root `README.mdx`)
 // is not a document change and must not rebuild.
 
-import { WORKSHEET_SUFFIX, TEMPLATE_SUFFIX, FEED_SUFFIX, FIXTURE_SUFFIX } from './loader.ts';
-
-const MANIFEST_NAME = 'reckoner.json';
+import { WORKSHEET_SUFFIX, TEMPLATE_SUFFIX, FEED_SUFFIX, FIXTURE_SUFFIX, MANIFEST_NAME } from './loader.ts';
 
 /** True when `relPath` names a file the report reads, at the directory the loader reads
  *  it from. `relPath` is the watch event's root-relative path. */

@@ -43,6 +43,10 @@ async function drive(
   watch: WatchSource | undefined,
   { debounceMs = 250, signal, onUnavailable }: WatchDocumentOptions,
 ): Promise<void> {
+  // Defer into the microtask queue first: the caller may run this from a React effect,
+  // and `onUnavailable` must never fire synchronously with it (a synchronous setState in
+  // an effect is exactly what the lint rule and the extra render it causes are about).
+  await Promise.resolve();
   if (watch === undefined) {
     onUnavailable?.();
     return;

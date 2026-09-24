@@ -86,14 +86,16 @@ describe('useReport — change-watch (R3-766)', () => {
     render([contentMount('/dispatched')]);
     await flush();
     expect(watchDocument).toHaveBeenCalledTimes(1);
-    expect(stateRef.current!.watching).toBe(true);
+    // Not "live" until the watch delivers — a silent watch keeps the fallback notice.
+    expect(stateRef.current!.watching).toBe(false);
 
-    // The watch callback is the reload half — driving it rebuilds the session.
+    // The watch callback is the reload half — driving it rebuilds the session and marks live.
     const onChange = watchDocument.mock.calls[0][1] as () => void;
     const before = buildReportSession.mock.calls.length;
     act(() => onChange());
     await flush();
     expect(buildReportSession.mock.calls.length).toBe(before + 1);
+    expect(stateRef.current!.watching).toBe(true);
   });
 
   it('changing the mount root aborts the first watch before starting the next', async () => {
