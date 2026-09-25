@@ -23,7 +23,7 @@ const currentLocalPath = (): string => window.location.pathname;
 const serverPath = (): string => '/';
 
 /**
- * The current app-space path — `/usage`, `/caldera`, `/`.
+ * The current app-space path — `/caldera`, `/`.
  *
  * Normalised through {@link appPathFromSandboxPath}, so a `files/`-prefixed link (which is
  * what the SDK's link builder emits by default, and what every URL this app has published

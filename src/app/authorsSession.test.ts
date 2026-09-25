@@ -33,7 +33,7 @@ function seed(over: {
   for (const [name, source] of Object.entries(over.templates ?? {})) {
     files[`/doc/templates/${name}.mdx`] = source;
   }
-  return { root: '/doc', files, demoFeed: false };
+  return { root: '/doc', files };
 }
 
 describe('author’s-view session wiring', () => {

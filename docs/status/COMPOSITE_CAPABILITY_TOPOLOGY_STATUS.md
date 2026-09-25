@@ -39,11 +39,19 @@ second layout that can drift into asking different questions.
 
 ## Not built
 
+> **2026-09-25 (roadmap R3-768).** Reckoner's report-view egress was removed: the bundled
+> usage workbook (R3-349) that hardcoded an analytics origin and forced an app-wide
+> `net:fetch` request is gone from app code, moved to its own `immediately-run/usage-workbook`
+> repo with declared `feeds/*.feed.json` files. The report view now holds no network, as this
+> spec's §2 requires; the connector realm that reconnects those feeds is R3-769.
+
 - **The substrate.** §2's matrix assumes D7 (a distinct `appKey` per realm), D8
-  (per-instance launch/keep-warm/teardown) and D1 (per-instance delegation). None of those
-  are built, so today there is nothing to build a real composite plan *from* — the module
-  is correct and unreachable, which is the intended order (enforcement before authority)
-  and worth stating plainly rather than implying the surface is live.
+  (per-instance launch/keep-warm/teardown) and D1 (per-instance delegation). D7 shipped as
+  **AA-01 program identity** (roadmap R3-162): a distinct `appKey` per realm now exists, so
+  realm separation is no longer blocked on identity. D8 and D1 are still unbuilt, so today
+  there is nothing to build a real composite plan *from* — the module is correct and
+  unreachable, which is the intended order (enforcement before authority) and worth stating
+  plainly rather than implying the surface is live.
 
 ## The exit criterion that is NOT code, and must not be reported as met
 

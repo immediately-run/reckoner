@@ -60,7 +60,9 @@ All three shells (A/B/C) are now merged to `main`. Each plugs into the existing 
 - **Live feed wired into the app** (PR #18) — a synthetic demo feed (`src/app/demoFeed.ts`) +
   a `feeds.live_regions` cell + a "Live activity" chart; `useReport` runs a `FeedRuntime` over the
   session engine (rAF flush cadence) and re-renders on each settled recompute. Live-verified in a
-  real browser over CDP (the chart populates and its values change over time).
+  real browser over CDP (the chart populates and its values change over time). *(Removed by R3-768 —
+  the app-supplied demo feed was report-view egress, not document content; a live-region feed
+  returns in R3-769 as a declared `feeds/*.feed.json`.)*
 - **Glitch-freedom proven** (§4.2 C-R-B, PR #19) — see §5; the common-epoch barrier is resolved
   (satisfied by construction), not a pending item.
 - **Windowed-feed input resolution** — `{ feed, window }` at the input site now resolves through
