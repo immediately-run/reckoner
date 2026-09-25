@@ -10,8 +10,8 @@ Try this template on [immediately.run](https://immediately.run/present/github/im
 
 The Reckoner demo documents also run from this repo's main (zip-cached, no GitHub API
 dependency): the [Meridian monthly review](https://immediately.run/present/github/immediately-run/reckoner/main/)
-(default), the [Caldera LBO workbook](https://immediately.run/present/github/immediately-run/reckoner/main/caldera)
-and the [usage workbook](https://immediately.run/present/github/immediately-run/reckoner/main/usage).
+(the default) and the [Caldera LBO workbook](https://immediately.run/present/github/immediately-run/reckoner/main/caldera).
+(The platform-usage workbook lives in its own repo, [immediately-run/usage-workbook](https://github.com/immediately-run/usage-workbook).)
 
 Each document has its own path, and the switcher above the title moves between them —
 the outer address bar follows, so Back works and a link is worth copying. The older

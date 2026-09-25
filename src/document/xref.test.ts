@@ -22,11 +22,8 @@ describe('validateExternalReferences — worksheet inputs', () => {
     expect(out[0].message).toContain('"ghost"');
   });
 
-  it('a runtime feed counts as supplied (the demo feed is app infra, not a document feed)', () => {
-    const out = validateExternalReferences(
-      [{ key: 'feeds.live_regions', site: 'review.live_by_region' }],
-      { ...available, feeds: new Set([...available.feeds, 'live_regions']), worksheetPaths: { review: 'worksheets/review.sheet.js' } },
-    );
+  it('a feed the document (or a runtime) DOES supply is not an error', () => {
+    const out = validateExternalReferences([{ key: 'feeds.orders', site: 'revenue.by_month' }], available);
     expect(out).toEqual([]);
   });
 

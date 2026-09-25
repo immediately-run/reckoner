@@ -29,7 +29,7 @@ import { useOverlayDialog } from './app/useOverlayDialog.ts';
 import { useVerdicts } from './hooks/useVerdicts.ts';
 
 function App() {
-  // The app-space PATH picks the bundled document (`/usage`, `/caldera`; `/` is the Meridian
+  // The app-space PATH picks the bundled document (`/caldera`; `/` is the Meridian
   // monthly review), falling back to the legacy `?doc=` query — which the host forwards only
   // at boot, so it cannot survive navigation and is compatibility only (R3-553). The picked
   // seed is a module constant, so the reference is stable across renders.
