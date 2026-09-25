@@ -11,7 +11,6 @@ import {
   DOCUMENTS,
   MERIDIAN_SEED,
   CALDERA_SEED,
-  USAGE_SEED,
 } from './seeds.ts';
 
 describe('seedFromBootLocation', () => {
@@ -37,30 +36,27 @@ describe('seedFromBootLocation', () => {
     expect(seedFromBootLocation({ search: '?href=%zz' })).toBe(MERIDIAN_SEED);
   });
 
-  it('the usage workbook rides the same picker: ?doc=usage in both boot shapes', () => {
-    expect(seedFromBootLocation({ search: '?doc=usage' })).toBe(USAGE_SEED);
+  it('a retired doc slug (usage, R3-768) falls back to the default, not a broken document', () => {
+    // The usage workbook moved out of the app into its own repo (R3-768); a legacy
+    // `?doc=usage` link must open the default document in both boot shapes.
+    expect(seedFromBootLocation({ search: '?doc=usage' })).toBe(MERIDIAN_SEED);
     const outer = 'https://immediately.run/present/github/immediately-run/reckoner/main/files/src/App.tsx?doc=usage';
-    expect(seedFromBootLocation({ search: '?href=' + encodeURIComponent(outer) })).toBe(USAGE_SEED);
+    expect(seedFromBootLocation({ search: '?href=' + encodeURIComponent(outer) })).toBe(MERIDIAN_SEED);
   });
 
-  it('the seeds are distinct documents with the feed flags set correctly', () => {
-    expect(MERIDIAN_SEED.demoFeed).toBe(true);
-    expect(CALDERA_SEED.demoFeed).toBe(false);
+  it('the seeds are distinct documents with the roots set correctly', () => {
     expect(CALDERA_SEED.root).toBe('caldera');
     expect(Object.keys(CALDERA_SEED.files).length).toBeGreaterThan(5);
-    expect(USAGE_SEED.usageFeeds).toBe(true);
-    expect(USAGE_SEED.demoFeed).toBeUndefined();
-    expect(USAGE_SEED.root).toBe('usage');
+    expect(MERIDIAN_SEED.root).toBe('meridian');
   });
 
   it('the slugs are LITERAL, because they are the published URL contract (R3-553)', () => {
     // Since the root is also the URL segment, renaming one silently breaks every link anyone
-    // has shared — `…/reckoner/main/usage` and the README's. Pinning the strings here makes a
+    // has shared — `…/reckoner/main/meridian` and the README's. Pinning the strings here makes a
     // rename a deliberate act with a failing test in front of it. Nothing else can: every
     // other assertion in this file reads `seed.root`, so it is true whatever the root says.
     expect(MERIDIAN_SEED.root).toBe('meridian');
     expect(CALDERA_SEED.root).toBe('caldera');
-    expect(USAGE_SEED.root).toBe('usage');
   });
 });
 
@@ -69,7 +65,7 @@ describe('seedFromAppPath', () => {
   // The expected roots are read from the SEEDS, never written as literals: the slug IS the
   // root, so a renamed root must fail this test rather than quietly diverge from the URL.
   it('a slug matching a seed root opens that document', () => {
-    expect(seedFromAppPath(`/${USAGE_SEED.root}`)).toBe(USAGE_SEED);
+    expect(seedFromAppPath(`/${MERIDIAN_SEED.root}`)).toBe(MERIDIAN_SEED);
     expect(seedFromAppPath(`/${CALDERA_SEED.root}`)).toBe(CALDERA_SEED);
   });
 
@@ -119,7 +115,7 @@ describe('seedFromAppPath', () => {
   it('a `files/`-prefixed DOCUMENT link resolves to that document', () => {
     // The SDK's link builder prefixes `files/` unless a caller opts out, so this is the
     // shape an accidentally-default-built link arrives in.
-    expect(seedFromAppPath(`/files/${USAGE_SEED.root}`)).toBe(USAGE_SEED);
+    expect(seedFromAppPath(`/files/${CALDERA_SEED.root}`)).toBe(CALDERA_SEED);
   });
 
   it('no slug may collide with a host-intercepted segment', () => {
@@ -134,8 +130,8 @@ describe('seedFromAppPath', () => {
     // The nav renders DOCUMENTS and the router resolves through it, so a document added to the
     // module but not to the list would be routable-but-invisible, or the reverse.
     const listed = new Set(DOCUMENTS.map((d) => d.seed));
-    for (const seed of [MERIDIAN_SEED, CALDERA_SEED, USAGE_SEED]) expect(listed.has(seed)).toBe(true);
-    expect(DOCUMENTS.length).toBe(3);
+    for (const seed of [MERIDIAN_SEED, CALDERA_SEED]) expect(listed.has(seed)).toBe(true);
+    expect(DOCUMENTS.length).toBe(2);
   });
 });
 
@@ -153,10 +149,10 @@ describe('appPathFromSandboxPath', () => {
 
 describe('seedForBoot — precedence', () => {
   it('the PATH wins over the query when a legacy link carries both', () => {
-    // The case that only appears once the app emits paths: `/usage` in the path and
-    // `?doc=caldera` in the query. The path is the one the user can navigate to and Back
+    // The case that only appears once the app emits paths: `/caldera` in the path and
+    // `?doc=meridian` in the query. The path is the one the user can navigate to and Back
     // out of, so it decides.
-    expect(seedForBoot('/usage', { search: '?doc=caldera' })).toBe(USAGE_SEED);
+    expect(seedForBoot(`/${CALDERA_SEED.root}`, { search: '?doc=meridian' })).toBe(CALDERA_SEED);
   });
 
   it('the DEFAULT document wins over the query at its own root — the blocking regression', () => {
@@ -169,9 +165,9 @@ describe('seedForBoot — precedence', () => {
   });
 
   it('the query still decides when the path names no document (every published link today)', () => {
-    expect(seedForBoot('/files/src/App.tsx', { search: '?doc=usage' })).toBe(USAGE_SEED);
+    expect(seedForBoot('/files/src/App.tsx', { search: '?doc=caldera' })).toBe(CALDERA_SEED);
     expect(seedForBoot('/', { search: '?doc=caldera' })).toBe(CALDERA_SEED);
-    expect(seedForBoot(undefined, { search: '?doc=usage' })).toBe(USAGE_SEED);
+    expect(seedForBoot(undefined, { search: '?doc=caldera' })).toBe(CALDERA_SEED);
   });
 
   it('neither → the default document', () => {

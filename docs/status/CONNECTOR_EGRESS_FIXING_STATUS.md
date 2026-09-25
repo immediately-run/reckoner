@@ -10,6 +10,12 @@ credential-kind eligibility — roadmap R3-394, in Residuals below.)* · **Creat
 > [`specs/CONNECTOR_EGRESS_FIXING_SPEC.md`](../specs/CONNECTOR_EGRESS_FIXING_SPEC.md).
 > Where the spec and this file disagree, this file governs.
 
+> **2026-09-25 (roadmap R3-768).** Reckoner's report-view egress was removed: the app no
+> longer requests `net:fetch`, the report view holds no network, and the bundled usage
+> workbook (R3-349) that hardcoded the analytics origin is moved to its own
+> `immediately-run/usage-workbook` repo with declared `feeds/*.feed.json` files. The
+> connector realm that reconnects those feeds as template-bound `feed:fetch` is R3-769.
+
 ## What "done" means here, and what it does not
 
 The spec is emphatic on this and so is this file: egress-fixing **bounds a compromised

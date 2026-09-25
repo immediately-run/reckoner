@@ -1,16 +1,14 @@
-// The report hook (shell B + M2 live feed). Loads the bundled demo document, runs the engine
-// once, exposes the `Bindings` port to the view, and — once ready — starts a `FeedRuntime` that
-// streams the demo live feed into the engine and re-renders on every settled recompute. A widget
-// write and a feed frame both flow to the same re-render tick. Kept out of App.tsx (Fast-Refresh:
-// components file exports only components).
+// The report hook (shell B). Loads the bundled document, runs the engine once, exposes
+// the `Bindings` port to the view, and re-renders on a param write (widget) or a reload.
+// R3-768 removed the app-supplied live-feed runtimes (the demo tick and the usage rollups):
+// a bundled document is fully frozen, and a *dispatched* workbook's feeds are the
+// connector-realm's job (R3-769), never report-view wiring. Kept out of App.tsx
+// (Fast-Refresh: components file exports only components).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildReportSession, sessionBindings } from '../app/reportSession.ts';
 import type { ReportSession, SeedDocument } from '../app/reportSession.ts';
 import type { SandboxMount } from '@immediately-run/sdk';
-import { demoLiveConnector, DEMO_FEED_NAME } from '../app/demoFeed.ts';
-import { usageFeedSpecs } from '../app/usageFeeds.ts';
-import { FeedRuntime } from '../feed/index.ts';
 import type { Bindings } from '../report/render/bindings.ts';
 import { resolveWorkbookMount } from '../app/dispatch.ts';
 
@@ -26,11 +24,6 @@ export interface ReportReload {
    *  the caller reloads. Pure state change — the effect below does the work. */
   reload: () => void;
 }
-
-const scheduleFlush = (fn: () => void): void => {
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fn);
-  else setTimeout(fn, 16);
-};
 
 export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = []): ReportState & ReportReload {
   const [session, setSession] = useState<ReportSession | null>(null);
@@ -63,38 +56,6 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
       alive = false;
     };
   }, [seed, mounts, dispatchKey, reloadToken]);
-
-  // Start the demo live feed once the session is ready; stop it on unmount — but only
-  // for documents that read it (Meridian). Retention covers the demo's 30s windowed
-  // input with margin (buffer ≥ longest dependent window, §5.3).
-  useEffect(() => {
-    if (session === null || seed.demoFeed !== true || dispatchKey !== '') return;
-    const runtime = new FeedRuntime(
-      [{ name: DEMO_FEED_NAME, connector: demoLiveConnector(), tier: 'live', retention: { keepFor: '2m' } }],
-      {
-        engine: session.engine,
-        scheduleFlush,
-        onSettled: () => setTick((t) => t + 1),
-      },
-    );
-    runtime.start();
-    return () => runtime.stop();
-  }, [session, seed, dispatchKey]);
-
-  // The usage workbook's rollup feeds (R3-349): five polled rollups + the meta feed,
-  // fetched browser-direct from the first-party analysis endpoint via the host's
-  // `net:fetch`. Same lifecycle as the demo feed; a failed poll keeps the last snapshot
-  // and refreshes the meta feed's status row instead of erroring the report.
-  useEffect(() => {
-    if (session === null || seed.usageFeeds !== true || dispatchKey !== '') return;
-    const runtime = new FeedRuntime(usageFeedSpecs(), {
-      engine: session.engine,
-      scheduleFlush,
-      onSettled: () => setTick((t) => t + 1),
-    });
-    runtime.start();
-    return () => runtime.stop();
-  }, [session, seed, dispatchKey]);
 
   const bindings = useMemo(
     () => (session === null ? null : sessionBindings(session, () => setTick((t) => t + 1))),

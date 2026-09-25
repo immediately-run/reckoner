@@ -24,4 +24,48 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Reckoner is a four-realm app (COMPOSITE_CAPABILITY_TOPOLOGY_SPEC §2): the report
+    // view and the engine hold NO network — only the connector realm holds egress, and
+    // it holds `feed:fetch`, template-bound, never general `net:fetch`. R3-768 removed
+    // the report-view egress and this rule makes reintroducing it a lint error rather
+    // than a silent regression. Scoped to `src/**` so a future test/build helper may
+    // still reach the network where the realm rule does not apply.
+    //
+    // R3-769 lifts exactly one slot below for the connector entry point. To do so,
+    // move that module's path out of the `paths` list (or add its dir to a per-file
+    // override) and leave every OTHER path restricted — edit ONE line, do not invent a
+    // new pattern.
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'fetch',
+          message: 'The report view and engine hold no network (COMPOSITE_CAPABILITY_TOPOLOGY §2); egress lives only in the connector realm, as template-bound feed:fetch.',
+        },
+        {
+          name: 'XMLHttpRequest',
+          message: 'The report view and engine hold no network (COMPOSITE_CAPABILITY_TOPOLOGY §2); egress lives only in the connector realm, as template-bound feed:fetch.',
+        },
+      ],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@immediately-run/sdk/netFetch',
+              importNames: ['hostFetch', 'netFetch'],
+              message: 'The report view and engine hold no network (COMPOSITE_CAPABILITY_TOPOLOGY §2); egress lives only in the connector realm, as template-bound feed:fetch.',
+            },
+            {
+              name: '@immediately-run/sdk',
+              importNames: ['hostFetch', 'netFetch'],
+              message: 'The report view and engine hold no network (COMPOSITE_CAPABILITY_TOPOLOGY §2); egress lives only in the connector realm, as template-bound feed:fetch.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ])

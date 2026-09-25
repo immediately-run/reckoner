@@ -10,25 +10,20 @@
 
 import { CALDERA_FILES, CALDERA_ROOT } from './caldera.ts';
 import { SEED_FILES, SEED_ROOT } from './document.ts';
-import { USAGE_FILES, USAGE_ROOT } from './usage.ts';
 
 /**
- * A bundled document the app can open with zero prompts. `demoFeed` marks the document
- * as reading the app-supplied live demo feed (Meridian does; Caldera does not, so its
- * session skips the feed runtime and the feed's xref allowance). `usageFeeds` marks the
- * usage workbook, whose rollup feeds the app supplies from `src/app/usageFeeds.ts`
- * (PLATFORM_TELEMETRY_SPEC §13, R3-349).
+ * A bundled document the app can open with zero prompts. No seed reads an app-supplied
+ * runtime feed (R3-768 removed the demo and usage feeds): a bundled document is fully
+ * frozen — its fixtures supply every input, and a live feed is a connector-realm concern
+ * that R3-769 reintroduces as a *declared* `feeds/*.feed.json` in a workbook repo.
  */
 export interface SeedDocument {
   root: string;
   files: Record<string, string>;
-  demoFeed?: boolean;
-  usageFeeds?: boolean;
 }
 
-export const MERIDIAN_SEED: SeedDocument = { root: SEED_ROOT, files: SEED_FILES, demoFeed: true };
-export const CALDERA_SEED: SeedDocument = { root: CALDERA_ROOT, files: CALDERA_FILES, demoFeed: false };
-export const USAGE_SEED: SeedDocument = { root: USAGE_ROOT, files: USAGE_FILES, usageFeeds: true };
+export const MERIDIAN_SEED: SeedDocument = { root: SEED_ROOT, files: SEED_FILES };
+export const CALDERA_SEED: SeedDocument = { root: CALDERA_ROOT, files: CALDERA_FILES };
 
 /**
  * Where the app's own route space begins inside the path the host gave it (R3-553).
@@ -58,7 +53,6 @@ export function appPathFromSandboxPath(sandboxPath: string | undefined | null): 
 export const DOCUMENTS: readonly { seed: SeedDocument; label: string }[] = [
   { seed: MERIDIAN_SEED, label: 'Meridian' },
   { seed: CALDERA_SEED, label: 'Caldera' },
-  { seed: USAGE_SEED, label: 'Usage' },
 ];
 
 /**
@@ -117,6 +111,5 @@ export function seedFromBootLocation(loc: { search: string }): SeedDocument {
     }
   }
   if (doc === 'caldera') return CALDERA_SEED;
-  if (doc === 'usage') return USAGE_SEED;
   return MERIDIAN_SEED;
 }

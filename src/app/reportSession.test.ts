@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildReportSession, makeTransport, sessionBindings, xrefDiagnostics } from './reportSession.ts';
 import { CALDERA_SEED } from './reportSession.ts';
+import type { SeedDocument } from './reportSession.ts';
 import { inMemoryTransport } from '../engine/workerTransport.ts';
 import { execSummary, mrrMovements } from '../seed/data.ts';
 
@@ -44,26 +45,6 @@ describe('buildReportSession + sessionBindings', () => {
     expect(stack.status).toBe('ok');
     expect(Array.isArray(stack.value)).toBe(true);
     expect((stack.value as unknown[]).length).toBe(mrrMovements.length * 3); // 3 drivers per month
-  });
-
-  it('the demo windowed-feed cell resolves and is bound by the template', async () => {
-    const session = await buildReportSession(inMemoryTransport());
-    const bindings = sessionBindings(session, () => {});
-    // No feed is running in this session → the buffer external is absent → the empty slice,
-    // resolved by the engine's windowed-input path (never an error).
-    const recent = bindings.resolve('review.live_recent_events');
-    expect(recent.status).toBe('ok');
-    expect(recent.value).toBe(0);
-    // and the report binds it (the "events in the trailing window" line).
-    expect(
-      session.nodes.some(
-        (n) =>
-          n.type === 'component' &&
-          n.name === 'Value' &&
-          n.attrs.source?.kind === 'literal' &&
-          n.attrs.source.value === 'review.live_recent_events',
-      ),
-    ).toBe(true);
   });
 
   it('writing a param recomputes dependent cells (the interaction loop)', async () => {
@@ -151,10 +132,6 @@ describe('the demo document under the value inspector', () => {
     const session = await buildReportSession(inMemoryTransport());
     const total = session.engine.cells().find((c) => c.id === 'review.total')!;
     expect(total.formulaSource).toContain('rows[rows.length - 1].mrr');
-    // the windowed cell (from the windowed-feed PR) describes its window in the resolver,
-    // so the inspector can chip it without knowing the input grammar
-    const recent = session.engine.cells().find((c) => c.id === 'review.live_recent_events');
-    expect(recent?.resolvers.some((r) => r.kind === 'windowed-feed' && r.feed === 'live_regions')).toBe(true);
   });
 });
 
@@ -179,6 +156,54 @@ describe('makeTransport — module-semantics degradation (the import.meta platfo
   it('the worker URL module itself resolves under real ESM (vitest) to the engine entry', async () => {
     const { ENGINE_WORKER_URL } = await import('./workerUrl.ts');
     expect(ENGINE_WORKER_URL.href).toContain('entry/engine.ts');
+  });
+});
+
+describe('declared vs undeclared feeds (R3-768)', () => {
+  const SHEET = `import { cell } from "@reckoner/stdlib";
+
+export const from_declared = cell({
+  doc: "reads a declared feed",
+  inputs: { raw: "feeds.declared" },
+  formula: ({ raw }) => raw,
+});
+
+export const from_ghost = cell({
+  doc: "reads an undeclared feed",
+  inputs: { raw: "feeds.ghost" },
+  formula: ({ raw }) => raw,
+});
+`;
+
+  const seed: SeedDocument = {
+    root: 'doc',
+    files: {
+      'doc/reckoner.json': JSON.stringify({
+        format: 1,
+        compat: { stdlib: '>=0.1.0', catalog: '>=0.1.0' },
+        worksheets: ['feeds'],
+        params: {},
+        title: 'Feed-xref harness',
+      }),
+      'doc/worksheets/feeds.sheet.js': SHEET,
+      'doc/feeds/declared.feed.json': JSON.stringify({ source: 'https://example.com/declared', mode: 'poll' }),
+      'doc/templates/weekly.mdx': '# Report.\n',
+    },
+  };
+
+  it('an input naming an undeclared feed still raises the "no feed named" diagnostic', async () => {
+    const session = await buildReportSession(inMemoryTransport(), seed);
+    const errors = session.diagnostics.filter((d) => d.severity === 'error');
+    expect(errors.some((d) => d.message.includes('no feed named "ghost"'))).toBe(true);
+    expect(errors.some((d) => d.message.includes('feeds.declared'))).toBe(false);
+  });
+
+  it('an input naming a declared feed raises no diagnostic and its cell resolves null', async () => {
+    const session = await buildReportSession(inMemoryTransport(), seed);
+    const errors = session.diagnostics.filter((d) => d.severity === 'error');
+    expect(errors.some((d) => d.message.includes('feeds.declared'))).toBe(false);
+    const bindings = sessionBindings(session, () => {});
+    expect(bindings.resolve('feeds.from_declared').value).toBeNull();
   });
 });
 
