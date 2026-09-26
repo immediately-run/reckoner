@@ -36,7 +36,22 @@ local `vite dev` — the most common silent failure.
 7. **Import local assets** (`import logo from './assets/logo.png'`); don't
    reference server paths that won't exist in the sandbox.
 8. **No Node / build-time-only APIs** in the rendered tree — it runs in a browser
-   iframe. `localStorage`, `document`, `window`, and `fetch` are available.
+   iframe. `document`, `window`, and `fetch` are available. **Web storage is
+   not**: `localStorage`, `sessionStorage`, `indexedDB` and the Cache API are
+   all unavailable — apps run at an opaque origin (a sandboxed iframe without
+   `allow-same-origin`; `BROWSER_CAPABILITIES_SPEC` §1 in the docs repo), where
+   even *reading* `localStorage` throws `SecurityError`, so a
+   `typeof localStorage === 'undefined'` guard does NOT work (the throw is on
+   access, not on the value). State goes to the mounts instead:
+   - **Device-local, rebuildable state** (caches, drafts, scroll positions,
+     checkpoints): the mount from `await openLocalStore()` in
+     `@immediately-run/sdk` — per device, never synced, evictable by the
+     browser under storage pressure.
+   - **Synced state**: `openSettings()`.
+   - Both need a signed-in user: `openLocalStore()` rejects `auth-required`
+     when signed out, so the app degrades to in-memory state rather than
+     crashing (platform security model rule 9). Treat persistence as optional
+     and keep the app fully usable without it.
 9. **MDX is only for long-form prose** (articles, guides). Structured/repeated
    data stays as typed arrays in `src/data/`. If you add `.mdx`, the Vite plugin
    and `src/mdx.d.ts` shim are already wired up.
