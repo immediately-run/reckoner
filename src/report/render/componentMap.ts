@@ -9,6 +9,7 @@ import Kpi from './components/Kpi.tsx';
 import Chart from './components/Chart.tsx';
 import Table from './components/Table.tsx';
 import GeoMap from './components/GeoMap.tsx';
+import Flow from './components/Flow.tsx';
 import Facets from './components/Facets.tsx';
 import Callout from './components/Callout.tsx';
 import Value from './components/Value.tsx';
@@ -34,6 +35,7 @@ export const componentMap: Record<string, NodeComponent> = {
   Chart,
   Table,
   Map: GeoMap,
+  Flow,
   Facets,
   Callout,
   Value,

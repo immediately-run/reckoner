@@ -5,13 +5,15 @@
 // (so container components render their children without importing this module). The
 // renderer itself is thin wiring — all behavior lives in the components and the pure helpers.
 //
-// V3's on-pixel affordance rides here too: a component node carrying a literal `source`
-// (the primary binding every bound catalog component declares) is wrapped in `Inspectable`,
+// V3's on-pixel affordance rides here too: a component node carrying a literal primary
+// binding — its `source`, or for a component without one (Flow: `nodes`/`edges`) its first
+// source-typed catalog attribute — is wrapped once in `Inspectable`,
 // which offers hover/long-press inspection when (and only when) `ReportView` receives an
 // inspection port — run mode without it renders exactly as before.
 import type { ReactNode } from 'react';
 import type { Bindings } from './bindings.ts';
-import type { TemplateNode } from '../nodes.ts';
+import type { ComponentNode, TemplateNode } from '../nodes.ts';
+import { catalog } from '../catalog.ts';
 import { BindingsContext } from './bindingsContext.ts';
 import { InspectionContext } from './inspectionContext.ts';
 import type { InspectionPort } from './inspectionContext.ts';
@@ -23,16 +25,28 @@ import Inspectable from './Inspectable.tsx';
 import Markdown from './components/Markdown.tsx';
 import Placeholder from './components/Placeholder.tsx';
 import './report.css';
+import './flow.css';
+
+/**
+ * The binding the inspection affordance targets: `source` (Chart-in-Facets has none and stays
+ * bare), or — for a component whose schema has no `source` — its first source-typed attribute.
+ */
+function primaryBinding(node: ComponentNode): string | undefined {
+  const sources = (catalog[node.name]?.attributes ?? []).filter((a) => a.type === 'source').map((a) => a.name);
+  const name = sources.length === 0 || sources.includes('source') ? 'source' : sources[0];
+  const v = node.attrs[name];
+  return v?.kind === 'literal' && typeof v.value === 'string' ? v.value : undefined;
+}
 
 function renderNode(node: TemplateNode, key: number): ReactNode {
   if (node.type === 'markdown') return <Markdown key={key} text={node.text} />;
   const Comp = componentMap[node.name];
   if (Comp === undefined) return <Placeholder key={key} name={node.name} />;
   const drawn = <Comp key={key} node={node} />;
-  const source = node.attrs.source;
-  if (source?.kind === 'literal' && typeof source.value === 'string') {
+  const source = primaryBinding(node);
+  if (source !== undefined) {
     return (
-      <Inspectable key={key} source={source.value}>
+      <Inspectable key={key} source={source}>
         {drawn}
       </Inspectable>
     );

@@ -5,7 +5,7 @@ import ReportView from './Renderer.tsx';
 import { missing } from './bindings.ts';
 import type { Bindings, BoundValue } from './bindings.ts';
 import { parseTemplate } from '../parse/mdx.ts';
-import type { Value } from '../../stdlib/types.ts';
+import type { Row, Value } from '../../stdlib/types.ts';
 
 // A hand-built data port standing in for the engine's tiered results (shell A's verification
 // path: unit-render the components against mock Engine values). renderToStaticMarkup runs in
@@ -150,5 +150,72 @@ describe('the on-pixel inspection affordance (V3)', () => {
     const html = renderToStaticMarkup(createElement(ReportView, { nodes: parseTemplate(src), bindings: bindings(map) }));
     expect(html).not.toContain('rk-inspectable');
     expect(html).not.toContain('rk-inspect-btn');
+  });
+});
+
+describe('Flow', () => {
+  const nodes: Row[] = [
+    { id: 'draft', label: 'Drafting', sub: 'agent', x: 0, y: 0, tone: 'agent' },
+    { id: 'review', label: 'Review gate', x: 260, y: 0, shape: 'diamond', tone: 'ci' },
+    { id: 'merge', label: 'Merge', x: 520, y: 0, shape: 'pill', tone: 'owner' },
+  ];
+  const edges: Row[] = [
+    { from: 'draft', to: 'review', label: 'awaiting review', value: 4, buffer: true, alert: true, tone: 'ci' },
+    { from: 'review', to: 'merge', label: 'green', value: '2' },
+    { from: 'review', to: 'draft', dashed: true, via: '330,100 70,100' },
+  ];
+  const tpl = '<Flow nodes="process.n" edges="process.e" title="The roadmap factory" />';
+
+  it('draws nodes, edges with arrowheads, annotations and the buffer triangle', () => {
+    const html = render(tpl, { 'process.n': ok(nodes), 'process.e': ok(edges) });
+    expect(html).toContain('<svg');
+    expect(html).toContain('>Drafting<');
+    expect(html).toContain('>Review gate<');
+    expect(html).toContain('>agent<'); // sub line
+    expect(html).toMatch(/<path class="rk-flow-edge[^"]*"[^>]*marker-end="url\(#rk-flow-arrow-/);
+    expect(html).toContain('>awaiting review<');
+    expect(html).toContain('>4<');
+    expect(html).toContain('rk-flow-buffer');
+    expect(html).toContain('rk-flow-alert');
+    expect(html.match(/rk-flow-alert/g)).toHaveLength(1);
+    expect(html).toContain('rk-flow-dashed');
+    expect(html).toContain('aria-label="The roadmap factory: 3 nodes, 3 connections. Drafting → Review gate: awaiting review 4 (alert); Review gate → Merge: green 2."');
+  });
+
+  it('a missing binding is a needs-access tile', () => {
+    const html = render(tpl, { 'process.n': ok(nodes) });
+    expect(html).toContain('Needs data access');
+    expect(html).not.toContain('<svg');
+  });
+
+  it('an edge to an unknown node id is a broken tile naming the id', () => {
+    const html = render(tpl, { 'process.n': ok(nodes), 'process.e': ok([{ from: 'draft', to: 'publish' }]) });
+    expect(html).toContain('rk-broken');
+    expect(html).toContain('unknown node id &quot;publish&quot;');
+    expect(html).not.toContain('<svg');
+  });
+
+  it('more than 80 nodes is a broken tile', () => {
+    const many = Array.from({ length: 81 }, (_, i) => ({ id: `n${i}`, label: `N${i}`, x: i * 10, y: 0 }));
+    const html = render(tpl, { 'process.n': ok(many), 'process.e': ok([]) });
+    expect(html).toContain('rk-broken');
+    expect(html).toMatch(/80-node cap/);
+  });
+
+  it('a non-table binding is a broken tile', () => {
+    const html = render(tpl, { 'process.n': ok(3), 'process.e': ok([]) });
+    expect(html).toContain('nodes: expected a table of rows');
+  });
+
+  it('carries one inspection affordance for the whole diagram (on its nodes binding)', () => {
+    const html = renderToStaticMarkup(
+      createElement(ReportView, {
+        nodes: parseTemplate(tpl),
+        bindings: bindings({ 'process.n': ok(nodes), 'process.e': ok(edges) }),
+        inspection: { onInspect: () => {}, canInspect: () => true },
+      }),
+    );
+    expect(html.match(/rk-inspect-btn/g)).toHaveLength(1);
+    expect(html).toContain('data-source="process.n"');
   });
 });

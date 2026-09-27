@@ -100,3 +100,23 @@ describe('validateTemplate — structural rules', () => {
     expect(v.diagnostics.some((d) => /missing required attribute "label"/.test(d.message))).toBe(true);
   });
 });
+
+describe('validateTemplate — Flow (two source attributes)', () => {
+  it('collects both nodes and edges as bindings', () => {
+    const v = validateTemplate([component('Flow', { nodes: 'process.factory_nodes', edges: 'process.factory_edges', title: 'Factory' })]);
+    expect(v.diagnostics).toEqual([]);
+    expect(v.bindings).toEqual(['process.factory_edges', 'process.factory_nodes']);
+  });
+
+  it('missing nodes or edges is a required-attribute error', () => {
+    const noNodes = validateTemplate([component('Flow', { edges: 'p.e' })]);
+    expect(noNodes.diagnostics.some((d) => d.severity === 'error' && /missing required attribute "nodes"/.test(d.message))).toBe(true);
+    const noEdges = validateTemplate([component('Flow', { nodes: 'p.n' })]);
+    expect(noEdges.diagnostics.some((d) => d.severity === 'error' && /missing required attribute "edges"/.test(d.message))).toBe(true);
+  });
+
+  it('a wildcard nodes/edges binding is an error', () => {
+    const v = validateTemplate([component('Flow', { nodes: 'p.*', edges: 'p.e' })]);
+    expect(v.diagnostics.some((d) => d.severity === 'error' && /"nodes" cannot bind a wildcard/.test(d.message))).toBe(true);
+  });
+});

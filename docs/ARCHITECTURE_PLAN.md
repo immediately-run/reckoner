@@ -596,6 +596,22 @@ conditional components `ShowAbove`/`ShowBelow` (§3.3.1); and a `Params` block o
 widgets — `Select`, `Toggle`, `Range`, `DateRange` (each with `name`, typed
 `options`/bounds, `default`).
 
+Plus: `Flow` — a data-positioned node/edge diagram (`nodes`, `edges`, optional `title`).
+It binds two tables: `nodes` rows `{ id, label, sub?, x, y, w?, h?, shape?
+(box/pill/diamond/note), tone? (agent/operator/owner/ci/neutral) }` and `edges` rows
+`{ from, to, via? ("x,y x,y …" waypoints), label?, value?, tone?, alert?, dashed?, at?
+(0..1 along the path), buffer? }`. The anti-affordance review: **data-positioned only** —
+every coordinate comes from the rows; there is no auto-layout, force layout or layout
+library, because the template never computes (§3.3.1 "never an expression") and fixed
+coordinates keep the drawing stable across captures. **Capped size** — more than 80 nodes
+or 160 edges, a malformed row, or an edge naming an unknown node is a broken tile naming
+the first offender, never a partial drawing. **Annotations are the only encoding beyond
+tone** — an edge's label + mono value, a value-stream inventory triangle for a buffer, the
+danger color for `alert` (a breached timeout or an over-bound buffer); there is no size,
+thickness or color-scale encoding and no pie-like or decorative marks. The annotated edges
+are spelled out in the SVG's accessible label, and a diagram wider than its container
+scrolls horizontally rather than shrinking its text. Geometry: `src/report/render/flowGeometry.ts`.
+
 **Excluded by construction** (anti-affordances the catalog makes inexpressible): 3D
 anything, dual-axis by default, pies beyond 5 slices, radial/gauge beyond the one KPI
 gauge, word clouds. Every future addition passes an anti-affordance review.
