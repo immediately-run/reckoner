@@ -3,6 +3,9 @@ import { buildReportSession, makeTransport, sessionBindings, xrefDiagnostics } f
 import { CALDERA_SEED } from './reportSession.ts';
 import type { SeedDocument } from './reportSession.ts';
 import { inMemoryTransport } from '../engine/workerTransport.ts';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import ReportView from '../report/render/Renderer.tsx';
 import { execSummary, mrrMovements } from '../seed/data.ts';
 
 // End-to-end integration of shell B over the real pipeline: the bundled document loads, the
@@ -233,5 +236,55 @@ describe('the Caldera seed (the live LBO demo branch)', () => {
     bindings.setParam('exit_multiple', 9);
     await recomputed;
     expect(bindings.resolve('model.sponsor_irr').value as number).toBeGreaterThan(before);
+  });
+});
+
+describe('Flow over the real producer (worksheet cells → two bound tables)', () => {
+  const SHEET = `import { cell } from "@reckoner/stdlib";
+
+export const n = cell({
+  doc: "factory stations",
+  formula: () => [
+    { id: "draft", label: "Drafting", x: 0, y: 0, tone: "agent" },
+    { id: "review", label: "Review gate", x: 240, y: 0, shape: "diamond", tone: "ci" },
+    { id: "merge", label: "Merge", x: 480, y: 0, shape: "pill", tone: "owner" },
+  ],
+});
+
+export const e = cell({
+  doc: "buffers between stations",
+  formula: () => [
+    { from: "draft", to: "review", label: "awaiting review", value: 3, buffer: true, alert: true },
+    { from: "review", to: "merge", label: "green", value: "1" },
+  ],
+});
+`;
+
+  const seed: SeedDocument = {
+    root: 'doc',
+    files: {
+      'doc/reckoner.json': JSON.stringify({
+        format: 1,
+        compat: { stdlib: '>=0.1.0', catalog: '>=0.1.0' },
+        worksheets: ['w'],
+        params: {},
+        title: 'Flow harness',
+      }),
+      'doc/worksheets/w.sheet.js': SHEET,
+      'doc/templates/weekly.mdx': '# Factory.\n\n<Flow nodes="w.n" edges="w.e" />\n',
+    },
+  };
+
+  it('validates clean and draws the stations and annotations', async () => {
+    const session = await buildReportSession(inMemoryTransport(), seed);
+    expect(session.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    const html = renderToStaticMarkup(createElement(ReportView, { nodes: session.nodes, bindings: sessionBindings(session, () => {}) }));
+    expect(html).not.toContain('rk-broken');
+    expect(html).toContain('>Drafting<');
+    expect(html).toContain('>Review gate<');
+    expect(html).toContain('>Merge<');
+    expect(html).toContain('>awaiting review<');
+    expect(html).toContain('rk-flow-buffer');
+    expect(html).toContain('rk-flow-alert');
   });
 });

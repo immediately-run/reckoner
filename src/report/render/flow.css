@@ -1,0 +1,96 @@
+/* Flow — the data-positioned node/edge diagram (§3.3). Colors come from the design-system
+   tokens (src/index.css) where they exist; the two hues the token set lacks (owner amber, ci
+   green) and the danger red reuse the literal values report.css already uses for
+   Callout warning/success and the negative KPI delta, with darker light-theme variants so
+   every tone reads on both canvases. */
+
+.rk-flow {
+  --flow-agent: var(--accent, #f49ad4);
+  --flow-operator: var(--accent-2, #b285f2);
+  --flow-owner: #ffce6b;
+  --flow-ci: #6bd6a3;
+  --flow-neutral: var(--ink-3, #6a677f);
+  --flow-danger: #ff8f8f;
+  margin: 0;
+}
+
+html[data-theme='light'] .rk-flow {
+  --flow-owner: #a4690a;
+  --flow-ci: #1f8a5b;
+  --flow-danger: #c8323c;
+}
+
+/* Narrow screens scroll the diagram sideways rather than shrinking text to illegibility
+   (§3.3.1): the svg fills its tile up to its natural width and stops shrinking at
+   --rk-flow-min, set per diagram. The page layout never widens. */
+.rk-flow-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.rk-flow-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: var(--rk-flow-w, 100%);
+  min-width: var(--rk-flow-min, 0);
+}
+
+.rk-flow-tone-agent { --flow-tone: var(--flow-agent); }
+.rk-flow-tone-operator { --flow-tone: var(--flow-operator); }
+.rk-flow-tone-owner { --flow-tone: var(--flow-owner); }
+.rk-flow-tone-ci { --flow-tone: var(--flow-ci); }
+.rk-flow-tone-neutral { --flow-tone: var(--flow-neutral); }
+
+/* Nodes */
+.rk-flow-node-shape {
+  fill: color-mix(in oklab, var(--flow-tone) 12%, var(--panel, #13141d));
+  stroke: var(--flow-tone);
+  stroke-width: 1.25;
+}
+.rk-flow-node-label {
+  fill: var(--ink, #ecebf4);
+  font-family: var(--sans, system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+}
+.rk-flow-node-sub {
+  fill: var(--ink-2, #9b97b3);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 10.5px;
+}
+
+/* Edges */
+.rk-flow-edge {
+  fill: none;
+  stroke: var(--flow-tone);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.rk-flow-dashed { stroke-dasharray: 5 4; }
+.rk-flow-arrow { fill: var(--flow-tone); }
+
+/* Annotations */
+.rk-flow-buffer {
+  fill: color-mix(in oklab, var(--flow-tone) 22%, var(--panel, #13141d));
+  stroke: var(--flow-tone);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+}
+.rk-flow-anno-label {
+  fill: var(--ink-2, #9b97b3);
+  font-family: var(--sans, system-ui, sans-serif);
+  font-size: 11.5px;
+  paint-order: stroke;
+  stroke: var(--panel, #13141d);
+  stroke-width: 3px;
+}
+.rk-flow-anno-value {
+  fill: var(--ink, #ecebf4);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  paint-order: stroke;
+  stroke: var(--panel, #13141d);
+  stroke-width: 3px;
+}
+.rk-flow-alert .rk-flow-anno-value { fill: var(--flow-danger); font-weight: 700; }
+.rk-flow-alert .rk-flow-buffer { stroke: var(--flow-danger); stroke-width: 2; }

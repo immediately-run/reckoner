@@ -102,6 +102,9 @@ const COMPONENTS: ComponentSchema[] = [
     // parentheses (the accounting convention).
   },
   MAP,
+  // Flow (§3.3): a data-positioned node/edge diagram — every node carries its own x/y and
+  // every edge its own waypoints; no auto-layout. Row contracts live in render/flowGeometry.ts.
+  { name: 'Flow', attributes: [source('nodes'), source('edges'), { name: 'title', type: 'string' }] },
   { name: 'Facets', container: true, childRule: 'single-chart', attributes: [source('source'), field('by', true)] },
   { name: 'Callout', container: true, attributes: [{ name: 'tone', type: 'enum', values: ['info', 'success', 'warning', 'danger'] }] },
   { name: 'Value', attributes: [source('source')] },

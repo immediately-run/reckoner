@@ -9,6 +9,7 @@ describe('component catalog', () => {
         'Chart',
         'Table',
         'Map',
+        'Flow',
         'Facets',
         'Callout',
         'Value',
