@@ -13,14 +13,13 @@ import { useRenderNodes } from '../renderContext.ts';
 import { attrString } from '../attrs.ts';
 import { asBoolean } from '../shape.ts';
 import BrokenTile from './BrokenTile.tsx';
+import BrokenBoundTile from './BrokenBoundTile.tsx';
 
 export default function ShowWhen({ node }: { node: ComponentNode }) {
   const bound = useSource(attrString(node, 'source'));
   const renderNodes = useRenderNodes();
 
-  if (bound.status !== 'ok') {
-    return <BrokenTile component="ShowWhen" reason={bound.message ?? 'unavailable'} variant={bound.status === 'missing' ? 'needs-access' : 'error'} />;
-  }
+  if (bound.status !== 'ok') return <BrokenBoundTile component="ShowWhen" bound={bound} />;
   const flag = asBoolean(bound.value);
   if (!flag.ok) return <BrokenTile component="ShowWhen" reason={flag.reason} />;
   return flag.data ? <>{renderNodes(node.children)}</> : null;
