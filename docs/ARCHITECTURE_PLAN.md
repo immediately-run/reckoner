@@ -612,6 +612,20 @@ thickness or color-scale encoding and no pie-like or decorative marks. The annot
 are spelled out in the SVG's accessible label, and a diagram wider than its container
 scrolls horizontally rather than shrinking its text. Geometry: `src/report/render/flowGeometry.ts`.
 
+Plus: `ShowWhen` — conditional render **by data** (`source`): the children render only when
+the bound cell is exactly `true`, and nothing at all when it is `false`. One attribute, one
+test — there are no operators, no `equals`/`gt`, no negation, and no `else` slot: the
+template never computes (§3.3.1 "never an expression"), so the worksheet owns the condition
+as a named, testable cell and the template only names it; a template that needs "else"
+binds a second cell. Truthiness (`1`, `"yes"`, a non-empty row list) is refused by the
+`asBoolean` shape guard — a cell that starts returning a count would silently flip the
+render — and a binding that cannot answer is loud, reusing the broken tile: `missing`
+renders the needs-access tile, `error` the broken tile, because an alarm hidden by a
+broken cell is the worst silent failure this component could add. No catalog version bump
+and no compat wiring: `resolveCompat` has no caller today, and a Reckoner that lacks
+`ShowWhen` already renders it as the unknown-component placeholder
+(`DOCUMENT_VERSIONING_SPEC` §2), which is the specified degradation.
+
 **Excluded by construction** (anti-affordances the catalog makes inexpressible): 3D
 anything, dual-axis by default, pies beyond 5 slices, radial/gauge beyond the one KPI
 gauge, word clouds. Every future addition passes an anti-affordance review.

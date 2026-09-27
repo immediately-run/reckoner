@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asScalar, asNumber, asRows, numericField, labelField } from './shape.ts';
+import { asScalar, asNumber, asBoolean, asRows, numericField, labelField } from './shape.ts';
 
 describe('shape guards', () => {
   it('asScalar accepts scalars, rejects tables/objects', () => {
@@ -13,6 +13,16 @@ describe('shape guards', () => {
     expect(asNumber(3)).toEqual({ ok: true, data: 3 });
     expect(asNumber(null).ok).toBe(false);
     expect(asNumber('7').ok).toBe(false);
+  });
+
+  it('asBoolean requires exactly true or false, never truthiness', () => {
+    expect(asBoolean(true)).toEqual({ ok: true, data: true });
+    expect(asBoolean(false)).toEqual({ ok: true, data: false });
+    expect(asBoolean(1)).toEqual({ ok: false, reason: 'expected true or false, got a number' });
+    expect(asBoolean('true')).toEqual({ ok: false, reason: 'expected true or false, got text' });
+    expect(asBoolean(null)).toEqual({ ok: false, reason: 'expected true or false, got no value' });
+    expect(asBoolean([])).toEqual({ ok: false, reason: 'expected true or false, got a table' });
+    expect(asBoolean({})).toEqual({ ok: false, reason: 'expected true or false, got an object' });
   });
 
   it('asRows requires an array of object rows', () => {

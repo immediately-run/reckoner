@@ -116,6 +116,9 @@ const COMPONENTS: ComponentSchema[] = [
   { name: 'Row', container: true, attributes: [] },
   { name: 'ShowAbove', container: true, attributes: SHOW_ATTRS },
   { name: 'ShowBelow', container: true, attributes: SHOW_ATTRS },
+  // ShowWhen (§3.3): conditional render by data — children render only when the bound cell is
+  // exactly `true`. One attribute, one test; no operators, no else slot, no truthiness.
+  { name: 'ShowWhen', container: true, attributes: [source('source')] },
   { name: 'Params', container: true, childRule: 'widgets', attributes: [] },
   { name: 'Select', attributes: [{ name: 'name', type: 'string', required: true }, { name: 'options', type: 'literal-array', required: true }, { name: 'default', type: 'string' }] },
   { name: 'Toggle', attributes: [{ name: 'name', type: 'string', required: true }, { name: 'default', type: 'boolean' }] },

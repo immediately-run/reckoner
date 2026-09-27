@@ -288,3 +288,43 @@ export const e = cell({
     expect(html).toContain('rk-flow-alert');
   });
 });
+
+describe('ShowWhen over the real producer (engine booleans → conditional subtrees)', () => {
+  const SHEET = `import { cell } from "@reckoner/stdlib";
+
+export const flag = cell({
+  doc: "on",
+  formula: () => true,
+});
+
+export const off = cell({
+  doc: "off",
+  formula: () => false,
+});
+`;
+
+  const seed: SeedDocument = {
+    root: 'doc',
+    files: {
+      'doc/reckoner.json': JSON.stringify({
+        format: 1,
+        compat: { stdlib: '>=0.1.0', catalog: '>=0.1.0' },
+        worksheets: ['w'],
+        params: {},
+        title: 'ShowWhen harness',
+      }),
+      'doc/worksheets/w.sheet.js': SHEET,
+      'doc/templates/weekly.mdx':
+        '# Alarm.\n\n<ShowWhen source="w.flag"><Callout tone="danger">Over bound.</Callout></ShowWhen>\n\n<ShowWhen source="w.off"><Callout tone="danger">Never shown.</Callout></ShowWhen>\n',
+    },
+  };
+
+  it("renders only the true cell's subtree, with no error diagnostics — the engine, not a literal, produces the boolean", async () => {
+    const session = await buildReportSession(inMemoryTransport(), seed);
+    expect(session.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    const html = renderToStaticMarkup(createElement(ReportView, { nodes: session.nodes, bindings: sessionBindings(session, () => {}) }));
+    expect(html).toContain('Over bound.');
+    expect(html).not.toContain('Never shown.');
+    expect(html).not.toContain('rk-broken');
+  });
+});

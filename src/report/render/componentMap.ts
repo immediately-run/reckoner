@@ -18,6 +18,7 @@ import Section from './components/Section.tsx';
 import Row from './components/Row.tsx';
 import ShowAbove from './components/ShowAbove.tsx';
 import ShowBelow from './components/ShowBelow.tsx';
+import ShowWhen from './components/ShowWhen.tsx';
 import Params from './components/Params.tsx';
 import FormulaIndex from './components/FormulaIndex.tsx';
 import TestIndex from './components/TestIndex.tsx';
@@ -44,6 +45,7 @@ export const componentMap: Record<string, NodeComponent> = {
   Row,
   ShowAbove,
   ShowBelow,
+  ShowWhen,
   Params,
   FormulaIndex,
   TestIndex,
