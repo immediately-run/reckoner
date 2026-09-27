@@ -1,5 +1,7 @@
-// Child-rendering context. Container components (Section, Row, Callout, Params, Facets,
-// ShowAbove, ShowBelow, ShowWhen) render their `node.children` by calling back into the single recursive dispatcher
+// Child-rendering context. Container components (Section, Row, Callout, Params, ShowAbove,
+// ShowBelow, ShowWhen — Facets is the one catalog container that does not: it renders its
+// wrapped Chart directly through ChartFigure, bypassing the dispatcher) render their
+// `node.children` by calling back into the single recursive dispatcher
 // (Renderer.tsx) through this context — rather than importing the dispatcher directly, which
 // would make the module graph cyclic (dispatcher → componentMap → container → dispatcher).
 // Component-free so the Fast-Refresh rule holds in the component files.
