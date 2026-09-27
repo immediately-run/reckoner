@@ -99,6 +99,12 @@ describe('validateTemplate — structural rules', () => {
     const v = validateTemplate([component('Chart', { source: 'a.b', kind: 'pie', value: 'amount' })]);
     expect(v.diagnostics.some((d) => /missing required attribute "label"/.test(d.message))).toBe(true);
   });
+
+  it('ShowWhen needs a source; a wildcard source is an error; a sourced one with children is clean', () => {
+    expect(validateTemplate([component('ShowWhen', {}, [])]).diagnostics.some((d) => /missing required attribute "source"/.test(d.message))).toBe(true);
+    expect(validateTemplate([component('ShowWhen', { source: 'a.*' }, [])]).diagnostics.some((d) => /wildcard/.test(d.message))).toBe(true);
+    expect(validateTemplate([component('ShowWhen', { source: 'a.b' }, [component('Value', { source: 'a.b' })])]).diagnostics).toEqual([]);
+  });
 });
 
 describe('validateTemplate — Flow (two source attributes)', () => {

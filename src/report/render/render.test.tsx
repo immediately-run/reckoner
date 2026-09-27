@@ -219,3 +219,50 @@ describe('Flow', () => {
     expect(html).toContain('data-source="process.n"');
   });
 });
+
+describe('ShowWhen', () => {
+  const tpl = '<ShowWhen source="process.flag"><Callout tone="danger">Over bound.</Callout></ShowWhen>';
+
+  it('renders the children when the bound cell is exactly true', () => {
+    const html = render(tpl, { 'process.flag': ok(true) });
+    expect(html).toContain('data-tone="danger"');
+    expect(html).toContain('Over bound.');
+    expect(html).not.toContain('rk-broken');
+  });
+
+  it('renders nothing when the cell is false — no prose, no broken tile', () => {
+    const html = render(tpl, { 'process.flag': ok(false) });
+    expect(html).not.toContain('Over bound.');
+    expect(html).not.toContain('rk-broken');
+  });
+
+  it('a missing binding renders the needs-access tile', () => {
+    const html = render(tpl, {});
+    expect(html).toContain('rk-broken');
+    expect(html).toContain('Needs data access');
+    expect(html).not.toContain('Over bound.');
+  });
+
+  it('an errored binding renders the broken tile with its message', () => {
+    const html = render(tpl, { 'process.flag': { value: null, tier: 'static', status: 'error', message: 'flag threw in the engine' } });
+    expect(html).toContain('rk-broken');
+    expect(html).toContain('flag threw in the engine');
+    expect(html).not.toContain('Over bound.');
+  });
+
+  it('refuses truthiness: 1, "true" and a row list each render a broken tile saying true or false', () => {
+    for (const v of [1, 'true', [{ a: 1 }]] as Value[]) {
+      const html = render(tpl, { 'process.flag': ok(v) });
+      expect(html).toContain('rk-broken');
+      expect(html).toContain('true or false');
+      expect(html).not.toContain('Over bound.');
+    }
+  });
+
+  it('adds no wrapper element inside a Row — the child is a direct child of the row container', () => {
+    const html = render('<Row><ShowWhen source="process.flag"><Callout tone="danger">Over bound.</Callout></ShowWhen></Row>', {
+      'process.flag': ok(true),
+    });
+    expect(html).toMatch(/<div class="rk-row"><div class="rk-callout"/);
+  });
+});

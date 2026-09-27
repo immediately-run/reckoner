@@ -22,6 +22,15 @@ export function asNumber(v: Value): ShapeResult<number> {
   return { ok: false, reason: 'expected a number' };
 }
 
+/** Require a boolean scalar (ShowWhen). Truthiness is refused: a cell that starts returning a count would silently flip the render. */
+export function asBoolean(v: Value): ShapeResult<boolean> {
+  if (v === true || v === false) return { ok: true, data: v };
+  if (v === null) return { ok: false, reason: 'expected true or false, got no value' };
+  if (typeof v === 'number') return { ok: false, reason: 'expected true or false, got a number' };
+  if (typeof v === 'string') return { ok: false, reason: 'expected true or false, got text' };
+  return { ok: false, reason: Array.isArray(v) ? 'expected true or false, got a table' : 'expected true or false, got an object' };
+}
+
 /** Require a table (an array of plain-object rows) for Chart / Table / Facets / Map. */
 export function asRows(v: Value): ShapeResult<Row[]> {
   if (!Array.isArray(v)) return { ok: false, reason: 'expected a table of rows' };

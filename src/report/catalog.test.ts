@@ -18,6 +18,7 @@ describe('component catalog', () => {
         'Row',
         'ShowAbove',
         'ShowBelow',
+        'ShowWhen',
         'Params',
         'Select',
         'Toggle',
