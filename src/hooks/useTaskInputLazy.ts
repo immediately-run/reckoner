@@ -5,21 +5,24 @@
 // forever — the same discipline `useEditFile` applies to `invokeTask`.
 //
 // The SDK exports no change-subscription for task input other than its own
-// `useTaskInput` hook (static-import-only), and the host's delivery is a bounded
-// re-send ladder (R3-754's site-main leg: the one-shot `task-input` wire message
-// races the callee's boot, so the host re-sends on the compile edges and again at
-// +1s/+4s). A short bounded poll — first read immediately, then 500ms until the
-// input arrives or 30s pass — is the lazy-safe equivalent of the subscription:
-// it settles within the ladder's window and then stops forever. Off-host (plain
-// `vite dev`, vitest) the dynamic import is safe (SDK R3-421) and the input stays
-// null; the poll expires silently.
+// `useTaskInput` hook (static-import-only), and the host's delivery is a re-send
+// gate (R3-550's `taskInputGate`, which this PR's site-main leg rides after the
+// 2026-09-29 rebase — its own 1s/4s ladder was dropped in favour of the later
+// reviewed fix for the same race): the one-shot `task-input` wire message races
+// the callee's boot, so the host re-sends on the compile edges and once more on
+// the first wire request after `success`. A short bounded poll — first read
+// immediately, then 500ms until the input arrives or 30s pass — is the lazy-safe
+// equivalent of the subscription: it settles past the gate's window and then
+// stops forever. Off-host (plain `vite dev`, vitest) the dynamic import is safe
+// (SDK R3-421) and the input stays null; the poll expires silently.
 
 import { useEffect, useState } from 'react';
 import type { TaskInput } from '@immediately-run/sdk/tasks';
 import { isNoHostTransport } from '../app/sdkTransportError.ts';
 
 const POLL_INTERVAL_MS = 500;
-const POLL_MAX_TRIES = 60; // 30s — well past the host's 4s re-send ladder.
+const POLL_MAX_TRIES = 60; // 30s — comfortably past the host's delivery gate (compile-edge
+// re-sends plus the first post-`success` request), without polling for the frame's life.
 
 export function useTaskInputLazy(): TaskInput | null {
   const [input, setInput] = useState<TaskInput | null>(null);
