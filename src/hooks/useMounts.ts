@@ -3,13 +3,17 @@
 // also be announced a beat after boot — so this observes `onMountsChange`. Honest
 // trigger story (review round 4, correcting a false latch claim): there IS no latch —
 // every `onMountsChange` hands a fresh array and the consumer's effect rebuilds on
-// identity; the rebuild's cheapness is what makes that safe, and the resolution
-// REFUSES two content mounts rather than latching one (dispatch.ts).
+// identity (a rebuild is a FULL cold session rebuild — it discards in-session param
+// writes and spins a fresh engine worker; observed rarely enough in practice that no
+// one has measured it, which is not the same as cheap), and the resolution REFUSES
+// two content mounts rather than latching one (dispatch.ts).
 
 import { useEffect, useState } from 'react';
-// The per-module subpath, deliberately: the SDK root pulls in `tasks.ts`, which
-// registers a host listener at module load and throws in plain vite dev (no host
-// transport). `mounts` is documented side-effect-clean for exactly this reason.
+// The per-module subpath, deliberately: the SDK root pulls in `tasks.ts`, whose
+// load-time listener is the side effect the §4.1/DN-R5 discipline keeps behind
+// dynamic imports. (Accuracy, review round 5: since SDK R3-421 / ≥0.57.3 the
+// listener's registration is try/catch-wrapped, so the load no longer THROWS
+// off-host — the discipline stands on the side-effect, not on the throw.)
 import { getMounts, onMountsChange } from '@immediately-run/sdk/mounts';
 import type { SandboxMount } from '@immediately-run/sdk/mounts';
 

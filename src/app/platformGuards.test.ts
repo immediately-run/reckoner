@@ -56,11 +56,13 @@ describe('the immediately.run compatibility guards', () => {
         if (/@immediately-run\/sdk(\/tasks)?['"]$/.test(stmt.trim())) offenders.push(relFromSrc);
       }
     }
-    // Rationale: `@immediately-run/sdk/tasks` calls addListener('task-input', …) at module
-    // load, which throws with no host transport — a white screen in plain `vite dev` and in
-    // any host-less render. The delegation must reach it via `await import()` inside its
-    // handler (the pattern makeTransport already uses for workerUrl). `mounts` is
-    // side-effect-clean and is imported normally in useMounts.ts.
+    // Rationale: `@immediately-run/sdk/tasks` registers a host listener at module
+    // load — the side effect the §4.1/DN-R5 discipline keeps behind `await import()`
+    // inside the handler (the pattern makeTransport already uses for workerUrl).
+    // (Accuracy, review round 5: since SDK R3-421 / ≥0.57.3 the registration is
+    // try/catch-wrapped and no longer throws off-host; pre-R3-421 it white-screened
+    // plain `vite dev`, which is the history the discipline was written against.)
+    // `mounts` is side-effect-clean and is imported normally in useMounts.ts.
     expect(offenders).toEqual([]);
   });
 });

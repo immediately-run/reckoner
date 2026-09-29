@@ -7,7 +7,8 @@
 // The SDK exports no change-subscription for task input other than its own
 // `useTaskInput` hook (static-import-only), and the host's delivery is TWO
 // complementary re-send mitigations for the one-shot `task-input` wire message
-// racing the callee's boot: R3-550's `taskInputGate` (re-send on the first wire
+// racing the callee's boot, BOTH living in the host leg (site-main#589's
+// SandboxListener): R3-550's `taskInputGate` (re-send on the first wire
 // request after `success` — for callees that make one) and the bounded 1s/4s
 // ladder past the compile edges (for callees, like this one, whose boot
 // issues no post-`success` wire request at all — mounts read the injected local
