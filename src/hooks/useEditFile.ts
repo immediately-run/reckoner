@@ -26,6 +26,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { SandboxMount } from '@immediately-run/sdk';
 import { validDocumentRelPath } from '../app/documentPaths.ts';
+import { isNoHostTransport } from '../app/sdkTransportError.ts';
 
 /** The plain refusal copy — one line, no code, no `EROFS` prose, no stack (§4.2). */
 const REFUSED_MESSAGE = 'This document can’t be edited here.';
@@ -62,11 +63,12 @@ export function useEditFile(mount: SandboxMount | null): EditFilePort {
   const mountState = mount !== null ? `${mount.id ?? mount.path}|${mount.mode ?? ''}` : null;
   const latchActive = latchedFor !== null && latchedFor === mountState;
   // The door needs BOTH the positive `rw` check AND an addressable mount: the
-  // descriptor's `id` is the universal `scheme:locator` form (established live,
-  // R3-447), and the host's grant lookup is an EXACT match on it — there is no
-  // documented fallback, so a mount without an id is not a door rather than a
-  // doomed call (fail-closed, belt and braces against a shape the live contract
-  // has not produced).
+  // descriptor's `id` is what the host's grant lookup matches EXACTLY — the
+  // universal `scheme:locator` form on the repo-load shape (established live,
+  // R3-447), the chroot path on the task-invocation shape (R3-754, probed live)
+  // — and there is no documented fallback either way, so a mount without an id
+  // is not a door rather than a doomed call (fail-closed, belt and braces
+  // against a shape the live contract has not produced).
   const writable = mount !== null && mount.id !== undefined && mount.mode === 'rw' && !latchActive;
 
   const canEditPath = useCallback(
@@ -84,9 +86,9 @@ export function useEditFile(mount: SandboxMount | null): EditFilePort {
         try {
           // §4.1/DN-R5 — the lazy import, inside the handler, never at module load.
           const { invokeTask, capFile } = await import('@immediately-run/sdk/tasks');
-          // The host contract (R3-447, established live): the mount's `id` IS the
-          // universal `scheme:locator` form, and the host's grant lookup matches it
-          // exactly — the descriptor's id, verbatim.
+          // The host contract (R3-447 + R3-754, both established live): the mount's
+          // `id` is the address — universal `scheme:locator` on repo-load, the chroot
+          // path on the task shape — and the host's grant lookup matches it exactly.
           const result = await invokeTask<{ saved?: boolean }>('edit-file', {
             file: capFile({ mountId: mount.id!, relPath }, { mode: 'rw' }),
           });
@@ -106,7 +108,7 @@ export function useEditFile(mount: SandboxMount | null): EditFilePort {
           } else if (err?.code === 'forbidden') {
             setNotice(REFUSED_MESSAGE);
             setLatchedFor(`${mount.id ?? mount.path}|${mount.mode ?? ''}`);
-          } else if (typeof err?.message === 'string' && /no host transport/i.test(err.message)) {
+          } else if (isNoHostTransport(err)) {
             setNotice(null); // host-less (plain vite dev) — a no-op (§4.1)
           } else {
             setNotice(`Couldn’t open the editor${err?.code !== undefined ? ` (${err.code})` : ''}.`);

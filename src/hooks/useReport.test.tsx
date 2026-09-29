@@ -14,6 +14,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { useReport, type ReportState } from './useReport.ts';
 import { MERIDIAN_SEED, CALDERA_SEED, type SeedDocument } from '../seed/seeds.ts';
 import type { ReportSession } from '../app/reportSession.ts';
+import type { SandboxMount } from '@immediately-run/sdk';
+import type { TaskInput } from '@immediately-run/sdk/tasks';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -70,5 +72,65 @@ describe('useReport — reload (§4.4)', () => {
     mountHook(CALDERA_SEED);
     await act(async () => {});
     expect(FeedRuntime).not.toHaveBeenCalled();
+  });
+});
+
+// The R3-754 handoff: the task input must ride through the hook into the session
+// builder, and its arrival (the host's re-send ladder lands it AFTER the delegation
+// mount) must trigger the rebuild. Both cases render a STABLE component identity so
+// a re-render is a re-render, not a remount — the second build has to come from the
+// deps/dispatch-key flip, not from a fresh hook.
+//
+// (Rebase note, 2026-09-29: the PR's third case — "the resolved task shape keeps the
+// demo feed off the mounted workbook" — is dropped here as subsumed: R3-768 removed
+// the feed runtimes wholesale, and the guardrail above asserts no FeedRuntime is EVER
+// constructed. Review round 3 then found the dispatchKey memo itself redundant — its
+// only post-R3-768 consumer was the effect deps array that already holds the memo's
+// inputs — and it was deleted (mutation-tested behaviour-identical), so the property
+// the third case pinned no longer exists to test. The handoff tests below pin what
+// remains: the input rides into the session builder, and its late arrival rebuilds.)
+const TASK_DIR = '/task/task-1/dir';
+const taskMounts = [
+  { id: TASK_DIR, path: TASK_DIR, type: 'task-delegation', mode: 'ro' },
+] as unknown as SandboxMount[];
+const taskInput = { task: 'open-workbook', params: { dir: TASK_DIR } } as TaskInput;
+
+function Probe(props: { s: SeedDocument; m: readonly SandboxMount[]; t: TaskInput | null }): null {
+  useReport(props.s, props.m, props.t);
+  return null;
+}
+
+describe('useReport — the task-input handoff (R3-754)', () => {
+  it('the input rides into buildReportSession as the 4th argument — dropping it there fails here', async () => {
+    buildReportSession.mockClear();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root: Root = createRoot(container);
+    act(() => {
+      root.render(createElement(Probe, { s: MERIDIAN_SEED, m: taskMounts, t: taskInput }));
+    });
+    await act(async () => {});
+    expect(buildReportSession).toHaveBeenCalledTimes(1);
+    expect(buildReportSession.mock.calls[0]).toEqual([undefined, MERIDIAN_SEED, taskMounts, taskInput]);
+    act(() => root.unmount());
+  });
+
+  it('the input arriving AFTER the first build rebuilds once more, carrying it', async () => {
+    buildReportSession.mockClear();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root: Root = createRoot(container);
+    act(() => {
+      root.render(createElement(Probe, { s: MERIDIAN_SEED, m: taskMounts, t: null }));
+    });
+    await act(async () => {});
+    expect(buildReportSession).toHaveBeenCalledTimes(1);
+    act(() => {
+      root.render(createElement(Probe, { s: MERIDIAN_SEED, m: taskMounts, t: taskInput }));
+    });
+    await act(async () => {});
+    expect(buildReportSession).toHaveBeenCalledTimes(2);
+    expect(buildReportSession.mock.calls[1]).toEqual([undefined, MERIDIAN_SEED, taskMounts, taskInput]);
+    act(() => root.unmount());
   });
 });

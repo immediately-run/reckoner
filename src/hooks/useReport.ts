@@ -9,8 +9,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildReportSession, sessionBindings } from '../app/reportSession.ts';
 import type { ReportSession, SeedDocument } from '../app/reportSession.ts';
 import type { SandboxMount } from '@immediately-run/sdk';
+import type { TaskInput } from '@immediately-run/sdk/tasks';
 import type { Bindings } from '../report/render/bindings.ts';
-import { resolveWorkbookMount } from '../app/dispatch.ts';
 
 export type ReportState =
   | { status: 'loading' }
@@ -25,7 +25,11 @@ export interface ReportReload {
   reload: () => void;
 }
 
-export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = []): ReportState & ReportReload {
+export function useReport(
+  seed: SeedDocument,
+  mounts: readonly SandboxMount[] = [],
+  taskInput?: TaskInput | null,
+): ReportState & ReportReload {
   const [session, setSession] = useState<ReportSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -35,17 +39,16 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
   const [reloadToken, setReloadToken] = useState(0);
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
-  // The resolution the current mount set implies ('' when not dispatched) — the effect
-  // key that rebuilds the session ONLY when the workbook appears/changes, never on an
-  // unrelated mount update mid-document.
-  const dispatchKey = useMemo(() => {
-    const r = resolveWorkbookMount(mounts);
-    return r.ok ? r.root : '';
-  }, [mounts]);
-
+  // Honest trigger story: the effect re-runs on ANY dep identity change — `mounts` is
+  // a fresh array on every host mount event (useMounts copies the set), and `taskInput`
+  // lands AFTER the delegation mount (the host's `task-input` delivery re-sends past
+  // the callee's boot, site-main R3-754), so the input's arrival itself flips a dep and
+  // triggers the rebuild that carries it. (There was a derived `dispatchKey` memo here
+  // until the R3-768 rebase: post-R3-768 its only consumer was this deps array, which
+  // already holds the memo's own inputs — mutation-tested redundant, review round 3.)
   useEffect(() => {
     let alive = true;
-    buildReportSession(undefined, seed, mounts)
+    buildReportSession(undefined, seed, mounts, taskInput)
       .then((s) => {
         if (alive) setSession(s);
       })
@@ -55,7 +58,7 @@ export function useReport(seed: SeedDocument, mounts: readonly SandboxMount[] = 
     return () => {
       alive = false;
     };
-  }, [seed, mounts, dispatchKey, reloadToken]);
+  }, [seed, mounts, taskInput, reloadToken]);
 
   const bindings = useMemo(
     () => (session === null ? null : sessionBindings(session, () => setTick((t) => t + 1))),

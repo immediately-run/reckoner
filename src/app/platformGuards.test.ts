@@ -56,11 +56,13 @@ describe('the immediately.run compatibility guards', () => {
         if (/@immediately-run\/sdk(\/tasks)?['"]$/.test(stmt.trim())) offenders.push(relFromSrc);
       }
     }
-    // Rationale: `@immediately-run/sdk/tasks` calls addListener('task-input', …) at module
-    // load, which throws with no host transport — a white screen in plain `vite dev` and in
-    // any host-less render. The delegation must reach it via `await import()` inside its
-    // handler (the pattern makeTransport already uses for workerUrl). `mounts` is
-    // side-effect-clean and is imported normally in useMounts.ts.
+    // Rationale: `@immediately-run/sdk/tasks` registers a host listener at module
+    // load — the side effect the §4.1/DN-R5 discipline keeps behind `await import()`
+    // inside the handler (the pattern makeTransport already uses for workerUrl).
+    // (Accuracy, review round 5: since SDK R3-421 / ≥0.57.3 the registration is
+    // try/catch-wrapped and no longer throws off-host; pre-R3-421 it white-screened
+    // plain `vite dev`, which is the history the discipline was written against.)
+    // `mounts` is side-effect-clean and is imported normally in useMounts.ts.
     expect(offenders).toEqual([]);
   });
 });
@@ -77,5 +79,23 @@ describe('the manifest declares what it invokes (DOCUMENT_NAVIGATOR_SPEC G-DN-B1
     const invokes = pkg['immediately.run']?.invokes ?? [];
     const editFile = invokes.find((i) => i.task === 'edit-file');
     expect(editFile).toMatchObject({ task: 'edit-file', version: '1.0' });
+  });
+
+  // R3-754: `requests.net:fetch.required:false` is load-bearing the same way — the
+  // host's M2 admission computes the REQUIRED-request delta against the binding's
+  // snapshot and refuses the task invoke (consent-required, no overlay) when a
+  // required request is missing from it; this app renders workbooks without
+  // fetching. No test read the `requests` block before, so flipping the flag back
+  // re-broke every task invoke with the suite green — the exact ships-dark failure
+  // mode DN-R6 records, on the admission leg instead of the invokes leg.
+  // (2026-09-29, rebase onto R3-768: the egress was REMOVED wholesale — the report
+  // view fetches nothing — so the block is gone rather than flagged. The invariant
+  // that matters to admission is "no REQUIRED net:fetch": absent or explicitly
+  // non-required both satisfy it; `required: true` fails here.)
+  it('package.json declares no REQUIRED net:fetch (the M2 admission leg, R3-754/R3-768)', () => {
+    const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as {
+      'immediately.run'?: { requests?: Record<string, { required?: boolean }> };
+    };
+    expect(pkg['immediately.run']?.requests?.['net:fetch']?.required ?? false).toBe(false);
   });
 });
