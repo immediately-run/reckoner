@@ -8,8 +8,8 @@
 // `useTaskInput` hook (static-import-only), and the host's delivery is TWO
 // complementary re-send mitigations for the one-shot `task-input` wire message
 // racing the callee's boot: R3-550's `taskInputGate` (re-send on the first wire
-// request after `success` — for callees that make one) and this PR's bounded
-// 1s/4s ladder past the compile edges (for callees, like this one, whose boot
+// request after `success` — for callees that make one) and the bounded 1s/4s
+// ladder past the compile edges (for callees, like this one, whose boot
 // issues no post-`success` wire request at all — mounts read the injected local
 // service, this poll is local, boot providers are receive-only). A short bounded
 // poll — first read immediately, then 500ms until the input arrives or 30s pass —
@@ -44,14 +44,18 @@ export function useTaskInputLazy(): TaskInput | null {
         })
         .catch((e: unknown) => {
           if (!alive) return;
-          // Off-host (plain `vite dev`, vitest) the module load itself throws the
-          // SDK's discriminated no-host-transport error — the benign case: the
-          // input stays null and the poll expires silently. Any OTHER rejection
-          // (an on-host module-eval failure, a half-torn-down frame) is a real
-          // fault in a dispatched task frame — surface it rather than let the
-          // frame render the demo document with no signal while the caller's
-          // overlay waits on a completeTask that never comes. The discrimination
-          // lives in ONE home (sdkTransportError.ts) shared with useEditFile §4.1.
+          // DEFENSIVE (review round 4): pre-R3-421 SDKs threw the discriminated
+          // no-host-transport error at module load off-host; since SDK R3-421
+          // (≥0.57.3) the load resolves and `getTaskInput()` returns null, so the
+          // benign off-host path is import-resolves/null and this branch is
+          // unreachable from the real producer today. It stays because a thrown
+          // no-host-transport remains the BENIGN shape should an older SDK or a
+          // torn-down frame produce one. Any OTHER rejection (an on-host
+          // module-eval failure, a half-torn-down frame) is a real fault in a
+          // dispatched task frame — surface it rather than let the frame render
+          // the demo document with no signal while the caller's overlay waits on
+          // a completeTask that never comes. The discrimination lives in ONE home
+          // (sdkTransportError.ts) shared with useEditFile §4.1.
           if (!isNoHostTransport(e)) console.warn('[reckoner] task-input read failed:', e);
         });
     };

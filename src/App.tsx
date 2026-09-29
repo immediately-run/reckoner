@@ -46,8 +46,10 @@ function App() {
   const report = useReport(seed, mounts, taskInput);
   // Part B (R3-447): the dispatched workbook's edit door. The mount the resolution
   // carries is the whole contract — writability by the positive `rw` check, and the
-  // `capFile` address from the descriptor's universal id. Absent (never disabled) in
-  // the seed flow and on any non-`rw` mount.
+  // `capFile` address from the descriptor's id — the universal `scheme:locator` form
+  // on the repo-load shape, the chroot path on the task-invocation shape (the two
+  // forms probed live; DOCUMENT_NAVIGATOR_STATUS.md). Absent (never disabled) in the
+  // seed flow and on any non-`rw` mount.
   const dispatch = resolveWorkbookMount(mounts, taskInput);
   const editFile = useEditFile(dispatch.ok ? dispatch.mount : null);
   const [reviewOpen, setReviewOpen] = useState(false);

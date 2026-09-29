@@ -93,7 +93,7 @@ describe('useTaskInputLazy', () => {
     expect(getTaskInput).toHaveBeenCalledTimes(atExpiry);
   });
 
-  it('the discriminated no-host-transport rejection is the SILENT case (plain `vite dev`, vitest)', async () => {
+  it('a thrown no-host-transport rejection is the SILENT case (defensive — post-R3-421 SDKs resolve null off-host instead)', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     getTaskInput.mockImplementation(() => {
       throw new Error('immediately.run: no host transport');

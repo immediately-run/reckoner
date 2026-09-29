@@ -102,7 +102,16 @@ of its own** (~~P6: task-delegation mounts are announced with no `mode`~~ — **
 2026-09-29 by the R3-754 probe below: the delegation mount announces `mode: 'ro'`**
 (the `min(caller grant, cap, contract)` stamp, site-main `mintDelegations.ts`), so the
 read-only rule IS implementable; P7: Reckoner has no fs watch, so the autosave safety argument
-has no consumer).
+has no consumer). R3-447's host spike therefore unblocks both surfaces, not just
+Part B — worth knowing before scoping it. The 2026-08-29 review also confirmed the
+seed-vs-mount wall applies to fixtures exactly as it does to worksheets: on the
+bundled-seed path there is no file to delegate, only a string in `src/seed/`.
+
+Spec §6 (`edit-table`, open-at-line, Delta B, click-to-insert, own-source editing) and
+§11 Q1–Q7 — including the two the review surfaced as real decisions rather than
+deferrals: whether the consumer-visible inspector carries an authoring door (Q6), and
+the template-file edit row without which "copy the snippet, open the template" has no
+door (Q7).
 
 ### The second dispatch shape's descriptor (R3-754, probed live 2026-09-29)
 
@@ -127,16 +136,7 @@ edit session's worktree): `panel.files`'s published port of the worktree is itse
 `ro`, so `min(…)` clamps to `ro` regardless of the session's writability. The edit
 door therefore stays dark on every dispatch-driven open — by design, pending R3-797 —
 and the URL/task dispatch shapes are recorded **view-only** (the owner's 2026-09-28
-decision (c) on R3-754). R3-447's host spike therefore unblocks both surfaces, not just Part B —
-worth knowing before scoping it. The review also confirmed the seed-vs-mount wall applies
-to fixtures exactly as it does to worksheets: on the bundled-seed path there is no file
-to delegate, only a string in `src/seed/`.
-
-Spec §6 (`edit-table`, open-at-line, Delta B, click-to-insert, own-source editing) and
-§11 Q1–Q7 — including the two the review surfaced as real decisions rather than
-deferrals: whether the consumer-visible inspector carries an authoring door (Q6), and
-the template-file edit row without which "copy the snippet, open the template" has no
-door (Q7).
+decision (c) on R3-754).
 
 ### The live gates (2026-09-22, the venue run against BOTH merged mains) — two pass, one is a FINDING
 
