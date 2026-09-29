@@ -84,8 +84,11 @@ describe('useReport — reload (§4.4)', () => {
 // (Rebase note, 2026-09-29: the PR's third case — "the resolved task shape keeps the
 // demo feed off the mounted workbook" — is dropped here as subsumed: R3-768 removed
 // the feed runtimes wholesale, and the guardrail above asserts no FeedRuntime is EVER
-// constructed. The dispatchKey-carries-taskInput property it existed to pin is covered
-// by the late-arrival case below.)
+// constructed. Review round 3 then found the dispatchKey memo itself redundant — its
+// only post-R3-768 consumer was the effect deps array that already holds the memo's
+// inputs — and it was deleted (mutation-tested behaviour-identical), so the property
+// the third case pinned no longer exists to test. The handoff tests below pin what
+// remains: the input rides into the session builder, and its late arrival rebuilds.)
 const TASK_DIR = '/task/task-1/dir';
 const taskMounts = [
   { id: TASK_DIR, path: TASK_DIR, type: 'task-delegation', mode: 'ro' },

@@ -11,7 +11,6 @@ import type { ReportSession, SeedDocument } from '../app/reportSession.ts';
 import type { SandboxMount } from '@immediately-run/sdk';
 import type { TaskInput } from '@immediately-run/sdk/tasks';
 import type { Bindings } from '../report/render/bindings.ts';
-import { resolveWorkbookMount } from '../app/dispatch.ts';
 
 export type ReportState =
   | { status: 'loading' }
@@ -40,19 +39,13 @@ export function useReport(
   const [reloadToken, setReloadToken] = useState(0);
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
-  // The resolution the current mount set + task input implies ('' when not dispatched).
-  // Honest trigger story: the effect below re-runs on ANY dep identity change, and
-  // `mounts` is a fresh array on every host mount event (useMounts copies the set), so
-  // an unrelated mount update does rebuild the session. dispatchKey is the SEMANTIC
-  // key — it changes only when the workbook appears/changes shape or root — and it
-  // carries the task input's arrival: the input lands AFTER the delegation mount (the
-  // host's `task-input` delivery is a bounded re-send ladder, site-main R3-754), so
-  // the arrival itself must flip the key and trigger the rebuild.
-  const dispatchKey = useMemo(() => {
-    const r = resolveWorkbookMount(mounts, taskInput);
-    return r.ok ? `${r.via}:${r.root}` : '';
-  }, [mounts, taskInput]);
-
+  // Honest trigger story: the effect re-runs on ANY dep identity change — `mounts` is
+  // a fresh array on every host mount event (useMounts copies the set), and `taskInput`
+  // lands AFTER the delegation mount (the host's `task-input` delivery re-sends past
+  // the callee's boot, site-main R3-754), so the input's arrival itself flips a dep and
+  // triggers the rebuild that carries it. (There was a derived `dispatchKey` memo here
+  // until the R3-768 rebase: post-R3-768 its only consumer was this deps array, which
+  // already holds the memo's own inputs — mutation-tested redundant, review round 3.)
   useEffect(() => {
     let alive = true;
     buildReportSession(undefined, seed, mounts, taskInput)
@@ -65,7 +58,7 @@ export function useReport(
     return () => {
       alive = false;
     };
-  }, [seed, mounts, taskInput, dispatchKey, reloadToken]);
+  }, [seed, mounts, taskInput, reloadToken]);
 
   const bindings = useMemo(
     () => (session === null ? null : sessionBindings(session, () => setTick((t) => t + 1))),
