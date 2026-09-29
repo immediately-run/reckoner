@@ -5,24 +5,27 @@
 // forever — the same discipline `useEditFile` applies to `invokeTask`.
 //
 // The SDK exports no change-subscription for task input other than its own
-// `useTaskInput` hook (static-import-only), and the host's delivery is a re-send
-// gate (R3-550's `taskInputGate`, which this PR's site-main leg rides after the
-// 2026-09-29 rebase — its own 1s/4s ladder was dropped in favour of the later
-// reviewed fix for the same race): the one-shot `task-input` wire message races
-// the callee's boot, so the host re-sends on the compile edges and once more on
-// the first wire request after `success`. A short bounded poll — first read
-// immediately, then 500ms until the input arrives or 30s pass — is the lazy-safe
-// equivalent of the subscription: it settles past the gate's window and then
-// stops forever. Off-host (plain `vite dev`, vitest) the dynamic import is safe
-// (SDK R3-421) and the input stays null; the poll expires silently.
+// `useTaskInput` hook (static-import-only), and the host's delivery is TWO
+// complementary re-send mitigations for the one-shot `task-input` wire message
+// racing the callee's boot: R3-550's `taskInputGate` (re-send on the first wire
+// request after `success` — for callees that make one) and this PR's bounded
+// 1s/4s ladder past the compile edges (for callees, like this one, whose boot
+// issues no post-`success` wire request at all — mounts read the injected local
+// service, this poll is local, boot providers are receive-only). A short bounded
+// poll — first read immediately, then 500ms until the input arrives or 30s pass —
+// is the lazy-safe equivalent of the subscription: it settles past both
+// mechanisms' windows and then stops forever. Off-host (plain `vite dev`,
+// vitest) the dynamic import is safe (SDK R3-421) and the input stays null; the
+// poll expires silently.
 
 import { useEffect, useState } from 'react';
 import type { TaskInput } from '@immediately-run/sdk/tasks';
 import { isNoHostTransport } from '../app/sdkTransportError.ts';
 
 const POLL_INTERVAL_MS = 500;
-const POLL_MAX_TRIES = 60; // 30s — comfortably past the host's delivery gate (compile-edge
-// re-sends plus the first post-`success` request), without polling for the frame's life.
+const POLL_MAX_TRIES = 60; // 30s — comfortably past the host's delivery mitigations
+// (compile-edge re-sends, the 1s/4s ladder, the post-`success` gate), without
+// polling for the frame's life.
 
 export function useTaskInputLazy(): TaskInput | null {
   const [input, setInput] = useState<TaskInput | null>(null);
