@@ -86,10 +86,14 @@ describe('the manifest declares what it invokes (DOCUMENT_NAVIGATOR_SPEC G-DN-B1
   // fetching. No test read the `requests` block before, so flipping the flag back
   // re-broke every task invoke with the suite green — the exact ships-dark failure
   // mode DN-R6 records, on the admission leg instead of the invokes leg.
-  it('package.json declares net:fetch as NOT required (the M2 admission leg, R3-754)', () => {
+  // (2026-09-29, rebase onto R3-768: the egress was REMOVED wholesale — the report
+  // view fetches nothing — so the block is gone rather than flagged. The invariant
+  // that matters to admission is "no REQUIRED net:fetch": absent or explicitly
+  // non-required both satisfy it; `required: true` fails here.)
+  it('package.json declares no REQUIRED net:fetch (the M2 admission leg, R3-754/R3-768)', () => {
     const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as {
       'immediately.run'?: { requests?: Record<string, { required?: boolean }> };
     };
-    expect(pkg['immediately.run']?.requests?.['net:fetch']).toMatchObject({ required: false });
+    expect(pkg['immediately.run']?.requests?.['net:fetch']?.required ?? false).toBe(false);
   });
 });
