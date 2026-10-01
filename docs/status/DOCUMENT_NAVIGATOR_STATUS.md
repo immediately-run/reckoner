@@ -163,3 +163,46 @@ Driven on the worker-VM venue with site-main at 60ddd0a and reckoner@main at 292
   design decision the owner owns (the repo-load dispatch minting the viewer's grant
   from the task binding; or the preview grant widening; or shipping the task-shape
   caller); recorded in R3-447's roadmap status, which stays **in-progress, unarchived**.
+
+### The live gates on the rw dispatch shape (2026-10-01, the venue; R3-797's grant + edit-file#10) — the remaining halves PASS
+
+Driven on the worker-VM venue (staging composition; site-main main 096ce08; STOCK
+reckoner; corpus `immediately-run-worker/r3-447-workbook` URL-dispatched, the corpus
+publishing **rw** since R3-797), with the empty-read blocker root-caused and fixed
+first:
+
+- **The 2026-09-22 B4 finding is resolved in two layers.** The grant layer was fixed by
+  R3-754 (grant flows to the dispatched frame) and R3-797 (the corpus publishes `rw`
+  under dispatch). The layer those legs exposed — the edit-file overlay rendering
+  "New or unreadable file — starting empty" on a healthy delegation — was **app-side,
+  not host-side**: the edit-file app's `src/fs.ts` read
+  `module.evaluation.module.bundler.fs`, the object the SDK's fs module names as the
+  documented WRONG one (no `promises`/`stat`). Every read threw before any RPC left
+  the frame (proven by a host-side op trace: zero ops after the edit click), and the
+  callee's catch rendered the empty state. The same chroot path read through the
+  supported surface (`__sandpackSharedFs`) returned the file's bytes. Fixed in
+  **edit-file#10** (delegate to `@immediately-run/sdk/fs` `sandboxFs()`; SDK pinned
+  0.75.0 — the `/fs` subpath predates nothing at ^0.13.0, the bump was forced).
+- **G-DN-B4 live (read + save + value provenance): PASS.** The edit chip on
+  `review.total`'s inspector opens the overlay, which now READS
+  `worksheets/review.sheet.js` (real bytes). A probe edit (the `total` formula ×2)
+  saved through the delegation — `completeTask({saved:true})`, overlay closed — and a
+  re-opened editor showed the SAVED bytes. After reload the report rendered the
+  doubled figure (409,994 → 819,988): the save landed in the corpus mount and the
+  report's re-read sees it. The original bytes were saved back and the report
+  re-verified at 409,994 (the venue drive is byte-net-zero; the corpus repo itself
+  never receives the write — the CoW overlay is the save target, RCD §5.1 as
+  disclosed).
+- **G-DN-B5 live (the cancel channel, on the rw shape): PASS.** Dismissing the editor
+  (Cancel) is silent — no notice — and does NOT latch the door (the chips stay
+  rendered, matching the §4.2 latch's mount-state keying). The forbidden channel
+  passed live 2026-09-22 (above) and is unchanged by the rw shape.
+- **G-DN-B9 live (staleness + reload): PASS.** The save flipped the §4.4 signal: the
+  notice rendered ("The mounted document changed after this report was rendered — the
+  figures below are stale.") with the Reload affordance, and Reload re-read the
+  document through the same mount resolution (the doubled value rendered).
+- **G-DN-B6 live on the rw shape: PASS (re-run).** Both `edit` chips render beside the
+  `file:line` anchors with the RCD §5.1 disclosure on the title AND the note line.
+
+Every Part B gate now has its host-exercised half green: B1–B3, B7–B8, B10 unit-side
+per the table above; B4/B5/B6/B9 live as recorded here and on 2026-09-22.
