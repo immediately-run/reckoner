@@ -207,8 +207,10 @@ first:
 Every Part B gate is now covered: the gates whose evidence is host questions
 (P1–P4, established live 2026-09-22) back B1–B4, B6 and B10; B4/B5/B6/B9 have the
 live venue legs recorded here and on 2026-09-22; B1–B3, B7, B8 and B10 carry their
-unit halves per the table above. One B5 case stays unit-side deliberately: the
-result-carried `{saved:false}` refusal (`useEditFile.test.ts`) needs the callee to
-complete without a save on a writable mount — no shipped callee path produces it
-(cancel throws `cancelled`, an `ro` mount never renders the door), so the channel
-is asserted against the contract shape rather than staged live.
+unit halves per the table above. Two B5 corners stay unexercised live, by shape
+rather than omission: the result-carried `{saved:false}` refusal
+(`useEditFile.test.ts`) needs the callee to complete without a save on a writable
+mount — no shipped callee path produces it (cancel throws `cancelled`, an `ro`
+mount never renders the door) — and `no-such-task` was never observed live; both
+ride the §4.2 generic branch (name the code), asserted unit-side via `timeout`
+(`useEditFile.test.ts`) and the contract shapes.
