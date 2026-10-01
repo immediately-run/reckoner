@@ -1,7 +1,7 @@
 # DOCUMENT_NAVIGATOR — implementation status
 
-**Status:** **Part A implemented (R3-446); Part B's contract established + build landed (R3-447)** ·
-**Updated:** 2026-09-22
+**Status:** **Part A implemented (R3-446); Part B's contract established + build landed (R3-447), live gates green on the rw dispatch shape (2026-10-01)** ·
+**Updated:** 2026-10-01
 
 This document is the single implementation-status source for
 `docs/specs/DOCUMENT_NAVIGATOR_SPEC.md`; where they disagree, this document governs.
@@ -182,7 +182,7 @@ first:
   callee's catch rendered the empty state. The same chroot path read through the
   supported surface (`__sandpackSharedFs`) returned the file's bytes. Fixed in
   **edit-file#10** (delegate to `@immediately-run/sdk/fs` `sandboxFs()`; SDK pinned
-  0.75.0 — the `/fs` subpath predates nothing at ^0.13.0, the bump was forced).
+  0.75.0 — `^0.13.0` predates the SDK's `/fs` subpath, so the bump was forced).
 - **G-DN-B4 live (read + save + value provenance): PASS.** The edit chip on
   `review.total`'s inspector opens the overlay, which now READS
   `worksheets/review.sheet.js` (real bytes). A probe edit (the `total` formula ×2)
@@ -204,5 +204,11 @@ first:
 - **G-DN-B6 live on the rw shape: PASS (re-run).** Both `edit` chips render beside the
   `file:line` anchors with the RCD §5.1 disclosure on the title AND the note line.
 
-Every Part B gate now has its host-exercised half green: B1–B3, B7–B8, B10 unit-side
-per the table above; B4/B5/B6/B9 live as recorded here and on 2026-09-22.
+Every Part B gate is now covered: the gates whose evidence is host questions
+(P1–P4, established live 2026-09-22) back B1–B4, B6 and B10; B4/B5/B6/B9 have the
+live venue legs recorded here and on 2026-09-22; B1–B3, B7, B8 and B10 carry their
+unit halves per the table above. One B5 case stays unit-side deliberately: the
+result-carried `{saved:false}` refusal (`useEditFile.test.ts`) needs the callee to
+complete without a save on a writable mount — no shipped callee path produces it
+(cancel throws `cancelled`, an `ro` mount never renders the door), so the channel
+is asserted against the contract shape rather than staged live.
