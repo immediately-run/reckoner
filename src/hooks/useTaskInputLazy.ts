@@ -4,21 +4,20 @@
 // DOCUMENT_NAVIGATOR_SPEC §4.1/DN-R5) keeps that surface behind dynamic imports
 // forever — the same discipline `useEditFile` applies to `invokeTask`.
 //
-// The SDK exports no change-subscription for task input other than its own
-// `useTaskInput` hook (static-import-only), and the host's delivery is TWO
-// complementary re-send mitigations for the one-shot `task-input` wire message
-// racing the callee's boot: R3-550's `taskInputGate` (merged, live on site-main
-// main — taskInputDelivery.ts wired in SandboxListener.ts; re-sends on the first
-// wire request after `success`, for callees that make one) and the bounded 1s/4s
-// ladder past the compile edges (site-main#589's SandboxListener, unmerged as of
-// this head — for callees, like this one, whose boot issues no post-`success`
-// wire request at all: mounts read the injected local service, this poll is
-// local, boot providers are receive-only). A short bounded
-// poll — first read immediately, then 500ms until the input arrives or 30s pass —
-// is the lazy-safe equivalent of the subscription: it settles past both
-// mechanisms' windows and then stops forever. Off-host (plain `vite dev`,
-// vitest) the dynamic import is safe (SDK R3-421) and the input stays null; the
-// poll expires silently.
+// Delivery (SDK 0.83.0+, pinned here at ^0.90.1): the SDK itself sends
+// `request-task-input` when its listener registers, and the host answers with
+// this frame's input — the pull that does not depend on timing, the way mounts
+// are pulled. `getTaskInput()` below re-runs the registration path, so the
+// first read triggers the poll if the host was not reachable at module load.
+// The host additionally keeps a bounded 1s/4s re-send ladder past the compile
+// edges for callees pinned to pre-poll SDKs; against a polling pin like this
+// one a repeat delivery is dropped (same input, same object), so the two
+// compose. This hook's own short bounded poll — first read immediately, then
+// 500ms until the input arrives or 30s pass — is the lazy-safe equivalent of
+// the subscription the SDK does not export (`useTaskInput` is
+// static-import-only); it settles past the ladder's windows and then stops
+// forever. Off-host (plain `vite dev`, vitest) the dynamic import is safe (SDK
+// R3-421) and the input stays null; the poll expires silently.
 
 import { useEffect, useState } from 'react';
 import type { TaskInput } from '@immediately-run/sdk/tasks';
