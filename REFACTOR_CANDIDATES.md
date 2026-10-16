@@ -36,8 +36,7 @@ status doc). **Do NOT scaffold tests in this pass** — recorded as a gap/candid
 
 ## SDK-version skew (record only)
 
-Pins `@immediately-run/sdk` at **`0.8.1`** (fleet spread: `0.2.8` / `0.8.1` /
-`0.11.0` / `^0.12.0`). Coordinated fleet bump is owed; do not bump here.
+This repo pins `@immediately-run/sdk` at **`^0.90.1`** (R3-787: a polling pin — 0.83.0+ sends `request-task-input` on listener registration). The first-party task callees still on pre-poll pins at that bump (color-picker `0.2.8`, file-selector `^0.13.0`, bundle-picker `^0.57.1`, lodestar `0.74.1`, edit-file `0.75.0`, grove `^0.80.0`) owe a coordinated fleet bump — tracked on R3-787's follow-up; do not bump those here.
 
 ## CLAUDE.md / scaffold conformance (verified)
 
